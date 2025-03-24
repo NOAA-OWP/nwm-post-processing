@@ -1,0 +1,13 @@
+{
+    "name": "streamflow",
+    "dimensions": [
+        {
+            "name": "station_id",
+            "size": 800
+        },
+        {
+            "name": "time",
+            "size": 18
+        }
+    ]
+}
