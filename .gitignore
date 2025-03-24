@@ -24,8 +24,8 @@ _site/
 # Logs and databases #
 ######################
 *.log
-*.sql
 *.sqlite
+*.db
 
 # OS generated files #
 ######################
@@ -75,3 +75,12 @@ bower_components/
 .grunt/
 src/vendor/
 dist/
+
+# IDEs #
+##############
+.vscode/
+.idea/
+
+# Output #
+##############
+*.nc
