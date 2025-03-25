@@ -70,3 +70,23 @@ class Region(PostProcessingEnumeration):
     HawaiiAPRFC = "hawaii.aprfc"
     Hawaii = "hawaii"
     PuertoRico = "puertorico"
+
+
+class RFC(enum.Enum):
+    ABRFC = "AB"
+    APRFC = "AP"
+    CBRFC = "CB"
+    CNRFC = "CN"
+    LMRFC = "LM"
+    MARFC = "MA"
+    MBRFC = "MB"
+    NCRFC = "NC"
+    NERFC = "NE"
+    """Norteast River Forecast Center"""
+    NWRFC = "NW"
+    """Nortwest River Forecast Center"""
+    OHRFC = "OH"
+    """Ohio River Valley River Forecast Center"""
+    SERFC = "SE"
+    """Southeast River Forecast Center"""
+    WGRFC = "WG"
