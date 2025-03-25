@@ -12,12 +12,9 @@ import tarfile
 import os
 import concurrent.futures
 import time
-import random
 
 import concurrent.futures.thread as thread
 import concurrent.futures.process as process
-
-from functools import partial
 
 from post_processing.configuration import settings
 from post_processing.utilities import networking
@@ -25,7 +22,7 @@ from post_processing.enums import RFC
 
 if __name__ == "__main__":
     logging.basicConfig(
-        level=logging.DEBUG,
+        level=logging.INFO,
         format=settings.log_format,
         datefmt=settings.date_format
     )
@@ -44,10 +41,10 @@ class Arguments:
     def __init__(self, *args: str):
         self.rfc_url: str = DEFAULT_SHAPEFILE_URL
         self.rfc: typing.Optional[RFC] = None
-        self.destination: pathlib.Path = settings.resource_path
+        self.destination: pathlib.Path = settings.resource_path / "shapefiles"
         self.overwrite: bool = False,
         self.log_level: str = logging.getLevelName(LOGGER.level)
-        self.parallelization: typing.Optional[typing.Literal['threaded', 'multiprocessed']] = 'multiprocessed'
+        self.parallelization: typing.Optional[typing.Literal['threaded', 'multiprocessed']] = None
         self.__parse(args)
 
     def __parse(self, args: typing.Iterable[str] = None):
@@ -62,8 +59,8 @@ class Arguments:
         )
 
         parser.add_argument(
-            "-l",
-            "--location",
+            "-u",
+            "--url",
             dest="rfc_url",
             type=str,
             default=self.rfc_url,
@@ -161,6 +158,7 @@ def get_aprfc_shapefiles(rfc_url: str) -> typing.Dict[str, bytes]:
     if conflicting_files:
         LOGGER.warning(
             "There is a conflict for Hawaii shapefiles - the following files will be overwritten:{newline}    - {overwritten_files}".format(
+                newline=os.linesep,
                 overwritten_files=(os.linesep + "    - ").join(conflicting_files)
             )
         )
@@ -180,6 +178,7 @@ def get_aprfc_shapefiles(rfc_url: str) -> typing.Dict[str, bytes]:
     if conflicting_files:
         LOGGER.warning(
             "There is a conflict for Alaska shapefiles - the following files will be overwritten:{newline}    - {overwritten_files}".format(
+                newline=os.linesep,
                 overwritten_files=(os.linesep + "    - ").join(conflicting_files)
             )
         )
@@ -220,6 +219,7 @@ def get_serfc_shapefiles(rfc_url: str) -> typing.Dict[str, bytes]:
     if conflicting_files:
         LOGGER.warning(
             "There is a conflict for Puerto Rico shapefiles - the following files will be overwritten:{newline}    - {overwritten_files}".format(
+                newline=os.linesep,
                 overwritten_files=(os.linesep + "    - ").join(conflicting_files)
             )
         )
@@ -228,11 +228,12 @@ def get_serfc_shapefiles(rfc_url: str) -> typing.Dict[str, bytes]:
         puertorico_shapefiles
     )
 
+    LOGGER.info("Data for SERFC has been downloaded and extracted")
     return archive
 
 
 
-def get_shapefiles(rfc_url: str, rfc: RFC) -> typing.Dict[str, bytes]:
+def retrieve_shapefiles(rfc_url: str, rfc: RFC) -> typing.Dict[str, bytes]:
     """
     Get the raw shapefile from NOMADS
 
@@ -266,9 +267,9 @@ def download_shapefiles(url: str) -> typing.Dict[str, bytes]:
     :returns: The extracted contents of the packaged shapefile
     """
     raw_archive: bytes = networking.get(url=url)
-    LOGGER.debug("Data from '{url}' has been downloaded".format(url))
+    LOGGER.debug("Data from '{url}' has been downloaded".format(url=url))
     archive: typing.Dict[str, bytes] = extract_archive(archive_bytes=raw_archive)
-    LOGGER.debug("Data from '{url}' has been unpacked".format(url))
+    LOGGER.debug("Data from '{url}' has been unpacked".format(url=url))
 
     return archive
 
@@ -306,7 +307,14 @@ def save_shapefiles(directory: pathlib.Path, rfc_url: str, rfc: RFC, overwrite: 
     if directory.is_file():
         raise ValueError("Cannot save shapefiles to '{directory}' it is a path to a file")
     
-    rfc_data: typing.Dict[str, bytes] = get_shapefiles(rfc_url=rfc_url, rfc=rfc)
+    directory = directory / rfc.value
+
+    if directory.is_file():
+        raise ValueError("Cannot save shapefiles to '{directory}' it is a path to a file")
+    
+    LOGGER.info("Downloading data for {rfc}".format(rfc=rfc))
+    
+    rfc_data: typing.Dict[str, bytes] = retrieve_shapefiles(rfc_url=rfc_url, rfc=rfc)
 
     directory.mkdir(parents=True, exist_ok=True)
 
@@ -329,8 +337,7 @@ def save_shapefiles(directory: pathlib.Path, rfc_url: str, rfc: RFC, overwrite: 
             )
             continue
 
-        buffer: io.BytesIO = io.BytesIO(filecontents)
-        full_path.write_bytes(data=buffer)
+        full_path.write_bytes(data=filecontents)
         LOGGER.info("'{name}' saved to '{path}'".format(name=filename, path=full_path))
 
 
@@ -380,6 +387,8 @@ def get_shapefiles_in_parallel(
 ):
     executor_type: typing.Type[concurrent.futures.Executor] = process.ProcessPoolExecutor if parallelization == 'multiprocessed' else thread.ThreadPoolExecutor
 
+    LOGGER.debug("Parallelizing with a(n) {executor_type}".format(executor_type=executor_type))
+
     future_results: typing.Dict[RFC, concurrent.futures.Future] = {}
     with executor_type(max_workers=min(os.cpu_count(), len(rfcs_to_download))) as executor:
         for rfc in rfcs_to_download:
@@ -393,23 +402,34 @@ def get_shapefiles_in_parallel(
             future_results[rfc] = future
 
         while future_results:
+            keys_to_purge: typing.List[RFC] = []
+            
             for rfc, future in future_results.items():
                 if not future.done():
                     LOGGER.debug("Waiting to finishing downloading '{rfc}' data...".format(rfc=rfc.name))
                     continue
-                if future.exception:
+                if not future.cancelled() and future.exception():
                     LOGGER.error(
                         'Failed to download shapefiles for {rfc}: {exception}'.format(
                             rfc=rfc.name,
-                            exception=future.exception
+                            exception=future.exception()
                         ),
-                        exc_info=future.exception
+                        exc_info=future.exception()
                     )
-                del future_results[rfc]
+                LOGGER.debug(
+                    "Slotting the key {rfc} to purge {future}".format(
+                        rfc=repr(rfc),
+                        future=repr(future)
+                    )
+                )
+                keys_to_purge.append(rfc)
+
+            for key_to_purge in keys_to_purge:
+                del future_results[key_to_purge]
 
             if future_results:
                 time_to_wait: float = 0.3
-                LOGGER.debug("Waiting {time_to_wait} seconds before checking for completion again".format(time_to_wait))
+                LOGGER.debug("Waiting {time_to_wait} seconds before checking for completion again".format(time_to_wait=time_to_wait))
                 time.sleep(0.3)
 
 
@@ -427,10 +447,11 @@ def main() -> int:
             rfc_url=arguments.rfc_url,
             rfc=arguments.rfc,
             destination=arguments.destination,
-            overwrite=arguments.overwrite
+            overwrite=arguments.overwrite,
+            parallelization=arguments.parallelization
         )
     except:
-        LOGGER.error("{filename} failed", exc_info=True, stack_info=True)
+        LOGGER.error("{filename} failed".format(__file__), exc_info=True, stack_info=True)
         return 1
     return 0
 

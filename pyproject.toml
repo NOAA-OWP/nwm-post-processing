@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nwm-post-processing"
+version = "0.0.1"
+dependencies = [
+    "xarray"
+]
+description = "Takes National Water Model data, combines the output, and subsets them based on region in order to make model data easier to work with"
+license = { file = "LICENSE" }
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Scientific/Engineering :: Hydrology",
+    "Operating System :: OS Independent",
+]
+
+[project.scripts]
+post-process = "post_processing.__main__:main"
+
+[project.urls]
+Homepage = "https://github.com/NOAA-OWP/nwm-post-processing"
+Documentation = "https://github.com/NOAA-OWP/nwm-post-processing"
+Repository = "https://github.com/NOAA-OWP/nwm-post-processing"
+"Bug Tracker" = "https://github.com/NOAA-OWP/nwm-post-processing/issues"
+
+[tool.setuptools]
+packages = ["post_processing"]

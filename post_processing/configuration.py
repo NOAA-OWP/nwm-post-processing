@@ -10,7 +10,7 @@ from collections import UserDict
 
 _DEFAULT_DEBUG_SETTING: bool = False
 _DEFAULT_DATE_FORMAT: str = "%Y-%m-%d %H:%M:%S%z"
-_DEFAULT_LOG_FORMAT: str = "[%(asctime)s] %(name)s %(levelname)s %(filename)s #%(lineno)d: %(message)s"
+_DEFAULT_LOG_FORMAT: str = "[%(asctime)s] %(levelname)s %(name)s: %(message)s"
 
 
 class _Settings(UserDict):
@@ -18,6 +18,7 @@ class _Settings(UserDict):
     An access point for application and environment settings
     """
     def __init__(self, initial_values: typing.Mapping = None, **kwargs):
+        super().__init__()
         for key, value in os.environ.items():
             self.__setitem__(key=key.lower(), item=value)
 
@@ -62,7 +63,7 @@ class _Settings(UserDict):
         key: str = "{prefix}_date_format".format(prefix=self.prefix).lower()
 
         if key not in self.keys() or not self.__getitem__(key=key):
-            self.__setitem__(key=key, value=_DEFAULT_DATE_FORMAT)
+            self.__setitem__(key=key, item=_DEFAULT_DATE_FORMAT)
 
         return self.__getitem__(key=key)
     
