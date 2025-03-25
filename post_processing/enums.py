@@ -1,7 +1,6 @@
 """
 Enumerations used to describe data
 """
-import typing
 import enum
 
 
@@ -28,12 +27,18 @@ class PostProcessingEnumeration(enum.Enum):
 
 
 class ModelOutputType(PostProcessingEnumeration):
+    """
+    Enumerates what type of data was modeled
+    """
     ChannelRouting = "channel_rt"
     Forcing = "forcing"
     Land = "land"
 
 
 class Configuration(PostProcessingEnumeration):
+    """
+    Enumerates the different ways a model may be configured for forecast/simulation length and input parameters
+    """
     ShortRange = "short_range"
     LongRange = "long_range"
     MediumRange = "medium_range"
@@ -48,14 +53,23 @@ class Configuration(PostProcessingEnumeration):
 
 
 class Region(PostProcessingEnumeration):
+    """Enumerates the different ways Regions/RFCs/General areas may be represented within strings"""
     ABRFC = "abrfc"
+    """Arkansas Red-Basin River Forecast Center"""
     APRFC = "aprfc"
+    """Alaska Pacific River Forecast Center"""
     CBRFC = "cbrfc"
+    """Colorado Basin River Forecast Center"""
     CNRFC = "cnrfc"
+    """California Nevada River Forecast Center"""
     LMRFC = "lmrfc"
+    """Lower Mississippi River Forecast Center"""
     MARFC = "marfc"
+    """Mid-Atlantic River Forecast Center"""
     MBRFC = "mbrfc"
+    """Missouri Basin River Forecast Center"""
     NCRFC = "ncrfc"
+    """North Central River Forecast Center"""
     NERFC = "nerfc"
     """Norteast River Forecast Center"""
     NWRFC = "nwrfc"
@@ -65,22 +79,43 @@ class Region(PostProcessingEnumeration):
     SERFC = "serfc"
     """Southeast River Forecast Center"""
     WGRFC = "wgrfc"
+    """West Gulf River Forecast Center"""
     AlaskaAPRFC = "alaska.aprfc"
+    """The state of Alaska in relation to APRFC"""
     Alaska = "alaska"
+    """The state of Alaska"""
     HawaiiAPRFC = "hawaii.aprfc"
+    """The state of hawaii in relation to APRFC"""
     Hawaii = "hawaii"
+    """The state of Hawaii"""
     PuertoRico = "puertorico"
+    """The territory of Puerto Rico"""
+    PuertoRicoSERFC = "puertorico.serfc"
+    """The territory of Puerto Rico in relation to SERFC"""
+    CONUS = "conus"
+    """Continental United States"""
 
 
 class RFC(enum.Enum):
+    """
+    Enumerates the ways that River Forecast Centers may be declared with their 2 character abbreviation
+    """
     ABRFC = "AB"
+    """Arkansas Red-Basin River Forecast Center"""
     APRFC = "AP"
+    """Alaska-Pacific River Forecast Center"""
     CBRFC = "CB"
+    """Colorado Basin River Forecast Center"""
     CNRFC = "CN"
+    """California Nevada River Forecast Center"""
     LMRFC = "LM"
+    """Lower Mississippi River Forecast Center"""
     MARFC = "MA"
+    """Mid-Atlantic River Forecast Center"""
     MBRFC = "MB"
+    """Missouri Basin River Forecast Center"""
     NCRFC = "NC"
+    """North Central River Forecast Center"""
     NERFC = "NE"
     """Norteast River Forecast Center"""
     NWRFC = "NW"
@@ -90,3 +125,4 @@ class RFC(enum.Enum):
     SERFC = "SE"
     """Southeast River Forecast Center"""
     WGRFC = "WG"
+    """West Gulf River Forecast Center"""
