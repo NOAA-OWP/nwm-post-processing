@@ -81,6 +81,18 @@ dist/
 .vscode/
 .idea/
 
+
+# Input #
+##############
+*.cpg
+*.dbf
+*.prj
+*.sbn
+*.sbx
+*.shp
+*.shp.xml
+*.shx
+
 # Output #
 ##############
 *.nc

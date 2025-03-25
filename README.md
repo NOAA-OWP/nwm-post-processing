@@ -10,19 +10,35 @@ Other things to include:
 
 ## Dependencies
 
-Describe any dependencies that must be installed for this software to work.
-This includes programming languages, databases or other storage mechanisms, build tools, frameworks, and so forth.
-If specific versions of other software are required, or known not to work, call that out.
+### Languages
+
+This is mostly written in python with the more complicated operations written in C++ in order to make the application more viable from a performance standpoint.
+Keep other languages (especially shell scripts) to a minimum to reduce complexity.
+
+### Libraries
+
+The main third party libraries used are [Xarray](https://docs.xarray.dev/en/stable/) and [Pandas](https://pandas.pydata.org/docs/). Targeted deployment environments
+run the risk of being highly restricted in terms of what libraries are permissable. As a result, keep reliance on third party libraries to an absolute minimum. `requests`
+and `httpx` may be 100x more effective and easier to maintain than your own networking code, but writing your own GET logic here is worth it if it allows us to avoid
+needing to request extra libraries in our shared deployment environments
 
 ## Installation
 
-Detailed instructions on how to install, configure, and get the project running.
-This should be frequently tested to ensure reliability. Alternatively, link to
-a separate [INSTALL](INSTALL.md) document.
+See [INSTALL](INSTALL.md).
 
 ## Configuration
 
-If the software is configurable, describe it in detail, either here or in other documentation to which you link.
+### Python Configuration
+
+The [configuration](post_processing/configuration.py) module provides a common entry point for accessing python related 
+environment and application settings. Reference it in order to know what all is available and add to it as more options are needed.
+The `post_processing.configuration.settings` is functionally equivalent to `os.environ` as well.
+
+### Python Logs
+
+Python logging is defined, by default, within [python_log_config.json](resources/python_log_config.json).
+It follows the basic python logging dictionary configuration. An alternative logging configuration may be used by
+setting the `PP_LOG_CONFIG_PATH` environment variable (case insensitive). 
 
 ## Usage
 
