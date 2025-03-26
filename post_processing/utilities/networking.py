@@ -11,16 +11,20 @@ import urllib.parse
 
 LOGGER: logging.Logger = logging.getLogger(pathlib.Path(__file__).stem)
 
+_MAXIMUM_REDIRECTS: int = 5
+"""The maximum amount of times that a web response can redirct"""
 
 def get(
     url: str,
-    destination: typing.Union[io.BytesIO, io.StringIO, pathlib.Path, typing.Callable[[bytes], typing.Any]] = None
+    destination: typing.Union[io.BytesIO, io.StringIO, pathlib.Path, typing.Callable[[bytes], typing.Any]] = None,
+    redirect_count: int = 0
 ) -> typing.Optional[bytes]:
     """
     Run a GET request to retrieve data from a network address
 
     :param url: The address of the resource to retrieve
     :param destination: Where to store the retrieved data
+    :param redirect_count: The number of times this request has been redirected
     :returns: The raw data in bytes form if no destination is given
     """
     parsed_url: urllib.parse.ParseResult = urllib.parse.urlparse(url=url)
@@ -48,6 +52,17 @@ def get(
     connection.request("GET", url=path)
     response: http.client.HTTPResponse = connection.getresponse()
 
+    if response.status in (301, 302, 303, 307, 308):
+        if redirect_count >= _MAXIMUM_REDIRECTS:
+            raise http.client.HTTPException("Too many redirects")
+        
+        location: typing.Optional[str] = response.getheader("Location")
+
+        if not location:
+            raise http.client.HTTPException("Redirect response is missing the next Location")
+        
+        return get(url=location, destination=destination, redirect_count=redirect_count + 1)
+      
     if response.status != 200:
         raise http.client.HTTPException(
             "HTTP Error {status}: {reason}".format(status=response.status, reason=response.reason)
