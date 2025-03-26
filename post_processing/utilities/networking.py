@@ -62,7 +62,7 @@ def get(
             raise http.client.HTTPException("Redirect response is missing the next Location")
         
         return get(url=location, destination=destination, redirect_count=redirect_count + 1)
-    
+      
     if response.status != 200:
         raise http.client.HTTPException(
             "HTTP Error {status}: {reason}".format(status=response.status, reason=response.reason)
