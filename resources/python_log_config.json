@@ -66,8 +66,8 @@
         "handlers": [
             "stdout",
             "stderr",
-            "file_info",
-            "file_error"
+            "log_file",
+            "error_file"
         ]
     }
 }

@@ -86,6 +86,12 @@ exhausted.
 Tests don't have to be perfect - just make sure they're there *and correct*. The only thing worse than no tests are wrong
 tests.
 
+## Dead Code
+
+Delete dead code as soon as possible. This application suite will end up being complicated and dead code serves as nothing
+but a collection of red herrings when it comes to development and debugging. The second functions and files are no longer
+needed, delete them.
+
 ## Style
 
 ### It's not 1987
@@ -192,6 +198,10 @@ def some_function(
 
 Notice that *even the examples have docstrings*?
 
+> Use vague types if possible. If a list is created in a function and the intent for that data is to only ever be read,
+> hint that you are returning a typing.Sequence. This will give a little leeway as to what's constructed and offers
+> guidance to the programmer using the function.
+
 ### Function Size
 
 If this were easy, your expertise wouldn't be needed. Functions can and will get complicated. No hard or fast rule
@@ -227,3 +237,10 @@ if __name__ == "__main__":
 
 Choose the first approach for application code, generally within the `post_processing` package, and the second for helper scripts,
 such as in `./scripts`. This will ensure that everything is logged as intended and helper logs do not obscure application logs
+
+### Have Predictable Values
+
+Command line parsers like the one from argparse may not be forthcoming with what values to expect on the parsed data. The
+same holds true on a lot of dicts.
+
+If a block of data has expected fields and types, put it into a data transfer object, preferrably a dataclass or very simple class.
