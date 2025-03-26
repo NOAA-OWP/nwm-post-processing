@@ -8,6 +8,7 @@ import logging
 import pathlib
 import sys
 
+from post_processing.configuration import settings
 from post_processing.utilities.logging import setup_logging
 
 if __name__ == "__main__":
@@ -26,4 +27,6 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    if settings.debug:
+        LOGGER.warning("Debug mode is enabled. Stop and disable if this is a testing or production environment.")
     sys.exit(main())

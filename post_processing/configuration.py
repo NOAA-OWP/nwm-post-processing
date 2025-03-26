@@ -9,8 +9,14 @@ from collections import UserDict
 
 
 _DEFAULT_DEBUG_SETTING: bool = False
+"""
+The default setting for whether or not behavior for debugging purposes is enabled. 
+Make sure that this is False when deployed to testing and production.
+"""
 _DEFAULT_DATE_FORMAT: str = "%Y-%m-%d %H:%M:%S%z"
+"""The default date format for the entire project"""
 _DEFAULT_LOG_FORMAT: str = "[%(asctime)s] %(levelname)s %(name)s: %(message)s"
+"""The default formatting for log messages when logging is not set up with the logging configuration"""
 
 
 class _Settings(UserDict):
