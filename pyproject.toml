@@ -6,6 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "nwm-post-processing"
 version = "0.0.1"
 dependencies = [
+    "netCDF4",
     "xarray"
 ]
 description = "Takes National Water Model data, combines the output, and subsets them based on region in order to make model data easier to work with"
@@ -21,6 +22,12 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Topic :: Scientific/Engineering :: Hydrology",
     "Operating System :: OS Independent",
+]
+
+[project.optional-dependencies]
+analysis = [
+    "geopandas",
+    "fiona"
 ]
 
 [project.scripts]

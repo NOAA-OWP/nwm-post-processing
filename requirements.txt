@@ -1,0 +1,9 @@
+exceptiongroup
+netCDF4
+h5py
+pandas
+pyshp
+pytest
+requests
+shapely
+xarray

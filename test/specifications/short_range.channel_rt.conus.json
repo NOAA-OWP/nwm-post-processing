@@ -1,0 +1,278 @@
+{
+    "dimensions": [
+        {
+            "name": "reference_time",
+            "size": 1
+        },
+        {
+            "name": "feature_id",
+            "size": 1000
+        },
+        {
+            "name": "time",
+            "size": 1
+        }
+    ],
+    "coordinates": [
+        {
+            "name": "reference_time",
+            "datatype": "int",
+            "dimensions": [
+                {
+                    "name": "reference_time",
+                    "size": 1
+                }
+            ],
+            "attributes": {
+                "long_name": "model initialization time",
+                "standard_name": "forecast_reference_time",
+                "units": "minutes since 1970-01-01 00:00:00 UTC"
+            },
+            "encoding": {
+                "dtype": "int32",
+                "_ChunkSizes": 1
+            }
+        },
+        {
+            "name": "time",
+            "datatype": "int",
+            "dimensions": [
+                {
+                    "name": "time",
+                    "size": 1
+                }
+            ],
+            "attributes": {
+                "long_name": "valid output time",
+                "standard_name": "time",
+                "units": "minutes since 1970-01-01 00:00:00 UTC",
+                "valid_min": 28203900,
+                "valid_max": 28204920
+            },
+            "encoding": {
+                "dtype": "int32",
+                "_ChunkSizes": 1024
+            }
+        },
+        {
+            "name": "feature_id",
+            "datatype": "int64",
+            "dimensions": [
+                {
+                    "name": "feature_id",
+                    "size": 1000
+                }
+            ],
+            "attributes": {
+                "long_name": "Reach ID",
+                "comment": "NHDPlusv2 ComIDs within CONUS, arbitrary Reach IDs outside of CONUS",
+                "cf_role": "timeseries_id"
+            },
+            "encoding": {
+                "dtype": "long",
+                "_ChunkSizes": 1000
+            }
+        }
+    ],
+    "variables": [
+        {
+            "name": "crs",
+            "datatype": "char",
+            "attributes": {
+                "transform_name": "latitude longitude",
+                "grid_mapping_name": "latitude longitude",
+                "esri_pe_string": "GEOGCS[\"GCS_WGS_1984\", DATUM[\"D_WGS_1984\", SPHEROID[\"WGS_1984\", 6378137.0, 298.257223563]], PRIMEM[\"Greenwich\", 0.0], UNIT[\"Degree\", 0.0174532925199433]];-400 -400 1000000000;-100000 10000;-100000 10000;8.98315284119521E-09;0.001;0.001;IsHighPrecision",
+                "spatial_ref": "GEOGCS[\"GCS_WGS_1984\", DATUM[\"D_WGS_1984\", SPHEROID[\"WGS_1984\", 6378137.0, 298.257223563]], PRIMEM[\"Greenwich\", 0.0], UNIT[\"Degree\", 0.0174532925199433]];-400 -400 1000000000;-100000 10000;-100000 10000;8.98315284119521E-09;0.001;0.001;IsHighPrecision",
+                "long_name": "CRS definition",
+                "longitude_of_prime_meridian": 0,
+                "_CoordinateAxes": "latitude longitude",
+                "semi_major_axis": 6378137,
+                "semi_minor_axis": 6356752.5,
+                "inverse_flattening": 298.2572326660156
+            },
+            "encoding": {
+                "dtype": "<U1"
+            }
+        },
+        {
+            "name": "streamflow",
+            "datatype": "float",
+            "dimensions": [
+                {
+                    "name": "feature_id",
+                    "size": 1000
+                }
+            ],
+            "attributes": {
+                "long_name": "River Flow",
+                "units": "m3 s-1",
+                "coordinates": "latitude longitude",
+                "grid_mapping": "crs",
+                "missing_value": -999900,
+                "valid_range": [0, 5000000],
+                "_ChunkSizes": 1000
+            },
+            "encoding": {
+                "dtype": "int32",
+                "_FillValue": -999900,
+                "scale_factor": 0.01,
+                "add_offset": 0.0,
+                "zlib": true
+            }
+        },
+        {
+            "name": "nudge",
+            "datatype": "float",
+            "dimensions": [
+                {
+                    "name": "feature_id",
+                    "size": 1000
+                }
+            ],
+            "attributes": {
+                "long_name": "Amount of stream flow alteration",
+                "units": "m3 s-1",
+                "coordinates": "latitude longitude",
+                "missing_value": -999900,
+                "grid_mapping": "crs",
+                "valid_range": [0, 5000000],
+                "_ChunkSizes": 1000
+            },
+            "encoding": {
+                "dtype": "int32",
+                "_FillValue": -999900,
+                "scale_factor": 0.01,
+                "add_offset": 0.0,
+                "zlib": true
+            }
+        },
+        {
+            "name": "velocity",
+            "datatype": "float",
+            "dimensions": [
+                {
+                    "name": "feature_id",
+                    "size": 1000
+                }
+            ],
+            "attributes": {
+                "long_name": "River Velocity",
+                "units": "m s-1",
+                "coordinates": "latitude longitude",
+                "missing_value": -999900,
+                "grid_mapping": "crs",
+                "valid_range": [0, 5000000],
+                "_ChunkSizes": 1000
+            },
+            "encoding": {
+                "dtype": "int32",
+                "_FillValue": -999900,
+                "scale_factor": 0.01,
+                "add_offset": 0.0,
+                "zlib": true
+            }
+        },
+        {
+            "name": "qSfcLatRunoff",
+            "datatype": "float",
+            "dimensions": [
+                {
+                    "name": "feature_id",
+                    "size": 1000
+                }
+            ],
+            "attributes": {
+                "long_name": "Runoff from terrain routing",
+                "units": "m3 s-1",
+                "coordinates": "latitude longitude",
+                "grid_mapping": "crs",
+                "missing_value": -999999900000,
+                "valid_range": [0, 2000000000],
+                "_ChunkSizes": 1000
+            },
+            "encoding": {
+                "dtype": "int32",
+                "_FillValue": -999900000,
+                "scale_factor": 0.00001,
+                "add_offset": 0.0,
+                "zlib": true
+            }
+        },
+        {
+            "name": "qBucket",
+            "datatype": "float",
+            "dimensions": [
+                {
+                    "name": "feature_id",
+                    "size": 1000
+                }
+            ],
+            "attributes": {
+                "long_name": "Flux from gw bucket",
+                "units": "m3 s-1",
+                "coordinates": "latitude longitude",
+                "missing_value": -999999900000,
+                "grid_mapping": "crs",
+                "valid_range": [0, 2000000000],
+                "_ChunkSizes": 1000
+            },
+            "encoding": {
+                "dtype": "int32",
+                "_FillValue": -999900000,
+                "scale_factor": 0.00001,
+                "add_offset": 0.0,
+                "zlib": true
+            }
+        },
+        {
+            "name": "qBtmVertRunoff",
+            "datatype": "float",
+            "dimensions": [
+                {
+                    "name": "feature_id",
+                    "size": 1000
+                }
+            ],
+            "attributes": {
+                "long_name": "Runoff from bottom of soil to bucket",
+                "units": "m3 s-1",
+                "coordinates": "latitude longitude",
+                "grid_mapping": "crs",
+                "missing_value": -999999900000,
+                "valid_range": [0, 2000000000],
+                "_ChunkSizes": 1000
+            },
+            "encoding": {
+                "dtype": "int32",
+                "_FillValue": -999900000,
+                "scale_factor": 0.00001,
+                "add_offset": 0.0,
+                "zlib": true
+            }
+        }
+    ],
+    "attributes": {
+        "TITLE": "OUTPUT FROM NWM v3.0",
+        "featureType": "timeSeries",
+        "proj4": "+proj=lcc +units=m +a=6370000.0 +b=6370000.0 +lat_1=30.0 +lat_2=60.0 +lat_0=40.0 +lon_0=-97.0 +x_0=0 +y_0=0 +k_0=1.0 +nadgrids=@",
+        "model_initialization_time": "2023-08-17_00:00:00",
+        "station_dimension": "feature_id",
+        "model_output_valid_time": "2023-08-17_01:00:00",
+        "model_total_valid_times": 18,
+        "stream_order_output": 1,
+        "cdm_datatype": "Station",
+        "Conventions": "CF-1.6",
+        "code_version": "v5.3.0-alpha1",
+        "NWM_version_number": "v3.0",
+        "model_output_type": "channel_rt",
+        "model_configuration": "short_range",
+        "dev_OVRTSWCRT": 1,
+        "dev_NOAH_TIMESTEP": 3600,
+        "dev_channel_only": 0,
+        "dev_channelBucket_only": 0,
+        "dev": "dev_ prefix indicates development/internal meta data"
+    },
+    "configuration": "short_range",
+    "model_output_type": "channel_rt",
+    "region": "conus"
+}

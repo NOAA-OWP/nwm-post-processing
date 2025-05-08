@@ -96,3 +96,7 @@ dist/
 # Output #
 ##############
 *.nc
+
+# Experiments #
+##############
+scratch/*
