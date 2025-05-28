@@ -82,7 +82,7 @@ def deserialize(cls: typing.Type[T], data: typing.Union[str, pathlib.Path, typin
 
         value = data[field.name]
 
-        dataclass_type_args: typing.List[typing.Type] = [
+        dataclass_type_args: typing.List[typing.Type[T]] = [
             inner_type
             for inner_type in typing.get_args(field.type)
             if dataclasses.is_dataclass(inner_type)
@@ -322,6 +322,15 @@ class Dataset:
             for frame_number in range(step, step * length + 1, step)
         ]
 
+        output_paths: typing.List[pathlib.Path] = [
+            output_directory / filename
+            for filename in filenames
+        ]
+
+        if all(map(lambda path: path.exists(), output_paths)) and not overwrite:
+            logging.info(f"Data for {self} already exists in {output_directory}")
+            return output_paths
+
         logging.info(f"Generating data for {len(filenames)} files")
         coordinate_values: typing.Dict[str, typing.Union[typing.Sequence[xarray.DataArray], xarray.DataArray]] = {}
 
@@ -375,7 +384,7 @@ class Dataset:
 
         keyword_arguments: typing.Sequence[typing.Dict[str, typing.Any]] = [
             {
-                "filename": output_directory / filename,
+                "filename": output_path,
                 "coordinates": {
                     coordinate_name: coordinates if isinstance(coordinates, xarray.DataArray) else coordinates[file_index]
                     for coordinate_name, coordinates in coordinate_values.items()
@@ -383,8 +392,9 @@ class Dataset:
                 "variable_definitions": self.variables,
                 "global_attributes": self.attributes,
                 "unlimited_dimensions": list(dimension.name for dimension in self.dimensions if dimension.unlimited),
+                "overwrite": overwrite
             }
-            for file_index, filename in enumerate(filenames)
+            for file_index, output_path in enumerate(output_paths)
         ]
 
         with multiprocessing.Pool() as pool:
@@ -436,8 +446,24 @@ def write_file(
     coordinates: typing.Dict[str, xarray.DataArray],
     variable_definitions: typing.Sequence[Variable],
     global_attributes: typing.Dict[str, typing.Any],
-    unlimited_dimensions: typing.Union[str, typing.Sequence[str]]
+    unlimited_dimensions: typing.Union[str, typing.Sequence[str]],
+    overwrite: bool = False
 ) -> pathlib.Path:
+    """
+    Generate fake data based on components from an output specification
+
+    :param filename: Where to put the generated data
+    :param coordinates: Common coordinate data
+    :param variable_definitions: The definitions for what variables should be included
+    :param global_attributes: Attributes that should be present on the global scope
+    :param unlimited_dimensions: One or more dimensions that should be considered as being unlimited, i.e. the record dimension
+    :param overwrite: Whether to overwrite the data if it already exists
+    :returns: The path to the generated data
+    """
+    if filename.exists() and not overwrite:
+        logging.info(f"Data already exists for {filename} - reusing that")
+        return filename
+
     logging.info(f"Generating data for {filename}")
 
     global_attributes = {

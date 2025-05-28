@@ -25,7 +25,7 @@ logging.basicConfig(level=logging.DEBUG)
 
 
 NPP_TEST_DATA_DIRECTORY: pathlib.Path = pathlib.Path(os.environ['NPP_TEST_DATA_DIRECTORY']) if 'NPP_TEST_DATA_DIRECTORY' in os.environ else None
-
+OVERWRITE_PREEXISTING_TEST_DATA: bool = False
 
 class NCOTest(unittest.TestCase):
     @classmethod
@@ -33,7 +33,12 @@ class NCOTest(unittest.TestCase):
         """
         Set up the test data on disk
         """
-        if NPP_TEST_DATA_DIRECTORY.is_dir():
+        if isinstance(NPP_TEST_DATA_DIRECTORY, pathlib.Path):
+            if NPP_TEST_DATA_DIRECTORY.is_file():
+                raise FileExistsError(
+                    f"Cannot use {NPP_TEST_DATA_DIRECTORY} as a data location directory - it is a file, not a directory"
+                )
+            NPP_TEST_DATA_DIRECTORY.mkdir(parents=True, exist_ok=True)
             cls.created_data_directory: bool = False
             cls.data_directory = NPP_TEST_DATA_DIRECTORY
         else:
@@ -47,6 +52,7 @@ class NCOTest(unittest.TestCase):
             cycle=FORECAST_CYCLE,
             length=FORECAST_LENGTH,
             step=FORECAST_INTERVAL,
+            overwrite=OVERWRITE_PREEXISTING_TEST_DATA
         )
 
     @classmethod

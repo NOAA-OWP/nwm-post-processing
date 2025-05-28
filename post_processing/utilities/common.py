@@ -1,6 +1,7 @@
 """
 Common functions
 """
+import logging
 import typing
 import pathlib
 import re
@@ -407,3 +408,21 @@ def sort_nwm_filepaths(filepaths: typing.Sequence[pathlib.Path]) -> typing.Seque
     )
     sorted_paths: typing.List[pathlib.Path] = [path for path, time in sorted_paths_and_times]
     return sorted_paths
+
+def program_exists(program_name: str) -> bool:
+    """
+    Determines if the CLI application exists
+
+    :param program_name: The program name
+    :returns: True if the program exists and can be called
+    """
+    try:
+        import subprocess
+        import os
+        run_result = subprocess.run(f"which {program_name}", shell=True, capture_output=True, text=True)
+        if run_result.stderr:
+            logging.error(f"When looking for {program_name}:{os.linesep}{run_result.stderr}")
+        return run_result.returncode == 0
+    except Exception as exception:
+        logging.error(f"Could not check if {program_name} exists: {exception}")
+        return False
