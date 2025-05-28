@@ -10,11 +10,80 @@ import sys
 
 from post_processing.configuration import settings
 from post_processing.utilities.logging import setup_logging
+from post_processing.exceptions import ArgumentValidationException
+from post_processing.utilities.common import get_cycle_files
+from post_processing.utilities.common import NWM_FILENAME_PATTERN
+
+from post_processing.enums import Region
+from post_processing.enums import Configuration
+from post_processing.enums import ModelOutputType
+
+from post_processing.schema import InputManifest
 
 if __name__ == "__main__":
     setup_logging()
 
 LOGGER: logging.Logger = logging.getLogger(pathlib.Path(__file__).stem)
+
+class Arguments:
+    """
+    Command line input
+    """
+    def __init__(self, *args):
+        self.source_file: pathlib.Path = None
+        """Where to get the data to process"""
+        self.destination: pathlib.Path = None
+        """Where to put the post processed data"""
+
+        self.__parse(args=args)
+        self.__validate()
+
+    def __validate(self):
+        """
+        Raise exceptions if arguments are invalid
+        """
+        messages: typing.List[str] = []
+
+        if not self.source_file.exists():
+            messages.append(f"Cannot process data within the '{self.source_file}' file - it does not exist")
+        if self.source_file.is_dir():
+            messages.append(
+                f"Cannot process data from within '{self.source_file}' - it is a directory but a file is required"
+            )
+        
+        if messages:
+            raise ArgumentValidationException(__file__, messages=messages)
+
+    def __parse(self, args: typing.Sequence[str]):
+        """
+        Parse passed in command line input
+        """
+        parser: argparse.ArgumentParser = argparse.ArgumentParser(
+            description="Process National Water Model output for easier use"
+        )
+
+        parser.add_argument(
+            "source",
+            type=pathlib.Path,
+            help="Where to get input data"
+        )
+
+        parser.add_argument(
+            "destination",
+            type=pathlib.Path,
+            help="Where to put the output"
+        )
+
+        parameters: argparse.Namespace = parser.parse_args(args=args) if args else parser.parse_args()
+
+        for key, value in vars(parameters).items():
+            if hasattr(self, key):
+                setattr(self, key, value)
+            else:
+                LOGGER.warning(
+                    f"{self.__class__.__module__}.{self.__class__.__qualname__} does not have an attribute named '{key}'"
+                )
+
 
 
 def main() -> int:
@@ -23,6 +92,38 @@ def main() -> int:
 
     :returns: The status code of the application run
     """
+    try:
+        arguments: Arguments = Arguments()
+    except ArgumentValidationException as exception:
+        LOGGER.error(str(exception))
+        return 2
+
+    try:
+        cycle_files: typing.Sequence[pathlib.Path] = get_cycle_files(arguments.source_file)
+    except Exception as exception:
+        LOGGER.error(f"Could not find files to process within this cycle: {exception}")
+        return 1
+
+    if len(cycle_files) == 0:
+        LOGGER.error("Cycle files could not be found")
+        return 1
+
+    file_attributes = NWM_FILENAME_PATTERN.match(arguments.source_file.name).groupdict()
+
+    manifest: InputManifest = InputManifest(
+        region=Region.from_string(file_attributes["region"]),
+        configuration=Configuration.from_string(file_attributes["configuration"]),
+        output_type=ModelOutputType.from_string(file_attributes["output_type"]),
+        cycle=file_attributes["cycle"],
+        files=cycle_files,
+        member=file_attributes["member"]
+    )
+    
+    try:
+        pass
+    except BaseException as exception:
+        LOGGER.error(f"{__file__} failed: {exception}", exc_info=exception)
+        return 1
     return 0
 
 

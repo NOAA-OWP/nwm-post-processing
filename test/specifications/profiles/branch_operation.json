@@ -1,0 +1,11 @@
+{
+    "operations": [
+        {
+            "operation": "branch",
+            "branches": {
+                "test1": [],
+                "test2": []
+            }
+        }
+    ]
+}

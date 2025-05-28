@@ -1,0 +1,41 @@
+{
+    "operations": [
+        {
+            "operation": "attribute",
+            "attribute_name": "long_name",
+            "attribute_value": "discharge",
+            "attribute_type": "string",
+            "field": "streamflow"
+        },
+        {
+            "operation": "attribute",
+            "attribute_name": "long_name",
+            "attribute_value": "discharge",
+            "attribute_type": "string"
+        },
+        {
+            "operation": "attribute",
+            "attribute_name": "grid_mapping",
+            "field": "streamflow",
+            "mode": "drop"
+        },
+        {
+            "operation": "attribute",
+            "mode": "drop",
+            "attribute_name": "stream_order_output"
+        },
+        {
+            "operation": "attribute",
+            "mode": "modify",
+            "attribute_name": "my_test_variable",
+            "attribute_value": "test"
+        },
+        {
+            "operation": "attribute",
+            "mode": "modify",
+            "attribute_name": "model_configuration",
+            "attribute_value": 5,
+            "attribute_type": "uint8"
+        }
+    ]
+}

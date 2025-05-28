@@ -12,11 +12,11 @@ import multiprocessing.pool
 
 import numpy
 import xarray
-from xarray.core.dtypes import NA as NO_VALUE
 from pandas.core.dtypes.common import is_integer_dtype
 
 import post_processing.enums
 from post_processing import nco
+from post_processing.nwm_file import NWMFile
 
 T = typing.TypeVar("T")
 """A generic type"""
@@ -120,6 +120,8 @@ class Dimension:
     """The name of the dimension"""
     size: int
     """The length of the dimension"""
+    unlimited: bool = dataclasses.field(default=False)
+    """Whether this is an unlimited/record dimension"""
 
 
 @dataclasses.dataclass
@@ -140,6 +142,40 @@ class Variable:
     coordinates: typing.List[str] = dataclasses.field(default_factory=list)
     """The names of coordinate variables that this relies upon"""
 
+    @classmethod
+    def from_data_array(cls, array: xarray.DataArray) -> "Variable":
+        """
+        Create a variable specification from a data array
+
+        :param array: The data array to mimic in specification form
+        :returns: A new variable specification from the given data array
+        """
+        name: str = str(array.name) if array.name is not None else 'array'
+        attributes: typing.Dict[str, typing.Any] = {
+            key: value.tolist() if isinstance(value, numpy.ndarray) else value
+            for key, value in array.attrs.items()
+            if key != 'source'
+        }
+        datatype: str = array.dtype.str
+        dimensions: typing.List[Dimension] = [
+            Dimension(name=str(key), size=value)
+            for key, value in array.sizes.items()
+        ]
+        coordinates: typing.List[str] = list(map(str, array.sizes.keys()))
+        encoding: typing.Dict[str, typing.Any] = {
+            key: value.tolist() if isinstance(value, numpy.ndarray) else value
+            for key, value in array.encoding.items()
+            if key != 'source'
+        }
+        return cls(
+            name=name,
+            attributes=attributes,
+            datatype=datatype,
+            dimensions=dimensions,
+            coordinates=coordinates,
+            encoding=encoding,
+        )
+
     def generate_raw_data(self) -> numpy.ndarray:
         """
         Generate arbitrary data
@@ -149,7 +185,7 @@ class Variable:
         shape: typing.Tuple[int, ...] = tuple(dimension.size for dimension in self.dimensions)
 
         if shape == tuple():
-            return data_type.type() # NO_VALUE
+            return data_type.type()
 
         return numpy.empty(shape, dtype=data_type)
 
@@ -197,10 +233,61 @@ class Dataset:
     """What configuration this output came from"""
     model_output_type: post_processing.enums.ModelOutputType
     """The type of model output that this data represents"""
-    region: post_processing.enums.Region
+    region: typing.Union[post_processing.enums.Region, post_processing.enums.RFC]
     """The region over which this data is valid"""
     member: typing.Optional[int] = dataclasses.field(default=None)
     """The ensemble member that this dataset reflects"""
+
+    @classmethod
+    def from_netcdf(cls, path: pathlib.Path) -> "Dataset":
+        """
+        Read a netcdf file and convert it into a Dataset specification
+
+        :param path: Path to the netcdf file
+        :returns: Dataset specification
+        """
+        if not path.is_file():
+            raise FileNotFoundError(f"File {path} not found - cannot create dataset specification")
+
+        data: xarray.Dataset = xarray.open_dataset(path)
+        dimensions: typing.List[Dimension] = list(Dimension(name=str(key), size=value) for key, value in data.sizes.items())
+        attributes: typing.Dict[str, typing.Any] = {
+            key: value.tolist() if isinstance(value, numpy.ndarray) else value
+            for key, value in data.encoding.items()
+            if key != 'source'
+        }
+        unlimited_dimensions: typing.Set[str] = data.encoding.get("unlimited_dims", set())
+
+        for unlimited_dimension in unlimited_dimensions:
+            matching_dimension: typing.Optional[Dimension] = next(
+                (dimension for dimension in dimensions if dimension.name == unlimited_dimension),
+                None
+            )
+            if matching_dimension is not None:
+                matching_dimension.unlimited = True
+
+        coordinates: typing.List[Variable] = [
+            Variable.from_data_array(array=array)
+            for array in data.coords.values()
+        ]
+
+        variables: typing.List[Variable] = [
+            Variable.from_data_array(array=array)
+            for array in data.data_vars.values()
+        ]
+
+        file_data: NWMFile = NWMFile.parse(path=path)
+
+        return cls(
+            dimensions=dimensions,
+            coordinates=coordinates,
+            variables=variables,
+            attributes=attributes,
+            configuration=file_data.configuration,
+            model_output_type=file_data.model_output_type,
+            region=file_data.region,
+            member=file_data.member,
+        )
 
     def generate_netcdf(
         self,
@@ -208,6 +295,7 @@ class Dataset:
         cycle: int = 0,
         length: int = 18,
         step: int = 1,
+        overwrite: bool = False
     ) -> typing.Sequence[pathlib.Path]:
         """
         Generate a series of netcdf files based off of this configuration
@@ -218,6 +306,7 @@ class Dataset:
         :param cycle: Which cycle the dataset will belong to
         :param length: How many frames should be in the dataset
         :param step: The number of hours between each frame
+        :param overwrite: Whether to overwrite preexisting files
         :returns: The paths to the newly created files
         """
         filenames: typing.List[str] = [
@@ -293,7 +382,7 @@ class Dataset:
                 },
                 "variable_definitions": self.variables,
                 "global_attributes": self.attributes,
-                "unlimited_dimensions": ['time']
+                "unlimited_dimensions": list(dimension.name for dimension in self.dimensions if dimension.unlimited),
             }
             for file_index, filename in enumerate(filenames)
         ]
