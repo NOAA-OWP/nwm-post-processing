@@ -11,6 +11,8 @@ import enum
 import tempfile
 import dataclasses
 
+from post_processing.utilities.common import starmap, program_exists
+
 LOGGER: logging.Logger = logging.getLogger(pathlib.Path(__file__).stem)
 
 _NCO_IS_AVAILABLE: typing.Optional[bool] = None
@@ -49,27 +51,14 @@ class NCOFunction(enum.StrEnum):
     HEADER = "ncdump"
 
     @classmethod
-    def is_usable(cls) -> typing.Tuple[bool, typing.Optional[str]]:
-        missing_applications: typing.List[str] = []
+    def is_usable(cls) -> bool:
+        programs_exist: typing.Sequence[bool] = starmap(
+            function=program_exists,
+            args=[{"program_name": str(member.value)} for member in cls],
+            threaded=True
+        )
 
-        for function in cls:
-            function_name: str = str(function.value)
-            try:
-                check_stdout, check_stderr = run_command(f"which {missing_applications}")
-                if not check_stdout:
-                    missing_applications.append(function_name)
-                if check_stderr:
-                    LOGGER.error(check_stderr)
-            except Exception as e:
-                LOGGER.error(e)
-                missing_applications.append(function_name)
-
-        if missing_applications:
-            description: str = (
-                f"NCO is unusable since the following netcdf functions are missing: {', '.join(missing_applications)}"
-            )
-            return False, description
-        return True, None
+        return all(programs_exist)
 
 class NCOAttributeType(enum.StrEnum):
     """
@@ -585,7 +574,7 @@ def reorder_dimensions(
 
 
 if _NCO_IS_AVAILABLE is None:
-    _NCO_IS_AVAILABLE, availability_message = NCOFunction.is_usable()
+    _NCO_IS_AVAILABLE = NCOFunction.is_usable()
 
     if not _NCO_IS_AVAILABLE:
-        raise RuntimeError(availability_message)
+        raise RuntimeError("Cannot use nco - applications are missing")
