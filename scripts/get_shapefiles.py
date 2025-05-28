@@ -42,12 +42,12 @@ class Arguments:
         self.rfc_url: str = DEFAULT_SHAPEFILE_URL
         self.rfc: typing.Optional[RFC] = None
         self.destination: pathlib.Path = settings.resource_path / "shapefiles"
-        self.overwrite: bool = False,
+        self.overwrite: bool = False
         self.log_level: str = logging.getLevelName(LOGGER.level)
         self.parallelization: typing.Optional[typing.Literal['threaded', 'multiprocessed']] = None
         self.__parse(args)
 
-    def __parse(self, args: typing.Iterable[str] = None):
+    def __parse(self, args: typing.Sequence[str] = None):
         """
         Parse given command line parameters
 

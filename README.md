@@ -54,4 +54,6 @@ From the root of the project, type:
 python -m unittest discover -s test -p "test_*.py"
 ```
 
-To run the unit tests on the python code
+To run the unit tests on the python code. This command tells the active python version to use the `unittest` testing library
+(as opposed to something like pytest) and discover unit tests under every file matching the glob of "test_*.py" 
+under the `./test` directory

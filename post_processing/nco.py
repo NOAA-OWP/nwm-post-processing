@@ -15,9 +15,26 @@ LOGGER: logging.Logger = logging.getLogger(pathlib.Path(__file__).stem)
 
 _NCO_IS_AVAILABLE: typing.Optional[bool] = None
 
-class DataVariable(typing.TypedDict):
+@dataclasses.dataclass
+class DataVariable:
+    """
+    Represents the name of a variable in a netcdf file that contains data
+    """
     name: str
+    """The name of the variable"""
     dimensions: typing.List[str]
+    """The names of the dimensions used as coordinates"""
+
+    def __getitem__(self, item: str) -> typing.Any:
+        if hasattr(self, item):
+            return getattr(self, item)
+        raise KeyError(f"There is no {item} variable in a {self.__class__.__qualname__}")
+
+    def __setitem__(self, key: str, value: typing.Any) -> None:
+        if hasattr(self, key):
+            setattr(self, key, value)
+        else:
+            raise KeyError(f"There is no {key} variable in a {self.__class__.__qualname__}")
 
 class NCOFunction(enum.StrEnum):
     """
@@ -29,6 +46,145 @@ class NCOFunction(enum.StrEnum):
     EDIT_ATTRIBUTES = "ncatted"
     RENAME = "ncrename"
     MANIPULATE_DIMENSIONS = "ncpdq"
+    HEADER = "ncdump"
+
+    @classmethod
+    def is_usable(cls) -> typing.Tuple[bool, typing.Optional[str]]:
+        missing_applications: typing.List[str] = []
+
+        for function in cls:
+            function_name: str = str(function.value)
+            try:
+                check_stdout, check_stderr = run_command(f"which {missing_applications}")
+                if not check_stdout:
+                    missing_applications.append(function_name)
+                if check_stderr:
+                    LOGGER.error(check_stderr)
+            except Exception as e:
+                LOGGER.error(e)
+                missing_applications.append(function_name)
+
+        if missing_applications:
+            description: str = (
+                f"NCO is unusable since the following netcdf functions are missing: {', '.join(missing_applications)}"
+            )
+            return False, description
+        return True, None
+
+class NCOAttributeType(enum.StrEnum):
+    """
+    The types that may be used for netcdf variables
+    """
+    FLOAT = "f"
+    DOUBLE = "d"
+    INTEGER = 'i'
+    SHORT = 's'
+    CHAR = 'c'
+    BYTE = 'b'
+    UNSIGNED_BYTE = 'ub'
+    UNSIGNED_SHORT = 'us'
+    UNSIGNED_INTEGER = 'ui'
+    INTEGER_64 = 'll'
+    UNSIGNED_INTEGER_64 = "ull"
+    STRING = "string"
+
+    @classmethod
+    def from_string(cls, string: str) -> "NCOAttributeType":
+        string = string.strip().lower()
+        mapping: typing.Dict[str, NCOAttributeType] = {
+            "int": cls.INTEGER,
+            "uint": cls.UNSIGNED_INTEGER,
+            "int32": cls.INTEGER,
+            "uint32": cls.UNSIGNED_INTEGER,
+            "int64": cls.INTEGER_64,
+            "uint64": cls.UNSIGNED_INTEGER_64,
+            "long": cls.INTEGER_64,
+            "int8": cls.BYTE,
+            "uint8": cls.UNSIGNED_BYTE,
+            "int16": cls.SHORT,
+            "uint16": cls.UNSIGNED_SHORT,
+            "real": cls.FLOAT,
+            "str": cls.STRING
+        }
+        for member in cls:
+            mapping[member.name.lower()] = member
+            value: str = str(member.value)
+            if member.value not in mapping:
+                mapping[value] = member
+
+        attribute_type: NCOAttributeType = mapping.get(string, None)
+
+        if attribute_type is None:
+            raise AttributeError(
+                f"There is no attribute type in NCO that may be referred to as '{string}'"
+            )
+        return attribute_type
+
+
+class EditMode(enum.StrEnum):
+    """
+    Modes used when editing
+    """
+    APPEND = "a"
+    """
+    Append value to current attribute value, if any. If the attribute does not exist, it is created
+    
+    WARNING: For non-string scalar values, this is convert the attribute to an array and add the value to the new 
+    array. For a string, this will concatenate.
+    """
+    CREATE = "c"
+    """
+    Create the attribute with the given value if it does not yet exist. Nothing happens if it already exists
+    """
+    DELETE = "d"
+    """
+    Remove the attribute if it exists
+    """
+    MODIFY = "m"
+    """
+    Change the value if the attribute exists. Nothing is done if it does not exist
+    """
+    APPEND_IF_EXISTS = "n"
+    """
+    Append the value, but only if it exists
+    
+    WARNING: For non-string scalar values, this is convert the attribute to an array and add the value to the new 
+    array. For a string, this will concatenate.
+    """
+    OVERWRITE = "o"
+    """
+    Add the attribute if it does not exist or modify it if it does
+    """
+    PREPEND = "p"
+    """
+    Prepend the attribute with the given value
+    
+    WARNING: For non-string scalar values, this is convert the attribute to an array and add the value to the new 
+    array. For a string, this will concatenate.
+    """
+
+    @classmethod
+    def from_string(cls, string: str) -> "EditMode":
+        string = string.strip().lower()
+        mapping: typing.Dict[str, EditMode] = {
+            "append_if_exists": cls.APPEND_IF_EXISTS
+        }
+
+        for member in cls:
+            mapping[member.name.lower()] = member
+            value: str = str(member.value)
+            if member.value not in mapping:
+                mapping[value] = member
+
+        edit_mode: EditMode = mapping.get(string, None)
+
+        if edit_mode is None:
+            raise AttributeError(
+                f"There is no edit mode in NCO that may be referred to as '{string}'"
+            )
+
+        return edit_mode
+
 
 @dataclasses.dataclass
 class NetcdfSummary:
@@ -81,10 +237,10 @@ class NetcdfSummary:
         ]
 
         data_variables: typing.List[DataVariable] = [
-            {
-                "name": group[variable_name_parameter],
-                "dimensions": [dimension.strip() for dimension in group[dimension_list_parameter].split(",")],
-            }
+            DataVariable(
+                name=group[variable_name_parameter],
+                dimensions=[dimension.strip() for dimension in group[dimension_list_parameter].split(",")],
+            )
             for group in variable_matches
             if group[variable_name_parameter] not in dimension_names
         ]
@@ -104,15 +260,16 @@ class NetcdfSummary:
         return summaries
 
 
-def run_command(command: str, *positional_args) -> typing.Tuple[str, str]:
+def run_command(command: str, *positional_args, prevent_history: bool = True) -> typing.Tuple[str, str]:
     """
     A consistent function used to execute the CLI commands for running
 
     :param command: The command to execute
     :param positional_args: Positional arguments to add to the call
+    :param prevent_history: Whether to ensure that NCO doesn't add global attributes showing the last used command
     :returns: Stdout and stderr
     """
-    if not {'-h', '--hst', '--history'}.intersection(positional_args):
+    if prevent_history and not {'-h', '--hst', '--history'}.intersection(positional_args):
         positional_args = ["--history", *positional_args]
 
     if positional_args:
@@ -124,18 +281,25 @@ def run_command(command: str, *positional_args) -> typing.Tuple[str, str]:
         text=True,
         shell=True,
     )
+
     if command_result.returncode != 0:
-        print(command_result.stderr)
         raise RuntimeError(
             f"Netcdf command failed:{os.linesep}"
             f"    {command}{os.linesep}"
+            f"STDOUT:{os.linesep}"
             f"{command_result.stderr}{os.linesep}"
+            f"STDERR:{os.linesep}"
             f"{command_result.stdout}{os.linesep}"
             f""
         )
+
     return command_result.stdout.strip(), command_result.stderr.strip()
 
-def keep_only_variables(input_file: typing.Union[str, pathlib.Path], output_file: typing.Union[str, pathlib.Path], variables: typing.Sequence[str]) -> None:
+def keep_only_variables(
+    input_file: typing.Union[str, pathlib.Path],
+    output_file: typing.Union[str, pathlib.Path],
+    variables: typing.Sequence[str]
+) -> None:
     """
     Remove all variables from the input file that aren't in the variables list and move all the resulting data
     into the output file
@@ -155,7 +319,11 @@ def keep_only_variables(input_file: typing.Union[str, pathlib.Path], output_file
     )
 
 
-def remove_variables(input_file: typing.Union[str, pathlib.Path], output_file: typing.Union[str, pathlib.Path], variables: typing.List[str]) -> None:
+def remove_variables(
+    input_file: typing.Union[str, pathlib.Path],
+    output_file: typing.Union[str, pathlib.Path],
+    variables: typing.List[str]
+) -> None:
     """
     Remove variables by name
 
@@ -197,17 +365,15 @@ def transform_variable(
     )
 
 
-def merge_files_by_variable(
+def merge_files(
     files: typing.Sequence[typing.Union[str, pathlib.Path]],
-    output_file: typing.Union[str, pathlib.Path],
-    variables: typing.Optional[typing.Union[typing.Sequence[str], str]] = None
+    output_file: typing.Union[str, pathlib.Path]
 ) -> None:
     """
     Combine files with the given variables and write to a new file
 
     :param files: The files to merge
     :param output_file: The output file to write to
-    :param variables: The list of variables to combine
     """
     with tempfile.TemporaryDirectory() as temporary_directory:
         temporary_directory_path: pathlib.Path = pathlib.Path(temporary_directory)
@@ -223,14 +389,14 @@ def merge_files_by_variable(
                 raise ValueError(f"Cannot merge {file} in with other netcdf data - it lacks a record dimension{os.linesep}{header}")
             adjustment_assignments: typing.Dict[typing.Tuple[str, str], str] = {}
             for data_variable in summary.data_variables:
-                if not set(summary.unlimited_dimensions).intersection(data_variable['dimensions']):
-                    total_dimensions: typing.List[str] = [
+                if not set(summary.unlimited_dimensions).intersection(data_variable.dimensions):
+                    total_dimensions: typing.List[str] = data_variable.dimensions
+                    total_dimensions += [
                         dimension
                         for dimension in summary.unlimited_dimensions
-                        if dimension not in data_variable['dimensions']
+                        if dimension not in data_variable.dimensions
                     ]
-                    total_dimensions += data_variable['dimensions']
-                    old_variable_name: str = data_variable['name']
+                    old_variable_name: str = data_variable.name
                     new_variable_name: str = f"{old_variable_name}_tmp"
 
                     rename_arguments: typing.Tuple[str, str] = (new_variable_name, old_variable_name)
@@ -294,7 +460,7 @@ def apply_mask_by_file(
 
 
 def get_header(target: pathlib.Path) -> str:
-    stdout, stderr = run_command("ncdump", "-h", target)
+    stdout, stderr = run_command(NCOFunction.HEADER, "-h", target)
     if stderr:
         raise RuntimeError(stderr)
     return stdout
@@ -304,7 +470,10 @@ def add_or_modify_attribute(
     input_file: typing.Union[str, pathlib.Path],
     attribute_name: str,
     attribute_value: str,
-    variable_name: str = "global"
+    variable_name: str = "global",
+    attribute_type: NCOAttributeType = NCOAttributeType.CHAR,
+    mode: EditMode = EditMode.OVERWRITE,
+    output_file: typing.Union[str, pathlib.Path] = None,
 ) -> None:
     """
     Add or update a global or variable attribute
@@ -314,20 +483,27 @@ def add_or_modify_attribute(
     :param attribute_value: The value of the attribute
     :param variable_name: The name of the variable that receives the attribute. 'global' sets the value in the
         global scope
+    :param attribute_type: The type of value that this should be
+    :param mode: How the attribute should be manipulated
+    :param output_file: Where to place the changes. Changes are made in-place if not provided
     """
+    if output_file is None:
+        output_file = input_file
     run_command(
         NCOFunction.EDIT_ATTRIBUTES,
         "-O",
         "-a",
-        f"{attribute_name},{variable_name},o,c,{attribute_value}",
-        input_file
+        f"{attribute_name},{variable_name},{mode.value},{attribute_type.value},{attribute_value}",
+        input_file,
+        output_file
     )
 
 
 def rename_variable(
     input_file: typing.Union[str, pathlib.Path],
     old_name: str,
-    new_name: str
+    new_name: str,
+    output_file: typing.Union[str, pathlib.Path] = None
 ) -> None:
     """
     Rename a single variable
@@ -335,30 +511,45 @@ def rename_variable(
     :param input_file: The path to the netcdf file to pull data from
     :param old_name: The name of the variable to rename
     :param new_name: The new name for the variable
+    :param output_file: Where to place the changes. Changes are made in-place if not provided
     """
+    if output_file is None:
+        output_file = input_file
+
     run_command(
         NCOFunction.RENAME,
         "-O",
         "-v",
         f"{old_name},{new_name}",
-        input_file
+        input_file,
+        output_file
     )
 
 
-def rename_dimension(input_file: typing.Union[str, pathlib.Path], old_name: str, new_name: str) -> None:
+def rename_dimension(
+    input_file: typing.Union[str, pathlib.Path],
+    old_name: str,
+    new_name: str,
+    output_file: typing.Union[str, pathlib.Path] = None
+) -> None:
     """
     Rename a single dimension
 
     :param input_file: The path to the netcdf file to pull data from
     :param old_name: The name of the dimension to rename
     :param new_name: The new name for the dimension
+    :param output_file: Where to place the changes. Changes are made in-place if not provided
     """
+    if output_file is None:
+        output_file = input_file
+
     run_command(
         NCOFunction.RENAME,
         "-O",
         "-d",
         f"{old_name},{new_name}",
-        input_file
+        input_file,
+        output_file
     )
 
 
@@ -394,7 +585,7 @@ def reorder_dimensions(
 
 
 if _NCO_IS_AVAILABLE is None:
-    _NCO_IS_AVAILABLE = bool(run_command(f"{NCOFunction.KITCHEN_SINK} --version"))
+    _NCO_IS_AVAILABLE, availability_message = NCOFunction.is_usable()
 
-if not _NCO_IS_AVAILABLE:
-    raise RuntimeError(f"Cannot use nco - make sure it is properly installed")
+    if not _NCO_IS_AVAILABLE:
+        raise RuntimeError(availability_message)

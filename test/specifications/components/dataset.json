@@ -10,13 +10,13 @@
         },
         {
             "name": "time",
-            "size": 120
+            "size": 1
         }
     ],
     "coordinates": [
         {
             "name": "reference_time",
-            "datatype": "datetime64[ns]",
+            "datatype": "int",
             "dimensions": [
                 {
                     "name": "reference_time",
@@ -30,11 +30,11 @@
         },
         {
             "name": "time",
-            "datatype": "datetime64[ns]",
+            "datatype": "int",
             "dimensions": [
                 {
                     "name": "time",
-                    "size": 120
+                    "size": 1
                 }
             ],
             "attributes": {
@@ -64,7 +64,7 @@
         },
         {
             "name": "station_id",
-            "datatype": "int",
+            "datatype": "int64",
             "dimensions": [
                 {
                     "name": "station",
@@ -85,7 +85,7 @@
                 },
                 {
                     "name": "time",
-                    "size": 120
+                    "size": 1
                 }
             ],
             "attributes": {
@@ -105,7 +105,7 @@
                 },
                 {
                     "name": "time",
-                    "size": 120
+                    "size": 1
                 }
             ],
             "attributes": {
@@ -122,7 +122,7 @@
         "model_initialization_time": "2025-03-22_12:00:00",
         "station_dimension": "feature_id",
         "model_output_valid_time": "2025-03-22_18:00:00",
-        "model_total_valid_times": 120,
+        "model_total_valid_times": 18,
         "cdm_datatype": "Station",
         "Conventions": "CF-1.6",
         "code_version": "v5.3.0-alpha1",
@@ -138,7 +138,7 @@
         "model_region": "conus",
         "model_version": "NWM 3.0"
     },
-    "configuration": "long_range",
+    "configuration": "short_range",
     "model_output_type": "channel_rt",
-    "region": "abrfc"
+    "region": "conus"
 }

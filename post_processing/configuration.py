@@ -84,6 +84,15 @@ class _Settings(UserDict):
             self.__setitem__(key=key, item=_DEFAULT_LOG_FORMAT)
 
         return self.__getitem__(key=key)
+
+    @property
+    def application_path(self) -> pathlib.Path:
+        """
+        Get the root of this application
+        """
+        import post_processing
+        return pathlib.Path(post_processing.__file__).parent
+
     
     @property
     def resource_path(self) -> pathlib.Path:
@@ -93,13 +102,7 @@ class _Settings(UserDict):
         key: str = "{prefix}_resource_path".format(prefix=self.prefix).lower()
 
         if key not in self.keys() or not self.__getitem__(key=key) or not isinstance(self.__getitem__(key=key), (pathlib.Path, str)):
-            path: pathlib.Path = pathlib.Path(__file__)
-
-            while not path.is_dir() or not path.name == "post_processing":
-                path = path.parent
-
-            path = path.parent
-            path = path / "resources"
+            path: pathlib.Path = self.application_path / "resources"
             
             self.__setitem__(key=key, item=path)
 
@@ -152,6 +155,63 @@ class _Settings(UserDict):
             )
         
         return self.__getitem__(key=key)
+
+    @property
+    def intermediate_directory(self) -> pathlib.Path:
+        """
+        Where generated products that serve as input for other products should be written
+        """
+        key: str = "{prefix}_intermediate_directory".format(prefix=self.prefix).lower()
+
+        if key not in self.keys() or not self.__getitem__(key=key):
+            path: pathlib.Path = self.application_path / "intermediate"
+            path.mkdir(parents=True, exist_ok=True)
+            self.__setitem__(key=key, item=path)
+        elif isinstance(self.__getitem__(key=key), str):
+            self.__setitem__(key=key, item=pathlib.Path(self.__getitem__(key=key)))
+        elif not isinstance(self.__getitem__(key=key), (str, pathlib.Path)):
+            raise TypeError(
+                "The '{key}' setting is invalid - it must be a path but was instead '{value}' (type={value_type})".format(
+                    key=key.upper(),
+                    value=self.__getitem__(key=key),
+                    value_type=type(self.__getitem__(key=key))
+                )
+            )
+
+        return self.__getitem__(key=key)
+
+    @property
+    def output_directory(self) -> typing.Optional[pathlib.Path]:
+        """
+        A preconfigured location for where to put output files
+        """
+        key: str = "{prefix}_output_directory".format(prefix=self.prefix).lower()
+
+        if key not in self.keys() or not self.__getitem__(key=key):
+            return None
+        elif isinstance(self.__getitem__(key=key), str):
+            self.__setitem__(key=key, item=pathlib.Path(self.__getitem__(key=key)))
+        elif not isinstance(self.__getitem__(key=key), pathlib.Path):
+            raise TypeError(
+                "The '{key}' setting is invalid it must be a path to a directory but was instead '{value}' (type={value_type})".format(
+                    key=key.upper(),
+                    value=self.__getitem__(key=key),
+                    value_type=type(self.__getitem__(key=key))
+                )
+            )
+        elif self.__getitem__(key=key).is_file():
+            raise FileExistsError(
+                "The '{key}' setting is invalid - it must be a path to a directory but was a path to a file".format(
+                    key=key
+                )
+            )
+
+        output_directory = self.__getitem__(key=key)
+
+        if not output_directory.exists():
+            output_directory.mkdir(parents=True, exist_ok=True)
+
+        return output_directory
 
 settings = _Settings()
 """Application wide settings"""
