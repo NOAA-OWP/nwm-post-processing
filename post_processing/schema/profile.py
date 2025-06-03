@@ -25,7 +25,7 @@ from post_processing.enums import Region
 from post_processing.enums import ModelOutputType
 from post_processing.enums import Configuration
 
-from post_processing import netcdf
+from post_processing import nco
 
 from post_processing.utilities.common import starmap
 from post_processing.utilities.common import partition
@@ -364,7 +364,7 @@ class MergeOperation(NCOOperation):
         """
         filename: str = self.file_name_pattern.format_map(metadata)
         output_path: pathlib.Path = work_directory / filename
-        netcdf.merge_files(files=files, output_file=output_path)
+        nco.merge_files(files=files, output_file=output_path)
         return [output_path]
 
     file_name_pattern: str = dataclasses.field()
@@ -406,9 +406,9 @@ class DropOperation(NCOOperation, InPlaceOperationMixin):
         :returns: The Paths for each created object
         """
         if self.exclude:
-            drop_function = netcdf.keep_only_variables
+            drop_function = nco.keep_only_variables
         else:
-            drop_function = netcdf.remove_variables
+            drop_function = nco.remove_variables
 
         arguments: typing.List[typing.Dict[str, typing.Any]] = []
 
@@ -491,7 +491,7 @@ class RenameOperation(NCOOperation, InPlaceOperationMixin):
                 for original_name, new_name in self.mapping.items()
             ]
             starmap(
-                function=netcdf.rename_variable,
+                function=nco.rename_variable,
                 args=args
             )
         return data
@@ -560,7 +560,7 @@ class AttributeOperation(NCOOperation, InPlaceOperationMixin):
         ]
 
         starmap(
-            function=netcdf.add_or_modify_attribute,
+            function=nco.add_or_modify_attribute,
             args=arguments,
             threaded=True
         )
@@ -568,23 +568,23 @@ class AttributeOperation(NCOOperation, InPlaceOperationMixin):
         return data
 
     def __post_init__(self):
-        if not isinstance(self.attribute_type, netcdf.NetcdfType):
+        if not isinstance(self.attribute_type, nco.NetcdfType):
             if isinstance(self.attribute_type, str):
-                self.attribute_type = netcdf.NetcdfType.from_string(self.attribute_type)
+                self.attribute_type = nco.NetcdfType.from_string(self.attribute_type)
             else:
                 raise ValueError(f"'{self.attribute_type}' is not a valid NCO attribute type")
 
-        if not isinstance(self.mode, netcdf.EditMode):
+        if not isinstance(self.mode, nco.EditMode):
             if isinstance(self.mode, str):
-                self.mode = netcdf.EditMode.from_string(self.mode)
+                self.mode = nco.EditMode.from_string(self.mode)
             else:
                 raise ValueError(f"'{self.mode}' is not a valid NCO Edit Mode")
 
     attribute_name: str
     field: typing.Optional[str] = dataclasses.field(default="global")
     attribute_value: typing.Optional[typing.Any] = dataclasses.field(default=None)
-    attribute_type: netcdf.NetcdfType = dataclasses.field(default=netcdf.NetcdfType.STRING)
-    mode: netcdf.EditMode = dataclasses.field(default=netcdf.EditMode.OVERWRITE)
+    attribute_type: nco.NetcdfType = dataclasses.field(default=nco.NetcdfType.STRING)
+    mode: nco.EditMode = dataclasses.field(default=nco.EditMode.OVERWRITE)
 
 
 @dataclasses.dataclass
@@ -1037,7 +1037,7 @@ def get_function_by_name(
         >>> # Since `from post_processing import netcdf` is defined up top, the following may be used:
         >>> get_function_by_name("netcdf.merge_files")
         <function merge_files at 0x7f550e82c400>
-        >>> from post_processing import netcdf
+        >>> from post_processing import nco
         >>> get_function_by_name("netcdf.merge_files")
         <function merge_files at 0x7f550e82c400>
         >>> from post_processing.netcdf import merge_files

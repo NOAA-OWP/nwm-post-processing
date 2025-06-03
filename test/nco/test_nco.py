@@ -16,12 +16,12 @@ import xarray
 from post_processing.configuration import settings
 from post_processing.utilities.logging import setup_logging
 from post_processing.utilities.common import first
-from .output_specification import Dataset
-from .output_specification import deserialize
-from .output_specification import Dimension
-from .output_specification import Variable
+from test.output_specification import Dataset
+from test.output_specification import deserialize
+from test.output_specification import Dimension
+from test.output_specification import Variable
 
-from post_processing import netcdf
+from post_processing import nco
 
 setup_logging(settings.resource_path / "python_test_log_config.json")
 
@@ -59,7 +59,7 @@ class NCOTest(unittest.TestCase):
             cls.created_data_directory: bool = True
             cls.data_directory = pathlib.Path(tempfile.mkdtemp())
 
-        cls.path_to_specification: pathlib.Path = pathlib.Path(__file__).absolute().parent / "specifications" / "short_range.channel_rt.conus.json"
+        cls.path_to_specification: pathlib.Path = settings.application_path / "test" / "specifications" / "short_range.channel_rt.conus.json"
         cls.test_dataset_config: Dataset = deserialize(Dataset, cls.path_to_specification)
         cls.input_files: typing.Sequence[pathlib.Path] = cls.test_dataset_config.generate_netcdf(
             output_directory=cls.data_directory,
@@ -85,7 +85,7 @@ class NCOTest(unittest.TestCase):
         """
         Test to ensure that the netcdf summary object correctly parses data from the header
         """
-        summaries: typing.Sequence[netcdf.NetcdfSummary] = netcdf.NetcdfSummary.load_summaries(paths=self.input_files)
+        summaries: typing.Sequence[nco.NetcdfSummary] = nco.NetcdfSummary.load_summaries(paths=self.input_files)
         self.assertEqual(len(summaries), len(self.input_files))
 
         for summary in summaries:
@@ -122,7 +122,7 @@ class NCOTest(unittest.TestCase):
                 )
 
             for global_key, global_value in self.test_dataset_config.attributes.items():
-                matching_attribute: typing.Optional[netcdf.Attribute] = first(
+                matching_attribute: typing.Optional[nco.Attribute] = first(
                     summary.attributes,
                     lambda attribute: attribute.name == global_key
                 )
@@ -130,10 +130,10 @@ class NCOTest(unittest.TestCase):
                     matching_attribute,
                     f"There is no global '{global_key}' attribute in {summary} as in the configuration at {self.path_to_specification}"
                 )
-                if matching_attribute.unit.group in (netcdf.AttributeTypeGroup.SIGNED_NATURAL_NUMBERS, netcdf.AttributeTypeGroup.UNSIGNED_NATURAL_NUMBERS):
+                if matching_attribute.unit.group in (nco.AttributeTypeGroup.SIGNED_NATURAL_NUMBERS, nco.AttributeTypeGroup.UNSIGNED_NATURAL_NUMBERS):
                     value = int(matching_attribute.value)
                     cast_information: str = f" ({matching_attribute} was converted into {value})"
-                elif matching_attribute.unit.group == netcdf.AttributeTypeGroup.REAL_NUMBERS:
+                elif matching_attribute.unit.group == nco.AttributeTypeGroup.REAL_NUMBERS:
                     value = float(matching_attribute.value)
                     cast_information: str = f" ({matching_attribute} was converted into {value})"
                 else:
@@ -141,7 +141,7 @@ class NCOTest(unittest.TestCase):
                     cast_information: str = ""
 
                 error_message: str = f"{matching_attribute} in {summary} does not match {global_key} in {self.path_to_specification}{cast_information}"
-                if matching_attribute.unit.group == netcdf.AttributeTypeGroup.REAL_NUMBERS:
+                if matching_attribute.unit.group == nco.AttributeTypeGroup.REAL_NUMBERS:
                     self.assertAlmostEqual(value, global_value, places=REQUIRED_MATCHING_DIGITS, msg=error_message)
                 else:
                     self.assertEqual(
@@ -156,7 +156,7 @@ class NCOTest(unittest.TestCase):
             )
 
             for variable in self.test_dataset_config.variables:  # type: Variable
-                matching_variable: typing.Optional[netcdf.DataVariable] = first(
+                matching_variable: typing.Optional[nco.DataVariable] = first(
                     summary.data_variables,
                     lambda data_variable: data_variable.name == variable.name
                 )
@@ -166,11 +166,11 @@ class NCOTest(unittest.TestCase):
                     f"{summary} is missing the {variable.name} variable described in {self.path_to_specification}"
                 )
 
-                data_type: netcdf.NetcdfType = netcdf.NetcdfType.from_string(variable.datatype)
+                data_type: nco.NetcdfType = nco.NetcdfType.from_string(variable.datatype)
 
-                if netcdf.AttributeTypeGroup.STRINGS not in {data_type.group, matching_variable.type.group}:
+                if nco.AttributeTypeGroup.STRINGS not in {data_type.group, matching_variable.type.group}:
                     if matching_variable.encoded_to_integer:
-                        self.assertEqual(data_type.group, netcdf.AttributeTypeGroup.REAL_NUMBERS)
+                        self.assertEqual(data_type.group, nco.AttributeTypeGroup.REAL_NUMBERS)
                     else:
                         self.assertEqual(data_type, matching_variable.type)
 
@@ -188,7 +188,7 @@ class NCOTest(unittest.TestCase):
                     )
 
                 for attribute_key, attribute_value in variable.attributes.items():
-                    matching_attribute: typing.Optional[netcdf.Attribute] = first(
+                    matching_attribute: typing.Optional[nco.Attribute] = first(
                         matching_variable.attributes,
                         lambda attribute: attribute.name == attribute_key
                     )
@@ -232,7 +232,7 @@ class NCOTest(unittest.TestCase):
         Test to ensure the `merge` operation correctly merges multiple files and maintains data and metadata integrity
         """
         target_file: pathlib.Path = self.output_directory / "merged_data.nc"
-        netcdf.merge_files(files=self.input_files, output_file=target_file)
+        nco.merge_files(files=self.input_files, output_file=target_file)
 
         merged_dataset: xarray.Dataset = xarray.open_dataset(target_file, decode_cf=False)
         input_dataset: xarray.Dataset = xarray.open_dataset(self.input_files[-1], decode_cf=False)

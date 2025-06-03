@@ -15,7 +15,7 @@ import xarray
 from pandas.core.dtypes.common import is_integer_dtype
 
 import post_processing.enums
-from post_processing import netcdf
+from post_processing import nco
 from post_processing.nwm_file import NWMFile
 
 T = typing.TypeVar("T")
@@ -490,6 +490,6 @@ def write_file(
     except:
         logging.error(f"Failed to write data to {filename}. Data:{os.linesep}{dataset}")
         raise
-    header: str = netcdf.get_header(filename)
+    header: str = nco.get_header(filename)
     logging.debug(f"Saved dataset to {filename}:{os.linesep}{header}")
     return filename
