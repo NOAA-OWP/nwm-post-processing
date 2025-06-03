@@ -5,6 +5,8 @@ import logging
 import typing
 import pathlib
 import re
+import dataclasses
+import json
 
 from datetime import datetime
 
@@ -157,7 +159,10 @@ def starmap_threaded(
                 exceptions.append(e)
 
         if exceptions:
-            raise ExceptionGroup(f"Could not perform {function} across {len(args)} set of arguments", exceptions)
+            raise condense_exceptions(
+                f"Could not perform {function.__name__} across {len(args)} set of arguments",
+                exceptions
+            )
 
     return results
 
@@ -426,3 +431,97 @@ def program_exists(program_name: str) -> bool:
     except Exception as exception:
         logging.error(f"Could not check if {program_name} exists: {exception}")
         return False
+
+def condense_exceptions(
+    message: str,
+    exceptions: typing.Iterable[Exception],
+    *additional_exceptions: Exception
+) -> ExceptionGroup:
+    """
+    Condences multiple exceptions into a single exception group containing unique errors or just a single error if it becomes one
+    """
+    import traceback
+    all_exceptions: typing.List[Exception] = [*exceptions, *additional_exceptions]
+    exception_hashes: typing.Dict[int, Exception] = {}
+
+    for exception in all_exceptions:
+        stack_hashes: typing.Tuple[int, ...] = tuple(
+            hash((frame.filename, frame.line, frame.lineno)) for frame in
+            traceback.extract_tb(exception.__traceback__)
+        )
+
+        exception_hash: int = hash(stack_hashes)
+
+        exception_hashes[exception_hash] = exception
+
+    unique_exceptions: typing.List[Exception] = list(exception_hashes.values())
+    return ExceptionGroup(message, unique_exceptions)
+
+
+class RecursiveEncoder(json.JSONEncoder):
+    """
+    A custom encoder that will recurse through objects and serialize based on behavior from:
+
+    - dataclasses
+    - items with `__dict__`
+    - items with `__slots__`
+    - `typing.Mapping`s
+    - Anything that may be iterated through
+    """
+    def default(self, item_to_serialize: typing.Any):
+        import inspect
+
+        if isinstance(item_to_serialize, (datetime, pathlib.Path)):
+            return str(item_to_serialize)
+
+        if dataclasses.is_dataclass(item_to_serialize):
+            converted_dataclass: typing.Dict[str, typing.Any] = dataclasses.asdict(item_to_serialize)
+            return self.default(converted_dataclass)
+
+        if hasattr(item_to_serialize, '__dict__'):
+            return {
+                key: self.default(value)
+                for key, value in vars(item_to_serialize).items()
+            }
+
+        if hasattr(item_to_serialize, '__slots__') and len(item_to_serialize.__slots__) > 0:
+            return {
+                key: self.default(getattr(item_to_serialize, key))
+                for key in item_to_serialize.__slots__
+                if hasattr(item_to_serialize, key)
+                   and not inspect.isdatadescriptor(getattr(item_to_serialize.__class__, key))
+            }
+
+        if isinstance(item_to_serialize, typing.Mapping):
+            return {
+                key: self.default(value)
+                for key, value in item_to_serialize.items()
+            }
+
+        if isinstance(item_to_serialize, bytes):
+            item_to_serialize = item_to_serialize.decode()
+
+        if isinstance(item_to_serialize, str):
+            return item_to_serialize
+
+        if isinstance(item_to_serialize, (typing.Iterator, typing.Iterable)):
+            return [
+                self.default(item)
+                for item in item_to_serialize
+            ]
+
+        from enum import Enum
+        if isinstance(item_to_serialize, Enum):
+            return item_to_serialize.value
+
+        from decimal import Decimal
+        if isinstance(item_to_serialize, Decimal):
+            return float(item_to_serialize)
+
+        return item_to_serialize
+
+def to_json(obj: object) -> str:
+    """
+    Convert an arbitrary object into a JSON string
+    """
+    return json.dumps(obj, cls=RecursiveEncoder, indent=4)
