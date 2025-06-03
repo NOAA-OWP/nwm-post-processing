@@ -91,7 +91,7 @@ class _Settings(UserDict):
         Get the root of this application
         """
         import post_processing
-        return pathlib.Path(post_processing.__file__).parent
+        return pathlib.Path(post_processing.__file__).parent.parent
 
     
     @property

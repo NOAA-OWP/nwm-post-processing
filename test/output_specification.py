@@ -15,7 +15,7 @@ import xarray
 from pandas.core.dtypes.common import is_integer_dtype
 
 import post_processing.enums
-from post_processing import nco
+from post_processing import netcdf
 from post_processing.nwm_file import NWMFile
 
 T = typing.TypeVar("T")
@@ -65,6 +65,13 @@ def xarray_dtype_from_str(dtype_str: str) -> numpy.dtype:
 
 
 def deserialize(cls: typing.Type[T], data: typing.Union[str, pathlib.Path, typing.Dict]) -> T:
+    """
+    Convert a path or dictionary to a dataclass
+
+    :param cls: The type of class to deserialize into
+    :param data: The data or path to deserialize
+    :return: The deserialized class
+    """
     if isinstance(data, str):
         data = pathlib.Path(data)
 
@@ -420,25 +427,18 @@ class Dataset:
 
 
 def shrink_value(value: typing.Any) -> typing.Any:
+    """
+    Reduce the size of an input value if necessary
+
+    :param value: The value whose type to shrink
+    :returns: The shrunken value, properly typed if necessary
+    """
     if isinstance(value, int):
-        if 0 <= value <= 255:
-            return numpy.uint8(value)
-        if -128 <= value <= 127:
-            return numpy.int8(value)
-        if -32768 <= value <= 32767:
-            return numpy.int16(value)
-        if 0 <= value <= 65_535:
-            return numpy.uint16(value)
         if -2_147_483_648 <= value <= 2_147_483_647:
             return numpy.int32(value)
-        if 0 <= value <= 4_294_967_295:
-            return numpy.uint32(value)
-        if 0 <= value <= 18_446_744_073_709_551_615:
-            return numpy.uint64(value)
-        if -9_223_372_036_854_775_808 <= value <= 9_223_372_036_854_775_807:
-            return numpy.int64(value)
+        return numpy.int64(value)
     if isinstance(value, float):
-        return numpy.float32(value)
+        return numpy.float64(value)
     return value
 
 def write_file(
@@ -461,10 +461,10 @@ def write_file(
     :returns: The path to the generated data
     """
     if filename.exists() and not overwrite:
-        logging.info(f"Data already exists for {filename} - reusing that")
+        logging.debug(f"Data already exists for {filename} - reusing that")
         return filename
 
-    logging.info(f"Generating data for {filename}")
+    logging.debug(f"Generating data for {filename}")
 
     global_attributes = {
         attribute_name: shrink_value(attribute_value)
@@ -490,6 +490,6 @@ def write_file(
     except:
         logging.error(f"Failed to write data to {filename}. Data:{os.linesep}{dataset}")
         raise
-    header: str = nco.get_header(filename)
-    logging.info(f"Saved dataset to {filename}:{os.linesep}{header}")
+    header: str = netcdf.get_header(filename)
+    logging.debug(f"Saved dataset to {filename}:{os.linesep}{header}")
     return filename

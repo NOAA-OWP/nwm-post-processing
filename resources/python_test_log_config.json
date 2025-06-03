@@ -37,37 +37,13 @@
             "filters": [
                 "only_errors"
             ]
-        },
-        "log_file": {
-            "class": "logging.handlers.RotatingFileHandler",
-            "level": "DEBUG",
-            "formatter": "detailed",
-            "filename": "pp_info.log",
-            "maxBytes": 52428800,
-            "backupCount": 5,
-            "filters": [
-                "exclude_errors"
-            ]
-        },
-        "error_file": {
-            "class": "logging.handlers.RotatingFileHandler",
-            "level": "ERROR",
-            "formatter": "detailed",
-            "filename": "pp_error.log",
-            "maxBytes": 52428800,
-            "backupCount": 5,
-            "filters": [
-                "only_errors"
-            ]
         }
     },
     "root": {
         "level": "INFO",
         "handlers": [
             "stdout",
-            "stderr",
-            "log_file",
-            "error_file"
+            "stderr"
         ]
     }
 }
