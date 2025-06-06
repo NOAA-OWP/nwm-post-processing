@@ -156,6 +156,14 @@ class _Settings(UserDict):
         
         return self.__getitem__(key=key)
 
+    @logging_config_path.setter
+    def logging_config_path(self, value: pathlib.Path):
+        """
+        The setter for logging_config_path
+        """
+        key: str = "{prefix}_log_config_path".format(prefix=self.prefix).lower()
+        self.__setitem__(key=key, item=value)
+
     @property
     def intermediate_directory(self) -> pathlib.Path:
         """

@@ -1,9 +1,11 @@
 """
 Details an 'InputManifest', which holds all the information describing what is being processed
 """
+import os
 import typing
 import dataclasses
 import pathlib
+import logging
 
 from datetime import datetime
 
@@ -14,8 +16,11 @@ from post_processing.enums import ModelOutputType
 from post_processing.utilities.common import datetime64_to_datetime
 from post_processing.utilities.common import sort_nwm_filepaths
 from post_processing.schema.base import BaseModel
+from post_processing.nwm_file import NWMFile
 
 REFERENCE_TIME_VARIABLE: str = "reference_time"
+
+LOGGER: logging.Logger = logging.getLogger(pathlib.Path(__file__).stem)
 
 @dataclasses.dataclass
 class InputManifest(BaseModel):
@@ -36,15 +41,38 @@ class InputManifest(BaseModel):
     """The ensemble member that may be getting processed"""
     _reference_time: typing.Optional[datetime] = None
 
+    @classmethod
+    def from_files(cls, files: typing.Sequence[pathlib.Path]) -> "InputManifest":
+        """
+        Create a manifest from a set of files
+        """
+        nwm_files: typing.List[NWMFile] = list(map(
+            lambda path: NWMFile.parse(path=path),
+            files
+        ))
+        included_groups: typing.Set[int] = set(map(lambda nwm_file: nwm_file.group_hash, nwm_files))
+        if len(included_groups) > 1:
+            raise ValueError(
+                f"Cannot load the following files into a manifest - they represent multiple incompatible groups:{os.linesep}"
+                f"    - {(os.linesep + '    - ').join(map(str, files))}"
+            )
+        sample: NWMFile = nwm_files[0]
+        manifest: InputManifest = InputManifest(
+            region=sample.region,
+            configuration=sample.configuration,
+            output_type=sample.model_output_type,
+            cycle=str(sample.cycle).zfill(2),
+            files=files,
+            member=sample.member,
+        )
+        return manifest
+
     @property
     def reference_time(self) -> datetime:
         """
         The reference time of the NWM output
         """
         return self._reference_time
-
-    def __post_init__(self):
-        self._validate()
 
     def _validate(self):
         """
@@ -82,10 +110,13 @@ class InputManifest(BaseModel):
 
         error_message: str = ""
 
+        # TODO: Write the validations for the rest
+        LOGGER.warning(f"The rest of the InputManifest validations need to be written")
+
         if error_message:
             raise ValueError(error_message)
 
-        self._reference_times = reference_times.pop()
+        self._reference_time = reference_times.pop()
         self.files = sort_nwm_filepaths(filepaths=self.files)
 
 

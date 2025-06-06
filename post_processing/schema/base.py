@@ -16,6 +16,9 @@ class BaseModel:
     """
     A base class for post-processing model objects
     """
+    def __post_init__(self):
+        self._validate()
+
     @classmethod
     def from_dict(cls: typing.Type[ModelType], **kwargs: typing.Any) -> ModelType:
         """
@@ -71,6 +74,12 @@ class BaseModel:
         deserialized_model: ModelType = cls.from_dict(**data)
         return deserialized_model
 
+    def _validate(self):
+        """
+        Validate and/or transform values on the model
+        """
+        pass
+
 ModelType = typing.TypeVar("ModelType", bound=BaseModel)
 
 
@@ -86,15 +95,19 @@ def member(
     if metadata is None:
         metadata = {}
 
-    metadata[MEMBER_FIELD_KEY] = True
-
     if dataclasses.MISSING not in (default, default_factory):
         raise ValueError(
             f"Cannot create a field - both a default value and a default factory cannot be specified - "
             f"choose one or the other"
         )
+    elif default == dataclasses.MISSING and default_factory == dataclasses.MISSING:
+        raise ValueError(f"An initial value must be given if a member variable is to be added")
 
-    if default_factory is not None:
+    if default_factory != dataclasses.MISSING:
+        if not callable(default_factory):
+            raise TypeError(
+                f"Cannot use '{default_factory}' (type={type(default_factory)} as the default factory as it is not callable"
+            )
         field = dataclasses.field(
             default_factory=default_factory,
             metadata=metadata,

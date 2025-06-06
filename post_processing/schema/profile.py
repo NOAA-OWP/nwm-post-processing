@@ -5,6 +5,7 @@ import abc
 import importlib
 import itertools
 import re
+import shutil
 import types
 import typing
 import dataclasses
@@ -30,6 +31,7 @@ from post_processing import nco
 from post_processing.utilities.common import starmap
 from post_processing.utilities.common import partition
 from post_processing.utilities.common import get_template_variables
+from post_processing.utilities.common import to_json
 from post_processing.configuration import settings
 
 LOGGER: logging.Logger = logging.getLogger(pathlib.Path(__file__).stem)
@@ -100,6 +102,8 @@ class OperationType(enum.StrEnum):
     """Load one or more netcdf files into memory"""
     WRITE = "write"
     """Write a netcdf file to disk (may conflict with 'save')"""
+    NCO = "not_implemented"
+    """A dummy operation type used as the base for NCO operations"""
 
 
 class InPlaceOperationMixin:
@@ -183,6 +187,10 @@ class ProfileOperation(BaseModel, OperationHandler[InputType, OutputType], abc.A
     def __str__(self):
         return self.operation().replace('_', ' ').title()
 
+    def __hash__(self):
+        values_to_hash: typing.Tuple[str, ...] = (self.__class__.__name__, to_json(self))
+        return hash(values_to_hash)
+
     @abc.abstractmethod
     def __call__(
         self,
@@ -206,12 +214,24 @@ class ProfileOperation(BaseModel, OperationHandler[InputType, OutputType], abc.A
         """
 
 
-@dataclasses.dataclass
-class NCOOperation(ProfileOperation[typing.Sequence[pathlib.Path], typing.Sequence[pathlib.Path]], abc.ABC):
-    ...
+class NCOOperation(ProfileOperation[typing.Sequence[pathlib.Path], typing.Sequence[pathlib.Path]]):
+    @classmethod
+    def operation(cls) -> OperationType:
+        return OperationType.NCO
+
+    def __call__(
+        self,
+        profile: "Profile",
+        process_identifier: str,
+        work_directory: pathlib.Path,
+        data: typing.Sequence[pathlib.Path],
+        previous_operations: typing.List["ProfileOperation"],
+        metadata: typing.Dict[str, typing.Any]
+    ) -> typing.Sequence[pathlib.Path]:
+        pass
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(unsafe_hash=True)
 class ExtractOperation(NCOOperation):
     """
     Describes how to extract and operate on individual pieces of data
@@ -334,7 +354,7 @@ class ExtractOperation(NCOOperation):
     _pattern: typing.Optional[re.Pattern] = member(default=None)
     _identifier_mapping: typing.Dict[pathlib.Path, typing.Dict[str, str]] = member(default_factory=dict)
 
-@dataclasses.dataclass
+@dataclasses.dataclass(unsafe_hash=True)
 class MergeOperation(NCOOperation):
     """
     Tells how to combine data
@@ -348,7 +368,7 @@ class MergeOperation(NCOOperation):
         profile: "Profile",
         process_identifier: str,
         work_directory: pathlib.Path,
-        files: typing.Sequence[pathlib.Path],
+        data: typing.Sequence[pathlib.Path],
         previous_operations: typing.List[ProfileOperation],
         metadata: typing.Dict[str, typing.Any]
     ) -> typing.Sequence[pathlib.Path]:
@@ -364,12 +384,14 @@ class MergeOperation(NCOOperation):
         """
         filename: str = self.file_name_pattern.format_map(metadata)
         output_path: pathlib.Path = work_directory / filename
-        nco.merge_files(files=files, output_file=output_path)
+
+        from post_processing.transform import merge_files_into_file
+        merge_files_into_file(files=data, output_file=output_path)
         return [output_path]
 
     file_name_pattern: str = dataclasses.field()
 
-@dataclasses.dataclass
+@dataclasses.dataclass(unsafe_hash=True)
 class DropOperation(NCOOperation, InPlaceOperationMixin):
     """
     Tells how to drop variables
@@ -436,7 +458,7 @@ class DropOperation(NCOOperation, InPlaceOperationMixin):
     fields: typing.List[str] = dataclasses.field()
     exclude: bool = dataclasses.field(default=False)
 
-@dataclasses.dataclass
+@dataclasses.dataclass(unsafe_hash=True)
 class RenameOperation(NCOOperation, InPlaceOperationMixin):
     """
     Tells how to rename variables or dimensions
@@ -498,7 +520,7 @@ class RenameOperation(NCOOperation, InPlaceOperationMixin):
 
     mapping: typing.Dict[str, str] = dataclasses.field()
 
-@dataclasses.dataclass
+@dataclasses.dataclass(unsafe_hash=True)
 class AttributeOperation(NCOOperation, InPlaceOperationMixin):
     """
     Tells how to add, modify, or remove attributes on variables or globally
@@ -583,11 +605,11 @@ class AttributeOperation(NCOOperation, InPlaceOperationMixin):
     attribute_name: str
     field: typing.Optional[str] = dataclasses.field(default="global")
     attribute_value: typing.Optional[typing.Any] = dataclasses.field(default=None)
-    attribute_type: nco.NetcdfType = dataclasses.field(default=nco.NetcdfType.STRING)
-    mode: nco.EditMode = dataclasses.field(default=nco.EditMode.OVERWRITE)
+    attribute_type: nco.NetcdfType = dataclasses.field(default_factory=lambda: nco.NetcdfType.STRING)
+    mode: nco.EditMode = dataclasses.field(default_factory=lambda: nco.EditMode.OVERWRITE)
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(unsafe_hash=True)
 class SaveOperation(NCOOperation):
     """
     Save the given files in another location
@@ -658,7 +680,7 @@ class SaveOperation(NCOOperation):
     identifier_pattern: typing.Optional[str] = dataclasses.field(default=None)
     _compiled_pattern: typing.Optional[re.Pattern] = member(default=None)
 
-@dataclasses.dataclass
+@dataclasses.dataclass(unsafe_hash=True)
 class BranchOperation(ProfileOperation[InputType, typing.Sequence[pathlib.Path]]):
     """
     An operation that lets you feed input data through multiple mutually exclusive operations
@@ -768,7 +790,7 @@ class BranchOperation(ProfileOperation[InputType, typing.Sequence[pathlib.Path]]
             )
         return results
 
-@dataclasses.dataclass
+@dataclasses.dataclass(unsafe_hash=True)
 class LoadOperation(ProfileOperation[typing.Sequence[pathlib.Path], xarray.Dataset]):
     """
     An operation that loads data within paths into a single xarray dataset
@@ -798,7 +820,7 @@ class LoadOperation(ProfileOperation[typing.Sequence[pathlib.Path], xarray.Datas
         # Your IDE may complain about the `data` parameter - it is a false positive. A sequence of paths is fine
         return xarray.open_mfdataset(data, combine='by_coords', **self.load_arguments)
 
-@dataclasses.dataclass
+@dataclasses.dataclass(unsafe_hash=True)
 class PythonOperation(ProfileOperation[InputType, OutputType], abc.ABC):
     """
     Base class for operations implemented via python
@@ -833,7 +855,7 @@ class PythonOperation(ProfileOperation[InputType, OutputType], abc.ABC):
         )
         return result
 
-@dataclasses.dataclass
+@dataclasses.dataclass(unsafe_hash=True)
 class IntoPythonOperation(PythonOperation[typing.Sequence[pathlib.Path], xarray.Dataset]):
     """
     An operation that transforms raw files into python objects
@@ -842,7 +864,7 @@ class IntoPythonOperation(PythonOperation[typing.Sequence[pathlib.Path], xarray.
     def operation(cls) -> OperationType:
         return OperationType.INTO_PYTHON
 
-@dataclasses.dataclass
+@dataclasses.dataclass(unsafe_hash=True)
 class ToPythonOperation(PythonOperation[xarray.Dataset, xarray.Dataset]):
     """
     An operation that transforms python objects and returns python objects
@@ -852,7 +874,7 @@ class ToPythonOperation(PythonOperation[xarray.Dataset, xarray.Dataset]):
         return OperationType.TO_PYTHON
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(unsafe_hash=True)
 class OutOfPythonOperation(PythonOperation[xarray.Dataset, typing.Sequence[pathlib.Path]]):
     """
     An operation that transforms python objects and returns paths to objects
@@ -875,6 +897,7 @@ class Profile(BaseModel):
     member: typing.Optional[int] = dataclasses.field(default=None)
     date_format: str = dataclasses.field(default="%Y%m%d")
     output_directory: typing.Optional[pathlib.Path] = dataclasses.field(default=None)
+    intermediate_directory: typing.Optional[pathlib.Path] = dataclasses.field(default_factory=lambda: settings.intermediate_directory)
 
     def __str__(self):
         description = (
@@ -929,7 +952,12 @@ class Profile(BaseModel):
                 f"{type(first_operation)}({first_operation})"
             )
 
-    def __call__(self, date: datetime, cycle: typing.Union[int, str], files: typing.Sequence[pathlib.Path]) -> typing.Sequence[pathlib.Path]:
+    def __call__(
+        self,
+        date: datetime,
+        cycle: typing.Union[int, str],
+        files: typing.Sequence[pathlib.Path]
+    ) -> typing.Sequence[pathlib.Path]:
         """
         Perform all operations configured for this profile
 
@@ -937,9 +965,9 @@ class Profile(BaseModel):
         :returns: The list of resultant files
         """
         metadata: typing.Dict[str, typing.Any] = {
-            self.output_type.__class__.__name__: self.output_type,
-            self.region.__class__.__name__: self.region,
-            self.configuration.__class__.__name__: self.configuration,
+            self.output_type.__class__.__name__: str(self.output_type.value),
+            self.region.__class__.__name__: self.region.value,
+            self.configuration.__class__.__name__: self.configuration.value,
             "member": self.member,
             "cycle": str(cycle).zfill(2),
             "date": date.strftime(self.date_format),
@@ -954,7 +982,7 @@ class Profile(BaseModel):
             *files,
             *self.operations
         )))
-        work_directory: pathlib.Path = settings.intermediate_directory / process_identifier
+        work_directory: pathlib.Path = self.intermediate_directory / process_identifier
         work_directory.mkdir(parents=True, exist_ok=True)
 
         try:
@@ -988,8 +1016,10 @@ class Profile(BaseModel):
 
                 output_path: pathlib.Path = output_directory / filename
                 output.to_netcdf(output_path)
+                return [output_path]
+            return output
         finally:
-            work_directory.unlink()
+            shutil.rmtree(work_directory)
 
     def get_output_filename(
         self,
@@ -1040,7 +1070,7 @@ def get_function_by_name(
         >>> from post_processing import nco
         >>> get_function_by_name("netcdf.merge_files")
         <function merge_files at 0x7f550e82c400>
-        >>> from post_processing.netcdf import merge_files
+        >>> from post_processing.transform import merge_files
         >>> get_function_by_name("merge_files")
         <function merge_files at 0x7f550e82c400>
 
@@ -1205,7 +1235,7 @@ def load_operation(specification: typing.Mapping[str, typing.Any]) -> ProfileOpe
 
     fields: typing.Sequence[dataclasses.Field] = get_fields(operation_class)
 
-    optional_fields, required_fields = partition(
+    required_fields, optional_fields = partition(
         lambda field: field.default == dataclasses.MISSING and field.default_factory == dataclasses.MISSING,
         fields
     )
@@ -1214,6 +1244,7 @@ def load_operation(specification: typing.Mapping[str, typing.Any]) -> ProfileOpe
         field.name
         for field in required_fields
         if field.name not in specification
+           and field.init is True
     ]
 
     if missing_fields:
@@ -1225,7 +1256,8 @@ def load_operation(specification: typing.Mapping[str, typing.Any]) -> ProfileOpe
     extra_fields: typing.List[str] = [
         f"{key}: {type(specification[key])}"
         for key in specification.keys()
-        if not any([field.name == key for field in fields])
+        if key != 'operation' and
+           not any([field.name == key for field in fields])
     ]
 
     if extra_fields:
@@ -1241,7 +1273,7 @@ def load_operation(specification: typing.Mapping[str, typing.Any]) -> ProfileOpe
         if field.name in specification
     }
 
-    return operation_class.__init__(**constructor_arguments)
+    return operation_class(**constructor_arguments)
 
 @functools.cache
 def get_profile_operation_types(
@@ -1281,5 +1313,11 @@ def get_profile_operation_types(
             raise KeyError(message)
 
         subclasses.update(sub_subclasses)
+    subclasses = {
+        operation_type: subclass
+        for operation_type, subclass in subclasses.items()
+        if operation_type is not None
+           and operation_type != OperationType.NCO
+    }
     return subclasses
 

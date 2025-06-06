@@ -12,9 +12,9 @@ import os
 import re
 
 import xarray
+import numpy
 
 from post_processing.configuration import settings
-from post_processing.utilities.logging import setup_logging
 from post_processing.utilities.common import first
 from test.output_specification import Dataset
 from test.output_specification import deserialize
@@ -23,7 +23,9 @@ from test.output_specification import Variable
 
 from post_processing import nco
 
-setup_logging(settings.resource_path / "python_test_log_config.json")
+from ..helpers import setup_logging
+
+setup_logging()
 
 FORECAST_CYCLE: int = 0
 FORECAST_LENGTH: int = 18
@@ -232,17 +234,103 @@ class NCOTest(unittest.TestCase):
         Test to ensure the `merge` operation correctly merges multiple files and maintains data and metadata integrity
         """
         target_file: pathlib.Path = self.output_directory / "merged_data.nc"
-        nco.merge_files(files=self.input_files, output_file=target_file)
+        from post_processing.transform import merge_files_into_file
 
-        merged_dataset: xarray.Dataset = xarray.open_dataset(target_file, decode_cf=False)
-        input_dataset: xarray.Dataset = xarray.open_dataset(self.input_files[-1], decode_cf=False)
+        LOGGER.info(f"Merging data into {target_file}")
+        merge_files_into_file(files=self.input_files, output_file=target_file)
+        LOGGER.info(f"{len(self.input_files)} files merged into {target_file}")
+
+        merged_dataset: xarray.Dataset = xarray.open_dataset(target_file)
+
+        import random
+        sample_input_path: pathlib.Path = random.sample(self.input_files, 1)[0]
+        input_dataset: xarray.Dataset = xarray.open_dataset(sample_input_path)
+
+        LOGGER.info(f"Comparing merged data with the data members in {sample_input_path}")
+
+        for merged_attribute_key, merged_attribute_value in merged_dataset.attrs.items():
+            self.assertTrue(
+                merged_attribute_key in input_dataset.attrs,
+                f"The merged netcdf in {target_file} has an attribute named '{merged_attribute_key}' that the original ({sample_input_path}) does not"
+            )
+            try:
+                if isinstance(merged_dataset.attrs[merged_attribute_key], numpy.ndarray) and isinstance(
+                    input_dataset.attrs[merged_attribute_key],
+                    numpy.ndarray
+                    ):
+                    self.assertListEqual(
+                        merged_attribute_value.tolist(),
+                        input_dataset.attrs[merged_attribute_key].tolist(),
+                        f"The value for {target_file}.{merged_attribute_key} does not match "
+                        f"the value for {sample_input_path}.{merged_attribute_key}"
+                    )
+                    continue
+
+                self.assertEqual(
+                    merged_attribute_value,
+                    input_dataset.attrs[merged_attribute_key],
+                    f"The value for {target_file}.{merged_attribute_key} does not match "
+                    f"the value for {sample_input_path}.{merged_attribute_key}"
+                )
+            except ValueError:
+                LOGGER.error(
+                    f"A comparison failed when trying to test the difference between "
+                    f"{target_file}.{merged_attribute_key} ({merged_attribute_value}, type={type(merged_attribute_value)}) and "
+                    f"{sample_input_path}.{merged_attribute_key} ({input_dataset.attrs[merged_attribute_key]}, type={type(input_dataset.attrs[merged_attribute_key])})"
+                )
+                raise
+
 
         # Select a single time slice. We're going to check if the time slice matches the data from the file
-        mirrored_merged_data: xarray.Dataset = merged_dataset.sel({"time": input_dataset.time.values})
+        LOGGER.info(f"Selecting a sample from the merged dataset that matches the data in {sample_input_path}")
+        merged_data_sample: xarray.Dataset = merged_dataset.sel({"time": input_dataset.time.values}).squeeze()
 
-        LOGGER.warning(
-            f"{self.__class__}.test_merge_files is not completely implemented and needs to be finished."
-        )
+        for variable_name, data_variable in merged_data_sample.data_vars.items(): # type: str, xarray.DataArray
+            input_variable: xarray.DataArray = input_dataset.data_vars[variable_name]
+            self.assertListEqual(list(data_variable.dims), list(data_variable.dims))
+
+            # Attribute Comparisons
+            for merged_attribute_key, merged_attribute_value in data_variable.attrs.items():
+                self.assertTrue(
+                    merged_attribute_key in input_variable.attrs,
+                    f"The {variable_name} variable in {target_file} has an attribute named '{merged_attribute_key}' that the original ({sample_input_path}) does not"
+                )
+                try:
+                    if isinstance(data_variable.attrs[merged_attribute_key], numpy.ndarray) and isinstance(input_variable.attrs[merged_attribute_key], numpy.ndarray):
+                        self.assertListEqual(
+                            merged_attribute_value.tolist(),
+                            input_variable.attrs[merged_attribute_key].tolist(),
+                            f"The value for {target_file}::{variable_name}.{merged_attribute_key} does not match "
+                            f"the value for {sample_input_path}::{variable_name}.{merged_attribute_key}"
+                        )
+                        continue
+
+                    self.assertEqual(
+                        merged_attribute_value,
+                        input_variable.attrs[merged_attribute_key],
+                        f"The value for {target_file}::{variable_name}.{merged_attribute_key} does not match "
+                        f"the value for {sample_input_path}::{variable_name}.{merged_attribute_key}"
+                    )
+                except ValueError:
+                    LOGGER.error(
+                        f"A comparison failed when trying to test the difference between "
+                        f"{target_file}::{variable_name}.{merged_attribute_key} ({merged_attribute_value}, type={type(merged_attribute_value)}) and "
+                        f"{sample_input_path}::{variable_name}.{merged_attribute_key} ({input_variable.attrs[merged_attribute_key]}, type={type(input_variable.attrs[merged_attribute_key])})"
+                    )
+                    raise
+
+            if not data_variable.dims:
+                continue
+
+            mask_for_non_matching = input_variable != data_variable
+            data_that_does_not_match: xarray.DataArray = input_variable.where(mask_for_non_matching)
+            data_that_does_not_match = data_that_does_not_match.dropna(dim=list(data_variable.sizes.keys())[0], how='any')
+            self.assertEqual(
+                data_that_does_not_match.size,
+                0,
+                f"There were {data_that_does_not_match.size} value(s) in {sample_input_path}::{variable_name} "
+                f"that do not match their merged value in {target_file}::{variable_name}"
+            )
 
     @unittest.skip("This has not been implemented yet")
     def test_keep_only_variables(self):

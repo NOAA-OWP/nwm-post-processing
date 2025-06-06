@@ -7,7 +7,10 @@ import pathlib
 import os
 import tempfile
 
+import xarray
+
 from post_processing.utilities.common import starmap
+from post_processing.utilities.common import first
 
 from .operation_helpers import run_command
 from .operation_helpers import NCOFunction
@@ -17,6 +20,7 @@ from .operation_helpers import EditMode
 from .structure import DataVariable
 from .structure import NetcdfSummary
 from .structure import NetcdfType
+from .structure import Attribute
 
 LOGGER: logging.Logger = logging.getLogger(pathlib.Path(__file__).stem)
 
@@ -141,7 +145,7 @@ def copy_and_correct_merge_input(
 
             rename_arguments: typing.Tuple[str, str] = (new_variable_name, old_variable_name)
             adjustment_assignments[rename_arguments] = (
-                f"{new_variable_name}[{','.join(total_dimensions)}]={variable_type.dtype}({old_variable_name})"
+                f"{new_variable_name}[{','.join(total_dimensions)}]={old_variable_name}*1.0"
             )
 
     # Make the adjustments and reassign the path if necessary
@@ -162,15 +166,7 @@ def copy_and_correct_merge_input(
             new_filepath
         )
 
-        remove_variables(
-            new_filepath,
-            new_filepath,
-            list(map(lambda temp_and_og_name: temp_and_og_name[1], adjustment_assignments.keys()))
-        )
-
         for temporary_variable_name, original_variable_name in adjustment_assignments:
-            rename_variable(new_filepath, temporary_variable_name, original_variable_name)
-
             from post_processing.utilities.common import first
             variable_summary: DataVariable = first(
                 summary.data_variables,
@@ -180,57 +176,20 @@ def copy_and_correct_merge_input(
             for attribute in variable_summary.attributes:
                 run_command(NCOFunction.EDIT_ATTRIBUTES, attribute.ncatted_argument, new_filepath)
 
+        remove_variables(
+            new_filepath,
+            new_filepath,
+            list(map(lambda temp_and_og_name: temp_and_og_name[1], adjustment_assignments.keys()))
+        )
+
+        for temporary_variable_name, original_variable_name in adjustment_assignments:
+            rename_variable(new_filepath, temporary_variable_name, original_variable_name)
+
         new_header = get_header(target=new_filepath)
         LOGGER.debug(f"A copy of {file} was created with the header:{os.linesep}{new_header}")
         file = new_filepath
 
     return file
-
-
-def merge_files(
-    files: typing.Sequence[typing.Union[str, pathlib.Path]],
-    output_file: typing.Union[str, pathlib.Path],
-    work_directory: pathlib.Path = None,
-    validate: bool = False
-) -> None:
-    """
-    Combine files with the given variables and write to a new file
-
-    :param files: The files to merge
-    :param output_file: The output file to write to
-    :param work_directory: The working directory to write intermediate products to
-    :param validate: Whether to perform extra work to make sure intermediate data matches the original
-    """
-    created_directory: bool = False
-    try:
-        if work_directory is None:
-            work_directory = pathlib.Path(tempfile.mkdtemp())
-            created_directory = True
-
-        new_files: typing.Sequence[pathlib.Path] = starmap(
-            copy_and_correct_merge_input,
-            [
-                {
-                    "file": file,
-                    "work_directory": work_directory,
-                }
-                for file in files
-            ],
-            threaded=True
-        )
-
-        run_command(NCOFunction.CONCATENATE, *new_files, output_file)
-
-        if validate:
-            # Perform validation functions to ensure everything was copied correctly
-            LOGGER.warning(f"Merge validation has not been implemented yet")
-
-        new_header = get_header(target=output_file)
-        LOGGER.debug(f"Merged Output:{os.linesep}{new_header}")
-    finally:
-        if created_directory and work_directory.is_dir():
-            import shutil
-            shutil.rmtree(work_directory)
 
 
 def apply_mask_by_file(

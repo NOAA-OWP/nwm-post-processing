@@ -11,7 +11,7 @@ class OnlyErrorFilter(logging.Filter):
     Only allows critical and error messages
     """
     def filter(self, record):
-        return record.levelno in (logging.ERROR, logging.CRITICAL)
+        return record.levelno in (logging.WARNING, logging.ERROR, logging.CRITICAL)
     
 
 class ErrorExclusionFilter(logging.Filter):
