@@ -109,7 +109,6 @@
                 "units": "m3 s-1",
                 "coordinates": "latitude longitude",
                 "grid_mapping": "crs",
-                "missing_value": -999900,
                 "valid_range": [0, 5000000],
                 "_ChunkSizes": 1000
             },
@@ -134,7 +133,6 @@
                 "long_name": "Amount of stream flow alteration",
                 "units": "m3 s-1",
                 "coordinates": "latitude longitude",
-                "missing_value": -999900,
                 "grid_mapping": "crs",
                 "valid_range": [0, 5000000],
                 "_ChunkSizes": 1000
@@ -160,7 +158,6 @@
                 "long_name": "River Velocity",
                 "units": "m s-1",
                 "coordinates": "latitude longitude",
-                "missing_value": -999900,
                 "grid_mapping": "crs",
                 "valid_range": [0, 5000000],
                 "_ChunkSizes": 1000
@@ -187,7 +184,6 @@
                 "units": "m3 s-1",
                 "coordinates": "latitude longitude",
                 "grid_mapping": "crs",
-                "missing_value": -999999900000,
                 "valid_range": [0, 2000000000],
                 "_ChunkSizes": 1000
             },
@@ -212,7 +208,6 @@
                 "long_name": "Flux from gw bucket",
                 "units": "m3 s-1",
                 "coordinates": "latitude longitude",
-                "missing_value": -999999900000,
                 "grid_mapping": "crs",
                 "valid_range": [0, 2000000000],
                 "_ChunkSizes": 1000
@@ -239,7 +234,6 @@
                 "units": "m3 s-1",
                 "coordinates": "latitude longitude",
                 "grid_mapping": "crs",
-                "missing_value": -999999900000,
                 "valid_range": [0, 2000000000],
                 "_ChunkSizes": 1000
             },

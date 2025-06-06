@@ -1,5 +1,16 @@
 {
     "operations": [
-
-    ]
+        {
+            "operation": "merge",
+            "file_name_pattern": "nwm.t{date}{cycle}z.{ModelOutputType}.{Configuration}.{Region}.nc"
+        },
+        {
+            "operation": "save",
+            "directory": "<fill in output directory>",
+            "filename_pattern": "nwm.t{cycle}z.{ModelOutputType}.{Region}.{Configuration}.Test.nc"
+        }
+    ],
+    "configuration": "short_range",
+    "output_type": "channel_rt",
+    "region": "conus"
 }

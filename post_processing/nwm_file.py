@@ -30,6 +30,29 @@ class NWMFile:
         if self.frame is None and self.t_minus is None:
             raise ValueError("frame and t_minus cannot both be None")
 
+    @property
+    def group_hash(self) -> int:
+        """
+        Get a hash code that will be unique to NWM files that should be grouped together
+
+        Groups are defined by:
+
+        - cycle
+        - model_output_type
+        - configuration
+        - region
+        - member
+
+        NOTE: Mixing forecasts from different days will include forecasts from those different days
+        """
+        return hash((
+            self.cycle,
+            self.model_output_type,
+            self.configuration,
+            self.region,
+            self.member,
+        ))
+
     @classmethod
     def parse(cls, path: typing.Union[pathlib.Path, str]) -> "NWMFile":
         """

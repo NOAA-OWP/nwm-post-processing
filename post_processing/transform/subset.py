@@ -1,7 +1,6 @@
 """
 Contains logic for subsetting netcdf files
 """
-import typing
 import pathlib
 
 def subset_file_into_file_by_mask(

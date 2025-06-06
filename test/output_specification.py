@@ -111,7 +111,7 @@ def deserialize(cls: typing.Type[T], data: typing.Union[str, pathlib.Path, typin
                         except:
                             LOGGER.debug(f'"{entry}" could not be deserialized as a {possible_type}')
                 initialization_kwargs[field.name].append(acceptable_value)
-                    
+
         else:
             initialization_kwargs[field.name] = value
 
@@ -183,10 +183,11 @@ class Variable:
             encoding=encoding,
         )
 
-    def generate_raw_data(self) -> numpy.ndarray:
+    def generate_raw_data(self, step: int, max_steps: int) -> numpy.ndarray:
         """
         Generate arbitrary data
         """
+        jitter_fraction: float = 0.05
         data_type: numpy.dtype = xarray_dtype_from_str(self.datatype)
 
         shape: typing.Tuple[int, ...] = tuple(dimension.size for dimension in self.dimensions)
@@ -194,16 +195,94 @@ class Variable:
         if shape == tuple():
             return data_type.type()
 
+        is_dimension: bool = len(shape) == 1 and self.dimensions[0].name == self.name
+
+        if 'valid_range' in self.attributes:
+            absolute_low_bound = int(self.attributes['valid_range'][0])
+            absolute_high_bound = int(self.attributes['valid_range'][1])
+        elif 'valid_min' in self.attributes and 'valid_max' in self.attributes:
+            absolute_low_bound = int(self.attributes['valid_min'])
+            absolute_high_bound = int(self.attributes['valid_max'])
+        else:
+            absolute_low_bound = 0 if is_dimension else 200
+            absolute_high_bound = shape[0] if is_dimension else 8000
+
+        if len(shape) == 1 and self.dimensions[0].name == self.name:
+            # This needs to be sequential values as this the set of values for a dimension
+            count: int = shape[0]
+
+            # If there is only a single value, there's a good chance this is a record variable. Just choose the one that is in the correct step in the range
+            if count == 1:
+                absolute_range: numpy.ndarray = numpy.linspace(absolute_low_bound, absolute_high_bound, num=max_steps, dtype=data_type)
+                return absolute_range[step:step + 1]
+            else:
+                values: numpy.ndarray = numpy.linspace(absolute_low_bound, absolute_high_bound, num=shape[0], dtype=data_type)
+                values = values.astype(data_type)
+                return values
+
+        random_number_generator: numpy.random.Generator = numpy.random.default_rng(abs(hash((self.name, self.datatype))))
+
+        initial_range: int = absolute_high_bound - absolute_low_bound
+        fourth = initial_range / 4.0
+        fourth_range = fourth * 0.8
+        low_midpoint = absolute_low_bound + fourth
+        high_midpoint = absolute_high_bound - fourth
+
+        if numpy.issubdtype(data_type, numpy.number):
+            if numpy.issubdtype(data_type, numpy.integer):
+                generator_function = random_number_generator.integers
+            elif numpy.issubdtype(data_type, numpy.floating):
+                generator_function = random_number_generator.uniform
+            else:
+                raise NotImplementedError(f"The generation of '{data_type}' numbers is not implemented.")
+
+            low_range: numpy.ndarray = generator_function(
+                low=low_midpoint - fourth_range,
+                high=low_midpoint + fourth_range,
+                size=shape
+            )
+            high_range: numpy.ndarray = generator_function(
+                low=high_midpoint - fourth_range,
+                high=high_midpoint + fourth_range,
+                size=shape
+            )
+
+            raw_data: numpy.ndarray = generator_function(low_range, high_range)
+            span: numpy.ndarray = high_range - low_range
+
+            for _ in range(step):
+                jitter: numpy.ndarray = random_number_generator.uniform(-jitter_fraction, jitter_fraction, size=shape) * span
+                jitter = jitter.astype(dtype=data_type)
+                raw_data += jitter
+                raw_data = numpy.clip(raw_data, low_range, high_range)
+
+            raw_data = raw_data.astype(dtype=data_type)
+            return raw_data
+
+        if numpy.issubdtype(data_type, numpy.bool_):
+            return random_number_generator.choice([numpy.True_, numpy.False_], size=shape)
+
+        if numpy.issubdtype(data_type, numpy.bytes_):
+            raise NotImplementedError(f"Random byte generation has not been implemented yet")
+
+        if numpy.issubdtype(data_type, numpy.datetime64):
+            raise NotImplementedError(f"Random Datetime generation has not been implemented yet")
+
         return numpy.empty(shape, dtype=data_type)
 
 
-    def generate_array(self, coordinates: typing.Mapping[str, typing.Sequence]) -> xarray.DataArray:
+    def generate_array(
+        self,
+        coordinates: typing.Mapping[str, typing.Sequence],
+        step: int,
+        max_steps: int
+    ) -> xarray.DataArray:
         """
         Generate a data array representing this variable
         """
-        logging.info(f"Generating the data for {self.name} ({self.datatype})")
+        LOGGER.info(f"Generating the data for {self.name} ({self.datatype})")
 
-        raw_data = self.generate_raw_data()
+        raw_data = self.generate_raw_data(step=step, max_steps=max_steps)
         array: xarray.DataArray = xarray.DataArray(
             data=raw_data,
             name=self.name,
@@ -244,6 +323,14 @@ class Dataset:
     """The region over which this data is valid"""
     member: typing.Optional[int] = dataclasses.field(default=None)
     """The ensemble member that this dataset reflects"""
+
+    def __str__(self):
+        return (
+            f"Dataset: "
+            f"{self.configuration}."
+            f"{self.model_output_type}{'_' + str(self.member) if self.member is not None else ''}."
+            f"{self.region}"
+        )
 
     @classmethod
     def from_netcdf(cls, path: pathlib.Path) -> "Dataset":
@@ -335,14 +422,14 @@ class Dataset:
         ]
 
         if all(map(lambda path: path.exists(), output_paths)) and not overwrite:
-            logging.info(f"Data for {self} already exists in {output_directory}")
+            LOGGER.info(f"Data for {self} already exists in {output_directory}")
             return output_paths
 
-        logging.info(f"Generating data for {len(filenames)} files")
+        LOGGER.info(f"Generating data for {len(filenames)} files")
         coordinate_values: typing.Dict[str, typing.Union[typing.Sequence[xarray.DataArray], xarray.DataArray]] = {}
 
         for coordinate in self.coordinates:
-            logging.info(f"Generating coordinate information for {coordinate.name}")
+            LOGGER.info(f"Generating coordinate information for {coordinate.name}")
             data_type = xarray_dtype_from_str(coordinate.datatype)
             if 'time' in coordinate.name:
                 import pandas
@@ -399,6 +486,8 @@ class Dataset:
                 "variable_definitions": self.variables,
                 "global_attributes": self.attributes,
                 "unlimited_dimensions": list(dimension.name for dimension in self.dimensions if dimension.unlimited),
+                "step": file_index,
+                "max_steps": len(output_paths),
                 "overwrite": overwrite
             }
             for file_index, output_path in enumerate(output_paths)
@@ -447,6 +536,8 @@ def write_file(
     variable_definitions: typing.Sequence[Variable],
     global_attributes: typing.Dict[str, typing.Any],
     unlimited_dimensions: typing.Union[str, typing.Sequence[str]],
+    step: int,
+    max_steps: int,
     overwrite: bool = False
 ) -> pathlib.Path:
     """
@@ -457,14 +548,16 @@ def write_file(
     :param variable_definitions: The definitions for what variables should be included
     :param global_attributes: Attributes that should be present on the global scope
     :param unlimited_dimensions: One or more dimensions that should be considered as being unlimited, i.e. the record dimension
+    :param step: The step that this file represents in the order of generation
+    :param max_steps: The maximum amount of steps being created. This will show {step} out of {max_steps}
     :param overwrite: Whether to overwrite the data if it already exists
     :returns: The path to the generated data
     """
     if filename.exists() and not overwrite:
-        logging.debug(f"Data already exists for {filename} - reusing that")
+        LOGGER.debug(f"Data already exists for {filename} - reusing that")
         return filename
 
-    logging.debug(f"Generating data for {filename}")
+    LOGGER.debug(f"Generating data for {filename}")
 
     global_attributes = {
         attribute_name: shrink_value(attribute_value)
@@ -474,7 +567,7 @@ def write_file(
     variables: typing.Dict[str, xarray.DataArray] = {}
 
     for variable in variable_definitions:
-        variables[variable.name] = variable.generate_array(coordinates=coordinates)
+        variables[variable.name] = variable.generate_array(coordinates=coordinates, step=step, max_steps=max_steps)
 
     dataset: xarray.Dataset = xarray.Dataset(
         data_vars=variables,
@@ -488,8 +581,8 @@ def write_file(
     try:
         dataset.to_netcdf(path=filename, unlimited_dims=unlimited_dimensions)
     except:
-        logging.error(f"Failed to write data to {filename}. Data:{os.linesep}{dataset}")
+        LOGGER.error(f"Failed to write data to {filename}. Data:{os.linesep}{dataset}")
         raise
     header: str = nco.get_header(filename)
-    logging.debug(f"Saved dataset to {filename}:{os.linesep}{header}")
+    LOGGER.debug(f"Saved dataset to {filename}:{os.linesep}{header}")
     return filename
