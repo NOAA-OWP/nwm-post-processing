@@ -9,12 +9,13 @@ dependencies = [
     "netCDF4",
     "xarray",
     "dask",
-    "pandas"
+    "pandas",
+    "geopandas",
 ]
 description = "Takes National Water Model data, combines the output, and subsets them based on region in order to make model data easier to work with"
 license = { file = "LICENSE" }
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 classifiers = [
     "Intended Audience :: Science/Research",
     "License :: OSI Approved :: Apache Software License",
@@ -26,8 +27,9 @@ classifiers = [
 
 [project.optional-dependencies]
 analysis = [
-    "geopandas",
-    "fiona"
+    "fiona",
+    "requests",
+    "BeautifulSoup4"
 ]
 
 [project.scripts]

@@ -1,0 +1,14 @@
+{
+    "operations": [
+        {
+            "operation": "echo",
+            "message": "An output for 'nwm.t<date><cycle>z.medium_range_blend.channel_rt.alaska.nc' should be generated, as defined in {source_file}.",
+            "level": "error",
+            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/WMS/medium_range_blend/channel_rt/nwm.t2025060712z.medium_range_blend.channel_rt.alaska.nc"
+        }
+    ],
+    "configuration": "medium_range_blend",
+    "output_type": "channel_rt",
+    "region": "alaska",
+    "member": null
+}
