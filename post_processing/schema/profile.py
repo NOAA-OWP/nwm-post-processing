@@ -40,8 +40,6 @@ OutputType = typing.TypeVar("OutputType")
 OPERATION_KEY: typing.Final[str] = "operation"
 """The key for a ProfileOperation dictionary stating what the ProfileOperation is supposed to do"""
 
-TEXT_FORMAT_VARIABLE_PATTERN: re.Pattern = re.compile(r"\{(?P<name>[\w_]+)(:[^}]*)?}")
-
 @typing.runtime_checkable
 class OperationHandler(typing.Protocol[InputType, OutputType]):
     """
@@ -219,6 +217,9 @@ class ProfileOperation(BaseModel, OperationHandler[InputType, OutputType], abc.A
 
 
 class EchoOperation(ProfileOperation[InputType, InputType]):
+    """
+    A profile operation that outputs formatted log messages. Useful for alerts and progress messages
+    """
     @classmethod
     def operation(cls) -> OperationType:
         return OperationType.ECHO
@@ -261,6 +262,11 @@ class EchoOperation(ProfileOperation[InputType, InputType]):
 
 
 class RaiseOperation(ProfileOperation[InputType, InputType]):
+    """
+    A profile operation that raises exceptions.
+
+    Used as an option for placeholders
+    """
     @classmethod
     def operation(cls) -> OperationType:
         return OperationType.RAISE
@@ -282,6 +288,7 @@ class RaiseOperation(ProfileOperation[InputType, InputType]):
             **metadata,
         }
         message: str = self.message.format(**message_metadata)
+
         # TODO: Write a custom exception for this
         raise Exception(message)
 
@@ -289,6 +296,9 @@ class RaiseOperation(ProfileOperation[InputType, InputType]):
 
 
 class NCOOperation(ProfileOperation[typing.Sequence[pathlib.Path], typing.Sequence[pathlib.Path]]):
+    """
+    Base class for file-set to file-set operations that mimic or wrap functions from CLI Netcdf Operators
+    """
     @classmethod
     def operation(cls) -> OperationType:
         return OperationType.NCO

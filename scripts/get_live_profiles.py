@@ -156,13 +156,22 @@ def parse_metadata_from_url(url: str) -> typing.Optional[typing.Dict[str, typing
         return None
 
     filename_parameters: typing.Dict[str, str] = match.groupdict()
+
+    # Some profiles may generate multiple files for many locations, so create a region name for the greater umbrella
+    # region that will be encountered. CONUS output is the most plentiful, outputs sets of files per RFC,
+    # so we'll use that as the default
     region = "conus"
 
+    # If alaska is in the name somewhere, we know it comes from a model run that ONLY generates alaska data
     if "alaska" in filename_parameters.get("region", ""):
         region = "alaska"
-    if "hawaii" in filename_parameters.get("region", ""):
+    elif "hawaii" in filename_parameters.get("region", ""):
+        # If hawaii is in the name somewhere, we know that it comes from a model run that ONLY generates Hawaii data
         region = "hawaii"
-    if "puerto" in filename_parameters.get("region", "") or "pr" in filename_parameters.get("region", ""):
+    elif "puerto" in filename_parameters.get("region", "") or "pr" in filename_parameters.get("region", ""):
+        # If 'puerto' (for Puerto Rico) is in the name or 'pr' (for PR/VI or Puerto Rico and the Virgin Islands) is
+        # in the name we know we are dealing with model output pertaining to Puerto Rico,
+        # which is independent of the other data
         region = "puertorico"
 
     # The output type used here should be an amalgamation of actual output type and its potential ensemble member.
