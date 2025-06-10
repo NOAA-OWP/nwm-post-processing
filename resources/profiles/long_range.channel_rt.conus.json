@@ -1,0 +1,14 @@
+{
+    "operations": [
+        {
+            "operation": "echo",
+            "message": "An output for 'nwm.t<date><cycle>z.long_range.channel_rt.conus.nc' should be generated, as defined in {source_file}.",
+            "level": "error",
+            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/WMS/long_range/channel_rt/nwm.t2025060712z.long_range.channel_rt.conus.nc"
+        }
+    ],
+    "configuration": "long_range",
+    "output_type": "channel_rt",
+    "region": "conus",
+    "member": null
+}

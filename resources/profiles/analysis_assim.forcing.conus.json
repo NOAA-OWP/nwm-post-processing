@@ -1,0 +1,266 @@
+{
+    "operations": [
+        {
+            "operation": "echo",
+            "message": "An output for 'nwm.t<date><cycle>z.analysis_assim.forcing.tm00.conus.nc' should be generated, as defined in {source_file}.",
+            "level": "error",
+            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/WMS/analysis_assim/fe/nwm.t2025060718z.analysis_assim.forcing.tm00.conus.nc"
+        },
+        {
+            "operation": "echo",
+            "message": "An output for 'nwm.t<date><cycle>z.analysis_assim.forcing.tm00.puertorico.nc' should be generated, as defined in {source_file}.",
+            "level": "error",
+            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/WMS/analysis_assim/fe/nwm.t2025060718z.analysis_assim.forcing.tm00.puertorico.nc"
+        },
+        {
+            "operation": "echo",
+            "message": "An output for 'nwm.t<date><cycle>z.analysis_assim.forcing.tm00.abrfc.nc' should be generated, as defined in {source_file}.",
+            "level": "error",
+            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AB/fe/nwm.t2025060718z.analysis_assim.forcing.tm00.abrfc.nc"
+        },
+        {
+            "operation": "echo",
+            "message": "An output for 'nwm.t<date><cycle>z.analysis_assim.forcing.tm01.abrfc.nc' should be generated, as defined in {source_file}.",
+            "level": "error",
+            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AB/fe/nwm.t2025060718z.analysis_assim.forcing.tm01.abrfc.nc"
+        },
+        {
+            "operation": "echo",
+            "message": "An output for 'nwm.t<date><cycle>z.analysis_assim.forcing.tm02.abrfc.nc' should be generated, as defined in {source_file}.",
+            "level": "error",
+            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AB/fe/nwm.t2025060718z.analysis_assim.forcing.tm02.abrfc.nc"
+        },
+        {
+            "operation": "echo",
+            "message": "An output for 'nwm.t<date><cycle>z.analysis_assim.forcing.tm00.aprfc.nc' should be generated, as defined in {source_file}.",
+            "level": "error",
+            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AP/fe/nwm.t2025060718z.analysis_assim.forcing.tm00.aprfc.nc"
+        },
+        {
+            "operation": "echo",
+            "message": "An output for 'nwm.t<date><cycle>z.analysis_assim.forcing.tm01.aprfc.nc' should be generated, as defined in {source_file}.",
+            "level": "error",
+            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AP/fe/nwm.t2025060718z.analysis_assim.forcing.tm01.aprfc.nc"
+        },
+        {
+            "operation": "echo",
+            "message": "An output for 'nwm.t<date><cycle>z.analysis_assim.forcing.tm02.aprfc.nc' should be generated, as defined in {source_file}.",
+            "level": "error",
+            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AP/fe/nwm.t2025060718z.analysis_assim.forcing.tm02.aprfc.nc"
+        },
+        {
+            "operation": "echo",
+            "message": "An output for 'nwm.t<date><cycle>z.analysis_assim.forcing.tm00.cbrfc.nc' should be generated, as defined in {source_file}.",
+            "level": "error",
+            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/CB/fe/nwm.t2025060718z.analysis_assim.forcing.tm00.cbrfc.nc"
+        },
+        {
+            "operation": "echo",
+            "message": "An output for 'nwm.t<date><cycle>z.analysis_assim.forcing.tm01.cbrfc.nc' should be generated, as defined in {source_file}.",
+            "level": "error",
+            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/CB/fe/nwm.t2025060718z.analysis_assim.forcing.tm01.cbrfc.nc"
+        },
+        {
+            "operation": "echo",
+            "message": "An output for 'nwm.t<date><cycle>z.analysis_assim.forcing.tm02.cbrfc.nc' should be generated, as defined in {source_file}.",
+            "level": "error",
+            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/CB/fe/nwm.t2025060718z.analysis_assim.forcing.tm02.cbrfc.nc"
+        },
+        {
+            "operation": "echo",
+            "message": "An output for 'nwm.t<date><cycle>z.analysis_assim.forcing.tm00.cnrfc.nc' should be generated, as defined in {source_file}.",
+            "level": "error",
+            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/CN/fe/nwm.t2025060718z.analysis_assim.forcing.tm00.cnrfc.nc"
+        },
+        {
+            "operation": "echo",
+            "message": "An output for 'nwm.t<date><cycle>z.analysis_assim.forcing.tm01.cnrfc.nc' should be generated, as defined in {source_file}.",
+            "level": "error",
+            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/CN/fe/nwm.t2025060718z.analysis_assim.forcing.tm01.cnrfc.nc"
+        },
+        {
+            "operation": "echo",
+            "message": "An output for 'nwm.t<date><cycle>z.analysis_assim.forcing.tm02.cnrfc.nc' should be generated, as defined in {source_file}.",
+            "level": "error",
+            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/CN/fe/nwm.t2025060718z.analysis_assim.forcing.tm02.cnrfc.nc"
+        },
+        {
+            "operation": "echo",
+            "message": "An output for 'nwm.t<date><cycle>z.analysis_assim.forcing.tm00.lmrfc.nc' should be generated, as defined in {source_file}.",
+            "level": "error",
+            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/LM/fe/nwm.t2025060718z.analysis_assim.forcing.tm00.lmrfc.nc"
+        },
+        {
+            "operation": "echo",
+            "message": "An output for 'nwm.t<date><cycle>z.analysis_assim.forcing.tm01.lmrfc.nc' should be generated, as defined in {source_file}.",
+            "level": "error",
+            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/LM/fe/nwm.t2025060718z.analysis_assim.forcing.tm01.lmrfc.nc"
+        },
+        {
+            "operation": "echo",
+            "message": "An output for 'nwm.t<date><cycle>z.analysis_assim.forcing.tm02.lmrfc.nc' should be generated, as defined in {source_file}.",
+            "level": "error",
+            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/LM/fe/nwm.t2025060718z.analysis_assim.forcing.tm02.lmrfc.nc"
+        },
+        {
+            "operation": "echo",
+            "message": "An output for 'nwm.t<date><cycle>z.analysis_assim.forcing.tm00.marfc.nc' should be generated, as defined in {source_file}.",
+            "level": "error",
+            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/MA/fe/nwm.t2025060718z.analysis_assim.forcing.tm00.marfc.nc"
+        },
+        {
+            "operation": "echo",
+            "message": "An output for 'nwm.t<date><cycle>z.analysis_assim.forcing.tm01.marfc.nc' should be generated, as defined in {source_file}.",
+            "level": "error",
+            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/MA/fe/nwm.t2025060718z.analysis_assim.forcing.tm01.marfc.nc"
+        },
+        {
+            "operation": "echo",
+            "message": "An output for 'nwm.t<date><cycle>z.analysis_assim.forcing.tm02.marfc.nc' should be generated, as defined in {source_file}.",
+            "level": "error",
+            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/MA/fe/nwm.t2025060718z.analysis_assim.forcing.tm02.marfc.nc"
+        },
+        {
+            "operation": "echo",
+            "message": "An output for 'nwm.t<date><cycle>z.analysis_assim.forcing.tm00.mbrfc.nc' should be generated, as defined in {source_file}.",
+            "level": "error",
+            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/MB/fe/nwm.t2025060718z.analysis_assim.forcing.tm00.mbrfc.nc"
+        },
+        {
+            "operation": "echo",
+            "message": "An output for 'nwm.t<date><cycle>z.analysis_assim.forcing.tm01.mbrfc.nc' should be generated, as defined in {source_file}.",
+            "level": "error",
+            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/MB/fe/nwm.t2025060718z.analysis_assim.forcing.tm01.mbrfc.nc"
+        },
+        {
+            "operation": "echo",
+            "message": "An output for 'nwm.t<date><cycle>z.analysis_assim.forcing.tm02.mbrfc.nc' should be generated, as defined in {source_file}.",
+            "level": "error",
+            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/MB/fe/nwm.t2025060718z.analysis_assim.forcing.tm02.mbrfc.nc"
+        },
+        {
+            "operation": "echo",
+            "message": "An output for 'nwm.t<date><cycle>z.analysis_assim.forcing.tm00.ncrfc.nc' should be generated, as defined in {source_file}.",
+            "level": "error",
+            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NC/fe/nwm.t2025060718z.analysis_assim.forcing.tm00.ncrfc.nc"
+        },
+        {
+            "operation": "echo",
+            "message": "An output for 'nwm.t<date><cycle>z.analysis_assim.forcing.tm01.ncrfc.nc' should be generated, as defined in {source_file}.",
+            "level": "error",
+            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NC/fe/nwm.t2025060718z.analysis_assim.forcing.tm01.ncrfc.nc"
+        },
+        {
+            "operation": "echo",
+            "message": "An output for 'nwm.t<date><cycle>z.analysis_assim.forcing.tm02.ncrfc.nc' should be generated, as defined in {source_file}.",
+            "level": "error",
+            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NC/fe/nwm.t2025060718z.analysis_assim.forcing.tm02.ncrfc.nc"
+        },
+        {
+            "operation": "echo",
+            "message": "An output for 'nwm.t<date><cycle>z.analysis_assim.forcing.tm00.nerfc.nc' should be generated, as defined in {source_file}.",
+            "level": "error",
+            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NE/fe/nwm.t2025060718z.analysis_assim.forcing.tm00.nerfc.nc"
+        },
+        {
+            "operation": "echo",
+            "message": "An output for 'nwm.t<date><cycle>z.analysis_assim.forcing.tm01.nerfc.nc' should be generated, as defined in {source_file}.",
+            "level": "error",
+            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NE/fe/nwm.t2025060718z.analysis_assim.forcing.tm01.nerfc.nc"
+        },
+        {
+            "operation": "echo",
+            "message": "An output for 'nwm.t<date><cycle>z.analysis_assim.forcing.tm02.nerfc.nc' should be generated, as defined in {source_file}.",
+            "level": "error",
+            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NE/fe/nwm.t2025060718z.analysis_assim.forcing.tm02.nerfc.nc"
+        },
+        {
+            "operation": "echo",
+            "message": "An output for 'nwm.t<date><cycle>z.analysis_assim.forcing.tm00.nwrfc.nc' should be generated, as defined in {source_file}.",
+            "level": "error",
+            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NW/fe/nwm.t2025060718z.analysis_assim.forcing.tm00.nwrfc.nc"
+        },
+        {
+            "operation": "echo",
+            "message": "An output for 'nwm.t<date><cycle>z.analysis_assim.forcing.tm01.nwrfc.nc' should be generated, as defined in {source_file}.",
+            "level": "error",
+            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NW/fe/nwm.t2025060718z.analysis_assim.forcing.tm01.nwrfc.nc"
+        },
+        {
+            "operation": "echo",
+            "message": "An output for 'nwm.t<date><cycle>z.analysis_assim.forcing.tm02.nwrfc.nc' should be generated, as defined in {source_file}.",
+            "level": "error",
+            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NW/fe/nwm.t2025060718z.analysis_assim.forcing.tm02.nwrfc.nc"
+        },
+        {
+            "operation": "echo",
+            "message": "An output for 'nwm.t<date><cycle>z.analysis_assim.forcing.tm00.ohrfc.nc' should be generated, as defined in {source_file}.",
+            "level": "error",
+            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/OH/fe/nwm.t2025060718z.analysis_assim.forcing.tm00.ohrfc.nc"
+        },
+        {
+            "operation": "echo",
+            "message": "An output for 'nwm.t<date><cycle>z.analysis_assim.forcing.tm01.ohrfc.nc' should be generated, as defined in {source_file}.",
+            "level": "error",
+            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/OH/fe/nwm.t2025060718z.analysis_assim.forcing.tm01.ohrfc.nc"
+        },
+        {
+            "operation": "echo",
+            "message": "An output for 'nwm.t<date><cycle>z.analysis_assim.forcing.tm02.ohrfc.nc' should be generated, as defined in {source_file}.",
+            "level": "error",
+            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/OH/fe/nwm.t2025060718z.analysis_assim.forcing.tm02.ohrfc.nc"
+        },
+        {
+            "operation": "echo",
+            "message": "An output for 'nwm.t<date><cycle>z.analysis_assim.forcing.tm00.serfc.nc' should be generated, as defined in {source_file}.",
+            "level": "error",
+            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/SE/fe/nwm.t2025060718z.analysis_assim.forcing.tm00.serfc.nc"
+        },
+        {
+            "operation": "echo",
+            "message": "An output for 'nwm.t<date><cycle>z.analysis_assim.forcing.tm01.puertorico.nc' should be generated, as defined in {source_file}.",
+            "level": "error",
+            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/SE/fe/nwm.t2025060718z.analysis_assim.forcing.tm01.puertorico.serfc.nc"
+        },
+        {
+            "operation": "echo",
+            "message": "An output for 'nwm.t<date><cycle>z.analysis_assim.forcing.tm01.serfc.nc' should be generated, as defined in {source_file}.",
+            "level": "error",
+            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/SE/fe/nwm.t2025060718z.analysis_assim.forcing.tm01.serfc.nc"
+        },
+        {
+            "operation": "echo",
+            "message": "An output for 'nwm.t<date><cycle>z.analysis_assim.forcing.tm02.puertorico.nc' should be generated, as defined in {source_file}.",
+            "level": "error",
+            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/SE/fe/nwm.t2025060718z.analysis_assim.forcing.tm02.puertorico.serfc.nc"
+        },
+        {
+            "operation": "echo",
+            "message": "An output for 'nwm.t<date><cycle>z.analysis_assim.forcing.tm02.serfc.nc' should be generated, as defined in {source_file}.",
+            "level": "error",
+            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/SE/fe/nwm.t2025060718z.analysis_assim.forcing.tm02.serfc.nc"
+        },
+        {
+            "operation": "echo",
+            "message": "An output for 'nwm.t<date><cycle>z.analysis_assim.forcing.tm00.wgrfc.nc' should be generated, as defined in {source_file}.",
+            "level": "error",
+            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/WG/fe/nwm.t2025060718z.analysis_assim.forcing.tm00.wgrfc.nc"
+        },
+        {
+            "operation": "echo",
+            "message": "An output for 'nwm.t<date><cycle>z.analysis_assim.forcing.tm01.wgrfc.nc' should be generated, as defined in {source_file}.",
+            "level": "error",
+            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/WG/fe/nwm.t2025060718z.analysis_assim.forcing.tm01.wgrfc.nc"
+        },
+        {
+            "operation": "echo",
+            "message": "An output for 'nwm.t<date><cycle>z.analysis_assim.forcing.tm02.wgrfc.nc' should be generated, as defined in {source_file}.",
+            "level": "error",
+            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/WG/fe/nwm.t2025060718z.analysis_assim.forcing.tm02.wgrfc.nc"
+        }
+    ],
+    "configuration": "analysis_assim",
+    "output_type": "forcing",
+    "region": "conus",
+    "member": null
+}

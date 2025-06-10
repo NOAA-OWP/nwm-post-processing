@@ -1,0 +1,26 @@
+{
+    "operations": [
+        {
+            "operation": "echo",
+            "message": "An output for 'nwm.t<date><cycle>z.analysis_assim.land.tm00.alaska.nc' should be generated, as defined in {source_file}.",
+            "level": "error",
+            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/WMS/analysis_assim/land/nwm.t2025060718z.analysis_assim.land.tm00.alaska.nc"
+        },
+        {
+            "operation": "echo",
+            "message": "An output for 'nwm.t<date><cycle>z.analysis_assim.land.tm01.alaska.nc' should be generated, as defined in {source_file}.",
+            "level": "error",
+            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AP/land/nwm.t2025060718z.analysis_assim.land.tm01.alaska.aprfc.nc"
+        },
+        {
+            "operation": "echo",
+            "message": "An output for 'nwm.t<date><cycle>z.analysis_assim.land.tm02.alaska.nc' should be generated, as defined in {source_file}.",
+            "level": "error",
+            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AP/land/nwm.t2025060718z.analysis_assim.land.tm02.alaska.aprfc.nc"
+        }
+    ],
+    "configuration": "analysis_assim",
+    "output_type": "land",
+    "region": "alaska",
+    "member": null
+}

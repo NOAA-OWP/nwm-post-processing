@@ -1,0 +1,26 @@
+{
+    "operations": [
+        {
+            "operation": "echo",
+            "message": "An output for 'nwm.t<date><cycle>z.short_range.forcing.48hour.hawaii.nc' should be generated, as defined in {source_file}.",
+            "level": "error",
+            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/WMS/short_range/fe/nwm.t2025060800z.short_range.forcing.48hour.hawaii.nc"
+        },
+        {
+            "operation": "echo",
+            "message": "An output for 'nwm.t<date><cycle>z.short_range.forcing.day1.hawaii.nc' should be generated, as defined in {source_file}.",
+            "level": "error",
+            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/WMS/short_range/fe/nwm.t2025060800z.short_range.forcing.day1.hawaii.nc"
+        },
+        {
+            "operation": "echo",
+            "message": "An output for 'nwm.t<date><cycle>z.short_range.forcing.day2.hawaii.nc' should be generated, as defined in {source_file}.",
+            "level": "error",
+            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/WMS/short_range/fe/nwm.t2025060800z.short_range.forcing.day2.hawaii.nc"
+        }
+    ],
+    "configuration": "short_range",
+    "output_type": "forcing",
+    "region": "hawaii",
+    "member": null
+}

@@ -1,0 +1,14 @@
+{
+    "operations": [
+        {
+            "operation": "echo",
+            "message": "An output for 'nwm.t<date><cycle>z.short_range.channel_rt.alaska.nc' should be generated, as defined in {source_file}.",
+            "level": "error",
+            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/WMS/short_range/channel_rt/nwm.t2025060718z.short_range.channel_rt.alaska.nc"
+        }
+    ],
+    "configuration": "short_range",
+    "output_type": "channel_rt",
+    "region": "alaska",
+    "member": null
+}

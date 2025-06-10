@@ -1,0 +1,14 @@
+{
+    "operations": [
+        {
+            "operation": "echo",
+            "message": "An output for 'nwm.t<date><cycle>z.analysis_assim.forcing.tm00.hawaii.nc' should be generated, as defined in {source_file}.",
+            "level": "error",
+            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/WMS/analysis_assim/fe/nwm.t2025060718z.analysis_assim.forcing.tm00.hawaii.nc"
+        }
+    ],
+    "configuration": "analysis_assim",
+    "output_type": "forcing",
+    "region": "hawaii",
+    "member": null
+}

@@ -1,0 +1,26 @@
+{
+    "operations": [
+        {
+            "operation": "echo",
+            "message": "An output for 'nwm.t<date><cycle>z.analysis_assim.channel_rt.tm00.alaska.nc' should be generated, as defined in {source_file}.",
+            "level": "error",
+            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/WMS/analysis_assim/channel_rt/nwm.t2025060718z.analysis_assim.channel_rt.tm00.alaska.nc"
+        },
+        {
+            "operation": "echo",
+            "message": "An output for 'nwm.t<date><cycle>z.analysis_assim.channel_rt.tm01.alaska.nc' should be generated, as defined in {source_file}.",
+            "level": "error",
+            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/WMS/analysis_assim/channel_rt/nwm.t2025060718z.analysis_assim.channel_rt.tm01.alaska.nc"
+        },
+        {
+            "operation": "echo",
+            "message": "An output for 'nwm.t<date><cycle>z.analysis_assim.channel_rt.tm02.alaska.nc' should be generated, as defined in {source_file}.",
+            "level": "error",
+            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/WMS/analysis_assim/channel_rt/nwm.t2025060718z.analysis_assim.channel_rt.tm02.alaska.nc"
+        }
+    ],
+    "configuration": "analysis_assim",
+    "output_type": "channel_rt",
+    "region": "alaska",
+    "member": null
+}

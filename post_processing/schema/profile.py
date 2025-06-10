@@ -104,6 +104,10 @@ class OperationType(enum.StrEnum):
     """Write a netcdf file to disk (may conflict with 'save')"""
     NCO = "not_implemented"
     """A dummy operation type used as the base for NCO operations"""
+    ECHO = "echo"
+    """Output a message"""
+    RAISE = "raise"
+    """Raise an exception"""
 
 
 class InPlaceOperationMixin:
@@ -212,6 +216,76 @@ class ProfileOperation(BaseModel, OperationHandler[InputType, OutputType], abc.A
         :param metadata: Metadata provided from previous operations that may be used as helpful hints
         :returns: The Paths for each created object
         """
+
+
+class EchoOperation(ProfileOperation[InputType, InputType]):
+    @classmethod
+    def operation(cls) -> OperationType:
+        return OperationType.ECHO
+
+    def __call__(
+        self,
+        profile: "Profile",
+        process_identifier: str,
+        work_directory: pathlib.Path,
+        data: InputType,
+        previous_operations: typing.List["ProfileOperation"],
+        metadata: typing.Dict[str, typing.Any]
+    ) -> InputType:
+        message_metadata: typing.Dict[str, typing.Any] = {
+            "profile": str(profile),
+            "process_identifier": process_identifier,
+            "work_directory": str(work_directory),
+            "previous_operations": "->".join(map(str, previous_operations)),
+            **metadata,
+        }
+
+        if profile.source_file is not None:
+            message_metadata["source_file"] = str(profile.source_file)
+
+        self._logger.log(self.level, self.message.format(**message_metadata))
+        return data
+
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        if self.logger_name:
+            self._logger = logging.getLogger(self.logger_name)
+
+        if not isinstance(self.level, int):
+            self.level = logging.getLevelName(self.level)
+
+    message: str
+    level: typing.Union[int, str] = dataclasses.field(default=logging.INFO)
+    logger_name: typing.Optional[str]
+    _logger: logging.Logger = member(default_factory=lambda: LOGGER)
+
+
+class RaiseOperation(ProfileOperation[InputType, InputType]):
+    @classmethod
+    def operation(cls) -> OperationType:
+        return OperationType.RAISE
+
+    def __call__(
+        self,
+        profile: "Profile",
+        process_identifier: str,
+        work_directory: pathlib.Path,
+        data: InputType,
+        previous_operations: typing.List["ProfileOperation"],
+        metadata: typing.Dict[str, typing.Any]
+    ) -> InputType:
+        message_metadata: typing.Dict[str, typing.Any] = {
+            "profile": str(profile),
+            "process_identifier": process_identifier,
+            "work_directory": str(work_directory),
+            "previous_operations": "->".join(map(str, previous_operations)),
+            **metadata,
+        }
+        message: str = self.message.format(**message_metadata)
+        # TODO: Write a custom exception for this
+        raise Exception(message)
+
+    message: str
 
 
 class NCOOperation(ProfileOperation[typing.Sequence[pathlib.Path], typing.Sequence[pathlib.Path]]):
@@ -898,6 +972,7 @@ class Profile(BaseModel):
     date_format: str = dataclasses.field(default="%Y%m%d")
     output_directory: typing.Optional[pathlib.Path] = dataclasses.field(default=None)
     intermediate_directory: typing.Optional[pathlib.Path] = dataclasses.field(default_factory=lambda: settings.intermediate_directory)
+    source_file: typing.Optional[pathlib.Path] = dataclasses.field(default=None)
 
     def __str__(self):
         description = (
