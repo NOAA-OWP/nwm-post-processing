@@ -8,3 +8,7 @@ requests
 shapely
 xarray
 dask
+
+numpy
+geopandas
+beautifulsoup4
