@@ -29,7 +29,9 @@ classifiers = [
 analysis = [
     "fiona",
     "requests",
-    "BeautifulSoup4"
+    "BeautifulSoup4",
+    "aiohttp",
+    "us"
 ]
 
 [project.scripts]
