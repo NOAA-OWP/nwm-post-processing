@@ -25,7 +25,7 @@ LOGGER: logging.Logger = logging.getLogger(pathlib.Path(__file__).stem)
 @dataclasses.dataclass
 class InputManifest(BaseModel):
     """
-    Details about the initial state of the data
+    Details everything about a set of files that will be operated upon
     """
     region: Region
     """Where the values are valid"""

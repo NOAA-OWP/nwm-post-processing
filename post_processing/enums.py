@@ -40,16 +40,18 @@ class Configuration(PostProcessingEnumeration):
     Enumerates the different ways a model may be configured for forecast/simulation length and input parameters
     """
     ShortRange = "short_range"
+    ShortRangeNoDA = "short_range_no_da"
     LongRange = "long_range"
     MediumRange = "medium_range"
     MediumRangeNoDA = "medium_range_no_da"
     MediumRangeBlend = "medium_range_blend"
     MediumRangeNFDF = "medium_range_nfdf"
     AnalysisAssimilation = "analysis_assim"
+    AnalysisAssimilationNoDA = "analysis_assim_no_da"
     ExtendedAnalysisAssimilation = "analysis_assim_extend"
     ExtendedAnalysisAssimilationNoDA = "analysis_assim_extend_no_da"
-    LongAnalysisAssimilation = "analysis_assimilation_long"
-    LongAnalysisAssimilationNoDA = "analysis_assimilation_long_no_da"
+    LongAnalysisAssimilation = "analysis_assim_long"
+    LongAnalysisAssimilationNoDA = "analysis_assim_long_no_da"
 
 
 class Region(PostProcessingEnumeration):

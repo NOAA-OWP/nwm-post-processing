@@ -27,6 +27,7 @@ from post_processing.enums import ModelOutputType
 from post_processing.enums import Configuration
 
 from post_processing import nco
+from post_processing import schema
 
 from post_processing.utilities.common import starmap
 from post_processing.utilities.common import partition
@@ -112,11 +113,11 @@ class InPlaceOperationMixin:
     """
     A mixin for data classes adding a field determining whether the files should be operated on in place or into a new file
     """
-    in_place: bool = dataclasses.field(default=False)
+    in_place: bool = False
     """
     Dictates whether the changes made to the data should be applied in place or if the changes should go into a new file
     """
-    output_pattern: typing.Optional[str] = dataclasses.field(default=None)
+    output_pattern: typing.Optional[str] = None
     """
     The file name pattern to use when not making a change in place
     """
@@ -215,7 +216,7 @@ class ProfileOperation(BaseModel, OperationHandler[InputType, OutputType], abc.A
         :returns: The Paths for each created object
         """
 
-
+@dataclasses.dataclass(unsafe_hash=True)
 class EchoOperation(ProfileOperation[InputType, InputType]):
     """
     A profile operation that outputs formatted log messages. Useful for alerts and progress messages
@@ -253,14 +254,14 @@ class EchoOperation(ProfileOperation[InputType, InputType]):
             self._logger = logging.getLogger(self.logger_name)
 
         if not isinstance(self.level, int):
-            self.level = logging.getLevelName(self.level)
+            self.level = logging.getLevelName(self.level.upper())
 
     message: str
     level: typing.Union[int, str] = dataclasses.field(default=logging.INFO)
-    logger_name: typing.Optional[str]
+    logger_name: typing.Optional[str] = dataclasses.field(default=None)
     _logger: logging.Logger = member(default_factory=lambda: LOGGER)
 
-
+@dataclasses.dataclass(unsafe_hash=True)
 class RaiseOperation(ProfileOperation[InputType, InputType]):
     """
     A profile operation that raises exceptions.
@@ -986,9 +987,9 @@ class Profile(BaseModel):
 
     def __str__(self):
         description = (
-            f"{self.output_type} generated for {self.configuration}"
-            f"{' for ensemble ' + str(self.member) + ' ' if self.member is not None else ''}"
-            f"across {self.region}"
+            f"{self.output_type.name} generated for {self.configuration.name}"
+            f"{' for ensemble ' + str(self.member) + ' ' if self.member is not None else ''} "
+            f"across {self.region.name}"
         )
         return description
 
@@ -1031,21 +1032,23 @@ class Profile(BaseModel):
                 )
 
         first_operation: ProfileOperation = self.operations[0]
-        if not isinstance(first_operation, (NCOOperation, BranchOperation)) or first_operation.operation() == OperationType.INTO_PYTHON:
+        if not isinstance(first_operation, (NCOOperation, BranchOperation, EchoOperation)) or first_operation.operation() == OperationType.INTO_PYTHON:
             raise ValueError(
                 f"The first operation in {self} must operate on files, but the first operation was instead "
                 f"{type(first_operation)}({first_operation})"
             )
 
-    def __call__(
+    def run(
         self,
         date: datetime,
-        cycle: typing.Union[int, str],
+        cycle: typing.Union[str, int],
         files: typing.Sequence[pathlib.Path]
     ) -> typing.Sequence[pathlib.Path]:
         """
         Perform all operations configured for this profile
 
+        :param date: The date that the cycle is for
+        :param cycle: The cycle of the data to be evaluated (t00z, t06z, etc)
         :param files: The files to operate on
         :returns: The list of resultant files
         """
@@ -1106,6 +1109,22 @@ class Profile(BaseModel):
         finally:
             shutil.rmtree(work_directory)
 
+    def __call__(
+        self,
+        date: datetime,
+        cycle: typing.Union[int, str],
+        files: typing.Sequence[pathlib.Path]
+    ) -> typing.Sequence[pathlib.Path]:
+        """
+        Perform all operations configured for this profile
+
+        :param date: The date that the cycle is for
+        :param cycle: The cycle of the data to be evaluated (t00z, t06z, etc)
+        :param files: The files to operate on
+        :returns: The list of resultant files
+        """
+        return self.run(date=date, cycle=cycle, files=files)
+
     def get_output_filename(
         self,
         date: typing.Union[str, datetime],
@@ -1137,6 +1156,36 @@ class Profile(BaseModel):
             cycle=cycle,
             **kwargs
         )
+
+def load_profiles(profile_path: typing.Union[str, pathlib.Path] = settings.profile_path) -> typing.Sequence[Profile]:
+    """
+    Load all available profiles
+
+    :param profile_path: The path to directory that contains all the profiles
+    :returns: All available profiles
+    """
+    if not isinstance(profile_path, pathlib.Path):
+        profile_path = pathlib.Path(profile_path)
+
+    profiles: typing.List[Profile] = []
+
+    for directory_member in profile_path.iterdir():
+        if not directory_member.is_file():
+            LOGGER.debug(f"Not loading {directory_member} since it is not a file")
+            continue
+
+        if not directory_member.suffix == ".json":
+            LOGGER.debug(f"Not loading {directory_member} since it is not a JSON file")
+            continue
+
+        profile: Profile = Profile.from_json(directory_member)
+        profile.source_file = directory_member
+        profiles.append(profile)
+
+    if not profiles:
+        raise FileNotFoundError(f"No profiles found in {profile_path}")
+
+    return profiles
 
 def get_function_by_name(
     function_name: str,
@@ -1251,7 +1300,34 @@ def call_operations(
 
     return current_data
 
+def get_profile(
+    manifest: schema.InputManifest,
+    profile_path: typing.Union[str, pathlib.Path] = settings.profile_path
+) -> typing.Sequence[Profile]:
+    """
+    Get 0 or more profiles that may operate on the passed in file
 
+    Returning 0 profiles means that there weren't any profiles for this type of file
+
+    :param manifest: A gathering of all metadata for what will be processed
+    :param profile_path: The path to where all profiles are stored
+    :returns: 0 or more profiles that may operate on the file path that is passed in
+    """
+    if isinstance(profile_path, str):
+        profile_path = pathlib.Path(profile_path)
+
+    profiles: typing.List[Profile] = [
+        profile
+        for profile in load_profiles(profile_path=profile_path)
+        if profile.configuration == manifest.configuration
+           and profile.region == manifest.region
+           and profile.member == manifest.member
+           and profile.output_type == manifest.output_type
+    ]
+
+    return profiles
+
+@functools.cache
 def load_profile(source: typing.Union[pathlib.Path, str, typing.Dict[str, typing.Any]]) -> Profile:
     """
     Deserialize a Profile
@@ -1350,7 +1426,7 @@ def load_operation(specification: typing.Mapping[str, typing.Any]) -> ProfileOpe
             f"The following extra fields were encountered in the specification for a {operation_class.__qualname__}: "
             f"{', '.join(extra_fields)}"
         )
-        LOGGER.warning(message)
+        LOGGER.debug(message)
 
     constructor_arguments: typing.Dict[str, typing.Any] = {
         field.name: specification[field.name]
@@ -1370,7 +1446,7 @@ def get_profile_operation_types(
     :param root: The base object whose concrete subclasses to look for
     :returns: All non-abstract implementations of the root ProfileOperation
     """
-    subclasses: typing.Dict[OperationType, typing.Type[ProfileOperation]] = {
+    subclasses: typing.Dict[typing.Optional[OperationType], typing.Type[ProfileOperation]] = {
         subclass.operation(): subclass
         for subclass in root.__subclasses__()
     }
@@ -1398,10 +1474,12 @@ def get_profile_operation_types(
             raise KeyError(message)
 
         subclasses.update(sub_subclasses)
+
     subclasses = {
         operation_type: subclass
         for operation_type, subclass in subclasses.items()
         if operation_type is not None
+           and subclass is not None
            and operation_type != OperationType.NCO
     }
     return subclasses
