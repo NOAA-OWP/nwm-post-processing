@@ -2,6 +2,7 @@
 """
 The entrypoint for the core post processing application
 """
+import os
 import typing
 import argparse
 import logging
@@ -19,6 +20,8 @@ from post_processing.enums import Configuration
 from post_processing.enums import ModelOutputType
 
 from post_processing.schema import InputManifest
+from post_processing.schema.profile import Profile
+from post_processing.schema.profile import get_profile
 
 if __name__ == "__main__":
     setup_logging()
@@ -63,7 +66,7 @@ class Arguments:
         )
 
         parser.add_argument(
-            "source",
+            "source_file",
             type=pathlib.Path,
             help="Where to get input data"
         )
@@ -118,9 +121,23 @@ def main() -> int:
         files=cycle_files,
         member=file_attributes["member"]
     )
+
+    profiles: typing.Sequence[Profile] = get_profile(manifest=manifest)
     
     try:
-        pass
+        if profiles:
+            for profile in profiles:
+                outputs: typing.Sequence[pathlib.Path] = profile.run(
+                    date=manifest.reference_time,
+                    cycle=manifest.cycle,
+                    files=manifest.files
+                )
+                LOGGER.info(
+                    f"The results for {profile} were written to:{os.linesep}"
+                    f"    - {(os.linesep + '    - ').join(map(str, outputs))}"
+                )
+        else:
+            LOGGER.warning(f"No profiles were found for '{manifest}'. Nothing will be processed")
     except BaseException as exception:
         LOGGER.error(f"{__file__} failed: {exception}", exc_info=exception)
         return 1

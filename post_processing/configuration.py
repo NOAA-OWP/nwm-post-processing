@@ -1,6 +1,7 @@
 """
 Common settings used within and without the application
 """
+import logging
 import typing
 import os
 import pathlib
@@ -93,6 +94,108 @@ class _Settings(UserDict):
         import post_processing
         return pathlib.Path(post_processing.__file__).parent.parent
 
+    @property
+    def loggers_to_quiet(self) -> typing.Sequence[str]:
+        """
+        The names of all loggers that may output errors but not basic INFO
+        """
+        key: str = "{prefix}_loggers_to_quiet".format(prefix=self.prefix).lower()
+        entries: typing.Optional[typing.Sequence[str]] = self.get(key)
+
+        if entries is None:
+            entries: typing.List[str] = []
+            names_from_environment: typing.Optional[str] = os.environ.get(key)
+
+            if names_from_environment is not None:
+                import re
+                names: typing.Sequence[str] = re.split(r"[;,]+", names_from_environment)
+                entries.extend(names)
+            self.__setitem__(key, entries)
+
+        return entries
+
+    @loggers_to_quiet.setter
+    def loggers_to_quiet(self, entries: typing.Sequence[str]) -> None:
+        key: str = "{prefix}_loggers_to_quiet".format(prefix=self.prefix).lower()
+        self.__setitem__(key, entries)
+
+    @property
+    def json_log_path(self) -> typing.Optional[pathlib.Path]:
+        """
+        The path to a json log to write to.
+
+        No log path means no configured json log
+        """
+        key: str = f"{self.prefix}_json_log_path"
+
+        if key in self.keys():
+            path = self.__getitem__(key)
+            if isinstance(path, str):
+                path = pathlib.Path(path)
+                self.__setitem__(key=key, item=path)
+        elif key in os.environ:
+            path = os.environ['key']
+
+            if isinstance(path, str):
+                path = pathlib.Path(path)
+
+            self.__setitem__(key=key, item=path)
+        else:
+            path = None
+
+        return path
+
+    @json_log_path.setter
+    def json_log_path(self, value: typing.Optional[pathlib.Path]):
+        key: str = f"{self.prefix}_json_log_path"
+        self.__setitem__(key=key, item=value)
+
+    @property
+    def json_log_level(self) -> int:
+        """
+        The log level of the optional json logger
+        """
+        key: str = f"{self.prefix}_json_log_level"
+
+        log_level: typing.Union[str, int, None] = self.get(key)
+
+        if log_level is None:
+            log_level: str = os.environ.get(key, "INFO")
+            self.__setitem__(key=key, item=log_level)
+
+        if isinstance(log_level, str) and log_level.isdigit():
+            log_level = int(log_level)
+        elif isinstance(log_level, str):
+            log_level = logging.getLevelName(level=log_level.upper())
+
+        return log_level
+
+    @json_log_level.setter
+    def json_log_level(self, value: typing.Optional[int]):
+        key: str = f"{self.prefix}_json_log_level"
+        self.__setitem__(key=key, item=value)
+
+    @property
+    def json_log_maximum_bytes(self) -> int:
+        """
+        The maximum size of a json log
+        """
+        key: str = f"{self.prefix}_json_log_maximum_bytes"
+        log_maximum_bytes: typing.Union[str, int, None] = self.get(key)
+        if log_maximum_bytes is None:
+            log_maximum_bytes: typing.Union[str, int, None] = int(float(os.environ.get(key, 1024 ** 2)))
+            self.__setitem__(key=key, item=log_maximum_bytes)
+
+        if not isinstance(log_maximum_bytes, int):
+            log_maximum_bytes = int(float(log_maximum_bytes))
+            self.__setitem__(key=key, item=log_maximum_bytes)
+
+        return log_maximum_bytes
+
+    @json_log_maximum_bytes.setter
+    def json_log_maximum_bytes(self, value: typing.Optional[int]):
+        key: str = f"{self.prefix}_json_log_maximum_bytes"
+        self.__setitem__(key=key, item=None if value is None else int(float(value)))
     
     @property
     def resource_path(self) -> pathlib.Path:
@@ -188,6 +291,14 @@ class _Settings(UserDict):
 
         return self.__getitem__(key=key)
 
+    @intermediate_directory.setter
+    def intermediate_directory(self, value: pathlib.Path):
+        if not value.is_dir():
+            raise NotADirectoryError(f"Cannot set the intermediate directory to '{value}' - it is not a directory")
+
+        key: str = "{prefix}_intermediate_directory".format(prefix=self.prefix).lower()
+        self.__setitem__(key=key, item=value)
+
     @property
     def output_directory(self) -> typing.Optional[pathlib.Path]:
         """
@@ -220,6 +331,28 @@ class _Settings(UserDict):
             output_directory.mkdir(parents=True, exist_ok=True)
 
         return output_directory
+
+    @property
+    def profile_path(self) -> pathlib.Path:
+        """
+        The path where you should expect to find profile confingurations
+        """
+        key: str = "{prefix}_profile_path".format(prefix=self.prefix).lower()
+
+        if key not in self.keys() or not self.__getitem__(key=key):
+            profile_path: pathlib.Path = pathlib.Path(os.environ.get(key, self.resource_path / "profiles"))
+            self.__setitem__(key=key, item=profile_path)
+
+        path: pathlib.Path = self.__getitem__(key=key)
+        path.mkdir(parents=True, exist_ok=True)
+        return path
+
+    @profile_path.setter
+    def profile_path(self, value: pathlib.Path):
+        if not value.is_dir():
+            raise NotADirectoryError(f"Cannot set the profile path to '{value}' - it is not a directory")
+        key: str = "{prefix}_profile_path".format(prefix=self.prefix).lower()
+        self.__setitem__(key=key, item=value)
 
 settings = _Settings()
 """Application wide settings"""
