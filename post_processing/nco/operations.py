@@ -192,33 +192,6 @@ def copy_and_correct_merge_input(
     return file
 
 
-def apply_mask_by_file(
-    input_file: typing.Union[str, pathlib.Path],
-    mask_file: typing.Union[str, pathlib.Path],
-    output_file: typing.Union[str, pathlib.Path],
-    dimension: str = "feature_id"
-) -> None:
-    """
-    Filter out data by applying a mask
-
-    :param input_file: The path to the netcdf file to filter
-    :param mask_file: The path to the file containing the mask
-    :param output_file: The path to where to write the output to
-    :param dimension: The dimension to apply the mask to
-    """
-    run_command(
-        NCOFunction.KITCHEN_SINK,
-        "-O",
-        "-X",
-        "-d",
-        f"{dimension},,",
-        "--cmp",
-        mask_file,
-        input_file,
-        output_file
-    )
-
-
 def add_or_modify_attribute(
     input_file: typing.Union[str, pathlib.Path],
     attribute_name: str,

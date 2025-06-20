@@ -380,6 +380,8 @@ class ExtractOperation(NCOOperation):
         return files
 
     def __post_init__(self):
+        Evaluate the paths for the masks for globs
+            it might make sense to make a utility function for it and find the other locations of that logic
         missing_masks: typing.List[pathlib.Path] = [path for path in self.masks if not path.is_file()]
 
         assert not any(missing_masks), f"A {self.__class__.__name__} is missing a required mask(s): {missing_masks}"
