@@ -1,7 +1,6 @@
 from .operations import keep_only_variables
 from .operations import remove_variables
 from .operations import transform_variable
-from .operations import apply_mask_by_file
 from .operations import add_or_modify_attribute
 from .operations import rename_variable
 from .operations import rename_dimension
