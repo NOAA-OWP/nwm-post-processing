@@ -7,7 +7,14 @@ import pathlib
 import logging
 import enum
 
-from post_processing.configuration import settings
+try:
+    from post_processing.configuration import settings
+    LOG_FORMAT: str = settings.log_format
+    DATE_FORMAT: str = settings.date_format
+except ImportError:
+    settings = None
+    LOG_FORMAT = "[%(asctime)s] %(levelname)s %(name)s: %(message)s"
+    DATE_FORMAT = "%Y-%m-%d %H:%M:%S%z"
 
 LOGGER: logging.Logger = logging.getLogger(pathlib.Path(__file__).stem)
 
@@ -214,8 +221,8 @@ def main() -> int:
 if __name__ == "__main__":
     logging.basicConfig(
         level=logging.INFO,
-        format=settings.log_format,
-        datefmt=settings.date_format,
+        format=LOG_FORMAT,
+        datefmt=DATE_FORMAT,
     )
     import sys
     sys.exit(main())
