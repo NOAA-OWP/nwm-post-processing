@@ -11,7 +11,7 @@ class OnlyErrorFilter(logging.Filter):
     Only allows critical and error messages
     """
     def filter(self, record):
-        return record.levelno in (logging.WARNING, logging.ERROR, logging.CRITICAL)
+        return record.levelno in (logging.ERROR, logging.CRITICAL)
     
 
 class ErrorExclusionFilter(logging.Filter):
@@ -20,6 +20,84 @@ class ErrorExclusionFilter(logging.Filter):
     """
     def filter(self, record):
         return record.levelno not in (logging.ERROR, logging.CRITICAL)
+
+
+class LevelFilter(logging.Filter):
+    """
+    Only levels registered within the filter may be logged
+    """
+    def __init__(self, levels: typing.Iterable[int]) -> None:
+        super().__init__()
+        self.levels = set(map(get_level, levels))
+        if len(self.levels) == 0:
+            raise ValueError("Cannot set up a level filter - no levels defined")
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        return record.levelno in self.levels
+
+def get_level(level: typing.Union[int, float, str, bytes]) -> int:
+    """
+    Get the proper level int based on a variety of possible input types
+
+    Example:
+        >>> get_level(20)
+        20
+        >>> get_level("info")
+        20
+        >>> get_level("DEBuG")
+        10
+        >>> get_level("52.1")
+        52
+        >>> get_level("kritical")
+        ValueError(...)
+
+    :param level: The level whose corresponding int we want to find
+    :returns: The proper int level that matches the input type
+    :raises ValueError: If the input type is not supported or is an invalid string
+    """
+    if isinstance(level, bytes):
+        level = level.decode()
+
+    if isinstance(level, float):
+        return int(level)
+    elif isinstance(level, int):
+        return level
+    elif isinstance(level, str) and level.isdigit():
+        return int(float(level))
+    elif isinstance(level, str):
+        level = level.strip()
+        parsed_level = logging.getLevelName(level=level.upper())
+        if parsed_level.startswith("Level "):
+            raise ValueError(f"Could not get an appropriate log level for: {level}")
+        return parsed_level
+    else:
+        raise TypeError(f"Cannot create a log level from: '{level}' (type={type(level)})")
+
+class LevelBasedFormatter(logging.Formatter):
+    """
+    A formatter that may have different formats per level
+    """
+    def __init__(
+        self,
+        fmt: str = None,
+        datefmt: str = None,
+        style="%",
+        validate: bool = True,
+        *,
+        defaults: typing.Mapping[str, typing.Any] = None,
+        level_formats: typing.Mapping[typing.Union[int, str], str] = None
+    ):
+        super().__init__(fmt=fmt, datefmt=datefmt, style=style, validate=validate, defaults=defaults)
+
+        self.level_formats: typing.Mapping[int, str] = {
+            get_level(level=level): level_format
+            for level, level_format in (level_formats or {}).items()
+        }
+
+    def format(self, record):
+        message_format: str = self.level_formats.get(record.levelno, self._fmt)
+        self._style._fmt = message_format
+        return super().format(record)
 
 
 class JSONLogHandler(logging.Handler):
@@ -192,7 +270,50 @@ class JSONLogHandler(logging.Handler):
 
     def __len__(self):
         return self.size
-    
+
+
+def override_log_levels(log_level_override_path: pathlib.Path = None):
+    """
+    Set configured overrides for log levels in order to hide unwanted messages from other libraries
+
+    :param log_level_override_path: The path to a log level override json file
+    """
+    if log_level_override_path is None:
+        return
+    if isinstance(log_level_override_path, str):
+        log_level_override_path = pathlib.Path(log_level_override_path)
+
+    if not isinstance(log_level_override_path, pathlib.Path):
+        raise TypeError(
+            f"The log level override path is invalid: {log_level_override_path} (type={type(log_level_override_path)})"
+        )
+
+    if log_level_override_path.is_dir():
+        logging.warning(
+            f"The log level override path is invalid - it points to a directory. No log levels will be overridden. "
+            f"{log_level_override_path}"
+        )
+        return
+
+    if not log_level_override_path.exists():
+        logging.warning(
+            f"There is no log level override file at '{log_level_override_path}'. No log levels will be overridden."
+        )
+        return
+
+    import json
+    try:
+        overrides: typing.Dict[str, typing.Union[str, int]] = json.loads(log_level_override_path.read_text())
+    except json.decoder.JSONDecodeError as error:
+        logging.warning(
+            f"Could not deserialize the file at '{log_level_override_path}'. No log levels will be overridden. {error}"
+        )
+        return
+
+    for logger_name, level in overrides.items():
+        level: int = get_level(level=level)
+        logging.getLogger(logger_name).setLevel(level)
+
     
 def setup_logging(log_path: typing.Union[pathlib.Path, str] = None):
     """
@@ -231,3 +352,5 @@ def setup_logging(log_path: typing.Union[pathlib.Path, str] = None):
     for logger_name in settings.loggers_to_quiet:
         logger: logging.Logger = logging.getLogger(logger_name)
         logger.setLevel(logging.WARNING)
+
+    override_log_levels(log_level_override_path=settings.log_level_override_path)

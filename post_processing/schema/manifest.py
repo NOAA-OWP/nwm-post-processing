@@ -79,11 +79,6 @@ class InputManifest(BaseModel):
         Make sure that the values are valid
         """
         import xarray
-        try:
-            import dask
-            has_dask = True
-        except ImportError:
-            has_dask = False
 
         reference_times: typing.Set[datetime] = set()
         output_types: typing.Set[ModelOutputType] = set()
@@ -91,12 +86,10 @@ class InputManifest(BaseModel):
         regions: typing.Set[Region] = set()
 
         file_issues: typing.Dict[pathlib.Path, typing.List[str]] = {}
+        from post_processing.utilities.netcdf import load_netcdf
 
         for file in self.files:
-            if has_dask:
-                data = xarray.open_dataset(file, chunks={})
-            else:
-                data = xarray.open_dataset(file)
+            data = load_netcdf(path=file)
 
             if REFERENCE_TIME_VARIABLE not in data.coords:
                 if file not in file_issues:

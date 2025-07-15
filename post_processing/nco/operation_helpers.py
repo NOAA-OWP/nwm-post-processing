@@ -96,7 +96,7 @@ class NCOFunction(enum.StrEnum):
         programs_exist: typing.Sequence[bool] = starmap(
             function=program_exists,
             args=[{"program_name": str(member.value)} for member in cls],
-            threaded=True
+            thread_count=True
         )
 
         return all(programs_exist)

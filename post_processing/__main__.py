@@ -98,17 +98,17 @@ def main() -> int:
     try:
         arguments: Arguments = Arguments()
     except ArgumentValidationException as exception:
-        LOGGER.error(str(exception))
+        LOGGER.critical(str(exception))
         return 2
 
     try:
         cycle_files: typing.Sequence[pathlib.Path] = get_cycle_files(arguments.source_file)
     except Exception as exception:
-        LOGGER.error(f"Could not find files to process within this cycle: {exception}")
+        LOGGER.critical(f"Could not find files to process within this cycle: {exception}")
         return 1
 
     if len(cycle_files) == 0:
-        LOGGER.error("Cycle files could not be found")
+        LOGGER.critical("Cycle files could not be found")
         return 1
 
     file_attributes = NWM_FILENAME_PATTERN.match(arguments.source_file.name).groupdict()
@@ -139,7 +139,7 @@ def main() -> int:
         else:
             LOGGER.warning(f"No profiles were found for '{manifest}'. Nothing will be processed")
     except BaseException as exception:
-        LOGGER.error(f"{__file__} failed: {exception}", exc_info=exception)
+        LOGGER.critical(f"{__file__} failed: {exception}", exc_info=exception)
         return 1
     return 0
 

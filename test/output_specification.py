@@ -10,6 +10,8 @@ import json
 import multiprocessing
 import multiprocessing.pool
 
+from datetime import datetime
+
 import numpy
 import xarray
 from pandas.core.dtypes.common import is_integer_dtype
@@ -17,6 +19,7 @@ from pandas.core.dtypes.common import is_integer_dtype
 import post_processing.enums
 from post_processing import nco
 from post_processing.nwm_file import NWMFile
+from post_processing.configuration import settings
 
 T = typing.TypeVar("T")
 """A generic type"""
@@ -321,8 +324,15 @@ class Dataset:
     """The type of model output that this data represents"""
     region: typing.Union[post_processing.enums.Region, post_processing.enums.RFC]
     """The region over which this data is valid"""
+    mask_names: typing.List[str]
+    """Names for mask files to use for testing"""
+    mask_coordinate: str
+    """The name of the coordinate to mask off of"""
     member: typing.Optional[int] = dataclasses.field(default=None)
     """The ensemble member that this dataset reflects"""
+    mask_seed: int = dataclasses.field(default=123456)
+    """A seed number to use for generating consistent partitions for masks"""
+
 
     def __str__(self):
         return (
@@ -381,7 +391,105 @@ class Dataset:
             model_output_type=file_data.model_output_type,
             region=file_data.region,
             member=file_data.member,
+            mask_names=[],
+            mask_coordinate=next(
+                (dimension.name for dimension in dimensions if dimension.unlimited),
+                coordinates[0].name
+            ),
         )
+
+    def get_filenames(
+        self,
+        data_path: pathlib.Path,
+        cycle: int = 0,
+        length: int = 18,
+        step: int = 1
+    ) -> typing.List[pathlib.Path]:
+        filenames: typing.List[str] = [
+            (
+                f"nwm."
+                f"t{str(cycle).zfill(2)}z."
+                f"{self.configuration}."
+                f"{self.model_output_type}{'_' + str(self.member) if self.member else ''}."
+                f"f{str(frame_number).zfill(6 if self.region == post_processing.enums.Region.Hawaii else 3)}."
+                f"{self.region}."
+                f"nc"
+            )
+            for frame_number in range(step, step * length + 1, step)
+        ]
+
+        output_paths: typing.List[pathlib.Path] = [
+            data_path / filename
+            for filename in filenames
+        ]
+        return output_paths
+
+    def generate_masks(
+        self,
+        data_path: pathlib.Path,
+        mask_directory: pathlib.Path,
+        cycle: int = 0,
+        length: int = 18,
+        step: int = 1
+    ) -> typing.Sequence[pathlib.Path]:
+        """
+        Generate a mask for each configured mask name to use for data subsetting tests
+
+        :param data_path: The directory where pregenerated test data is stored
+        :param mask_directory: Where to store the masks
+        :param cycle: Which cycle to use
+        :param length: The length of the 'forecast' that this mask is for
+        :param step: The step between each file in the 'forecast' that this mask is for
+        :returns: The path to each mask file
+        """
+        generated_data_paths: typing.Sequence[pathlib.Path] = self.get_filenames(
+            data_path=data_path,
+            cycle=cycle,
+            length=length,
+            step=step
+        )
+
+        if not generated_data_paths or not generated_data_paths[0].is_file():
+            raise Exception(
+                f"Data has not been generated for {generated_data_paths[0]} - "
+                f"data must be generated before generating masks"
+            )
+
+        partition_count: int = len(self.mask_names)
+        mask_paths: typing.List[pathlib.Path] = [
+            mask_directory / mask_name
+            for mask_name in self.mask_names
+        ]
+
+        if all(mask_path.exists() for mask_path in mask_paths):
+            LOGGER.info(f"Masks for {self} already exists in {mask_directory}")
+            return mask_paths
+
+        import xarray
+        import numpy
+
+        random_number_generator: numpy.random.Generator = numpy.random.default_rng(self.mask_seed)
+        first_dataset: xarray.Dataset = xarray.open_dataset(generated_data_paths[0], chunks={})
+        coordinate_values: numpy.ndarray = first_dataset[self.mask_coordinate].values.flatten()
+        indices: numpy.ndarray = numpy.arange(len(coordinate_values))
+        random_number_generator.shuffle(indices)
+        partitions: typing.List[numpy.ndarray] = numpy.array_split(indices, partition_count)
+
+        for partition_path, partition in zip(mask_paths, partitions):
+            partition_coordinates: numpy.ndarray = coordinate_values[partition]
+            mask_dataset: xarray.Dataset = xarray.Dataset(
+                {
+                    self.mask_coordinate: (self.mask_coordinate, partition_coordinates)
+                },
+                attrs={
+                    "generated_on": datetime.now().astimezone().strftime(settings.date_format),
+                    "mask_name": partition_path.stem,
+                    "created_from": generated_data_paths[0].name,
+                }
+            )
+            mask_dataset.to_netcdf(path=partition_path)
+
+        return mask_paths
 
     def generate_netcdf(
         self,
@@ -403,29 +511,19 @@ class Dataset:
         :param overwrite: Whether to overwrite preexisting files
         :returns: The paths to the newly created files
         """
-        filenames: typing.List[str] = [
-            (
-                f"nwm."
-                f"t{str(cycle).zfill(2)}z."
-                f"{self.configuration}."
-                f"{self.model_output_type}{'_' + str(self.member) if self.member else ''}."
-                f"f{str(frame_number).zfill(6 if self.region == post_processing.enums.Region.Hawaii else 3)}."
-                f"{self.region}."
-                f"nc"
-            )
-            for frame_number in range(step, step * length + 1, step)
-        ]
 
-        output_paths: typing.List[pathlib.Path] = [
-            output_directory / filename
-            for filename in filenames
-        ]
+        output_paths: typing.List[pathlib.Path] = self.get_filenames(
+            data_path=output_directory,
+            cycle=cycle,
+            length=length,
+            step=step
+        )
 
         if all(map(lambda path: path.exists(), output_paths)) and not overwrite:
             LOGGER.info(f"Data for {self} already exists in {output_directory}")
             return output_paths
 
-        LOGGER.info(f"Generating data for {len(filenames)} files")
+        LOGGER.info(f"Generating data for {len(output_paths)} files")
         coordinate_values: typing.Dict[str, typing.Union[typing.Sequence[xarray.DataArray], xarray.DataArray]] = {}
 
         for coordinate in self.coordinates:

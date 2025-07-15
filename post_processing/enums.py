@@ -25,6 +25,9 @@ class PostProcessingEnumeration(enum.Enum):
         """
         return rf"(?P<{cls.__name__}>{'|'.join([member.value for member in cls])})"
 
+    def __str__(self):
+        return str(self.value)
+
 
 class ModelOutputType(PostProcessingEnumeration):
     """
@@ -128,3 +131,34 @@ class RFC(enum.Enum):
     """Southeast River Forecast Center"""
     WGRFC = "WG"
     """West Gulf River Forecast Center"""
+
+class Verbosity(enum.IntEnum):
+    """
+    Describes the range of log statements that may be applicable within the span of different type of log statements
+
+    Example:
+        >>> if volume >= Verbosity.LOUD:
+        ...     message = "detailed message"
+        ... elif volume >= Verbosity.NORMAL:
+        ...     message = "regular message"
+        ... else:
+        ...     message = None
+        ...
+        ... if message is not None:
+        ...     print(message)
+        >>> if volume > Verbosity.SILENT:
+        ...     print("Here is another example")
+    """
+    SILENT = -2
+    """Indicates a message that should be output even if everything is supposed to be completely silent"""
+    QUIET = -1
+    """Indicates a message that should be output even if this are supposed to be fairly quiet"""
+    NORMAL = 0
+    """Indicates a normal output volume for a message"""
+    VERBOSE = 1
+    """Indicates a message that should only be output if we are supposed to be fairly verbose"""
+    LOUD = 2
+    """Indicates a message that should only be output if we are being extremely verbose"""
+    ALL = 3
+    """Indicates a message that should only be output if we're being over the top"""
+

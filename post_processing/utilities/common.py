@@ -14,6 +14,8 @@ import numpy
 import numpy.typing
 import xarray
 
+LOGGER: logging.Logger = logging.getLogger(pathlib.Path(__file__).stem)
+
 T = typing.TypeVar("T")
 """A generic type"""
 
@@ -57,27 +59,32 @@ NWM_FILENAME_PATTERN: re.Pattern = re.compile(
 def starmap(
     function: typing.Callable[[FunctionParameters], RT],
     args: typing.Iterable[ArgsAndKwargs],
-    threaded: bool = False
+    thread_count: int = 0
 ) -> typing.Sequence[RT]:
     """
     Call the given function with each of sequence of positional arguments
 
     :param function: The function to call
     :param args: Each set of arguments to pass
-    :param threaded: If true, process each item in its own thread
+    :param thread_count: If true, process each item in its own thread
     :returns: The result of each function call
     """
     results: typing.List[RT] = []
 
+    from post_processing.configuration import settings
+    from post_processing.enums import Verbosity
+
     if not isinstance(args, typing.Iterable) or isinstance(args, (str, bytes)):
         raise TypeError(f"Arguments for starmap must be an iterable collection. Received '{args}' (type={type(args)})")
 
-    if threaded:
+    if thread_count is not None and thread_count > 0:
         results.extend(
-            starmap_threaded(function=function, args=args)
+            starmap_threaded(function=function, args=args, thread_count=thread_count)
         )
     else:
-        for arg in args:
+        for argument_index, arg in enumerate(args):
+            if settings.verbosity >= Verbosity.ALL:
+                LOGGER.debug(f"Running through iteration {argument_index + 1} of {function}")
             if isinstance(arg, typing.Mapping):
                 result: RT = function(**arg)
             elif isinstance(arg, typing.Sequence) and len(arg) == 2 and isinstance(args[0], typing.Sequence) and isinstance(args[1], typing.Mapping):
@@ -86,10 +93,98 @@ def starmap(
                 result: RT = function(*arg)
             else:
                 result: RT = function(arg)
-
+            if settings.verbosity >= Verbosity.ALL:
+                LOGGER.debug(f"Completed iteration {argument_index + 1} of {function}")
             results.append(result)
 
     return results
+
+
+def expand_path(path: typing.Union[str, pathlib.Path], strict: bool = True) -> typing.Sequence[pathlib.Path]:
+    """
+    Expand the given path to ensure that it catches everything if it contains a glob
+
+    :param path: The path to expand
+    :param strict: Whether to only return paths that are files
+    :returns: All paths that the given path refers to
+    """
+    if isinstance(path, str):
+        path = pathlib.Path(path)
+
+    if path.is_file():
+        return [path]
+
+    glob_index: int = next(
+        (
+            part_index
+            for part_index, part in enumerate(path.parts)
+            if '*' in part
+                or '?' in part
+                or '[' in part
+        ), -1
+    )
+
+    if glob_index < 0:
+        return [path] if path.is_file() or not strict else []
+
+    path_prefix: pathlib.Path = pathlib.Path(*path.parts[:glob_index])
+    glob: str = str(pathlib.Path(*path.parts[glob_index:]))
+    matching_paths: typing.List[pathlib.Path] = [
+        found_path
+        for found_path in path_prefix.glob(glob)
+        if found_path.is_file()
+            or not strict
+    ]
+    return matching_paths
+
+
+def expand_paths(
+    paths: typing.Iterable[typing.Union[str, pathlib.Path]],
+    base_path: pathlib.Path = None,
+    strict: bool = True
+) -> typing.List[pathlib.Path]:
+    """
+    Expand a series of paths into more paths if given paths contain glob strings
+
+    Example:
+        >>> example_paths: typing.Sequence[typing.Union[pathlib.Path]] = [
+        ...     "resources/*/*.dbf",
+        ...      pathlib.Path("non-existent.log"),
+        ...      pathlib.Path("/path/to/app/resources/*/nwm.*/*.nc")
+        ... ]
+        >>> expand_paths(paths=example_paths)
+        [
+            pathlib.Path('/path/to/app/resources/example/conus.dbf'),
+            pathlib.Path('/path/to/app/resources/other/conus.dbf'),
+            pathlib.Path('/path/to/app/resources/other/hawaii.test.28.dbf'),
+            pathlib.Path('/path/to/app/resources/nwm/nwm.20250405/nwm.t00z.short_range.conus.f001.nc'),
+            pathlib.Path('/path/to/app/resources/nwm/nwm.20250405/nwm.t00z.short_range.conus.f002.nc'),
+            pathlib.Path('/path/to/app/resources/nwm/nwm.20250405/nwm.t00z.short_range.conus.f003.nc'),
+            pathlib.Path('/path/to/app/resources/nwm/nwm.20250405/nwm.t00z.short_range.conus.f004.nc'),
+            pathlib.Path('/path/to/app/resources/para/nwm.20250423/nwm.t00z.short_range.conus.f001.nc'),
+            pathlib.Path('/path/to/app/resources/para/nwm.20250501/nwm.t00z.short_range.conus.f002.nc'),
+            pathlib.Path('/path/to/app/resources/para/nwm.20250602/nwm.t00z.short_range.conus.f003.nc'),
+            pathlib.Path('/path/to/app/resources/para/nwm.20250603/nwm.t00z.short_range.conus.f004.nc'),
+        ]
+
+    :param paths: A list of paths to expand
+    :param base_path: The path to search as the root if given paths are not absolute
+    :param strict: Whether to only bring back paths if it is confirmed that they are files
+    :returns: All globbed paths
+    """
+    if base_path is None:
+        base_path = pathlib.Path.cwd()
+
+    paths = list(map(pathlib.Path, paths))
+    expanded_paths: typing.List[pathlib.Path] = []
+
+    for path in paths:
+        if not path.is_absolute():
+            path = base_path / path
+        found_paths: typing.Sequence[pathlib.Path] = expand_path(path=path, strict=strict)
+        expanded_paths.extend(found_paths)
+
+    return expanded_paths
 
 
 def starmap_threaded(
@@ -105,58 +200,68 @@ def starmap_threaded(
     :param thread_count: The maximum amount of threads to process at once
     :returns: The result of each function call
     """
+    from post_processing.configuration import settings
+    from post_processing.enums import Verbosity
+
+    if thread_count is None:
+        thread_count = settings.maximum_additional_threads
+
     results: typing.List[RT] = []
     import concurrent.futures
     with concurrent.futures.ThreadPoolExecutor(max_workers=thread_count) as executor:
         future_results: typing.List[concurrent.futures.Future[RT]] = []
         for arg in args:
-            if isinstance(arg, typing.Mapping):
+            arguments_are_keyword: bool = isinstance(arg, typing.Mapping)
+            arguments_are_positional: bool = isinstance(arg, typing.Sequence) and not isinstance(arg, str)
+            arguments_are_positional_and_keyword: bool = (
+                isinstance(arg, typing.Sequence)
+                    and len(arg) == 2
+                    and isinstance(arg[0], typing.Sequence) and not isinstance(arg[0], str)
+                    and isinstance(arg[1], typing.Mapping)
+            )
+            if arguments_are_keyword:
                 future_result: concurrent.futures.Future[RT] = executor.submit(
                     function,
                     **arg
                 )
-            elif isinstance(arg, typing.Sequence) and len(arg) == 2 and isinstance(
-                args[0],
-                typing.Sequence
-                ) and isinstance(args[1], typing.Mapping):
+            elif arguments_are_positional_and_keyword:
                 future_result: concurrent.futures.Future[RT] = executor.submit(
                     function,
                     *arg[0],
                     **arg[1]
                 )
-            elif isinstance(arg, typing.Sequence) and len(arg) == 2 and isinstance(
-                args[1],
-                typing.Sequence
-                ) and isinstance(args[0], typing.Mapping):
-                future_result: concurrent.futures.Future[RT] = executor.submit(
-                    function,
-                    *arg[1],
-                    **arg[0]
-                )
-            elif isinstance(arg, typing.Sequence) and not isinstance(arg, str):
+            elif arguments_are_positional:
                 future_result: concurrent.futures.Future[RT] = executor.submit(
                     function,
                     *arg
                 )
             else:
-
                 future_result: concurrent.futures.Future[RT] = executor.submit(
                     function,
                     arg
                 )
             future_results.append(future_result)
 
+        if settings.verbosity >= Verbosity.ALL:
+            LOGGER.debug(f"{len(future_results)} jobs have been scheduled for {function}")
+
         exceptions: typing.List[Exception] = []
 
         while future_results:
-            future_result: concurrent.futures.Future[RT] = future_results.pop()
+            future_result: concurrent.futures.Future[RT] = future_results.pop(0)
             try:
                 result: RT = future_result.result(timeout=1)
+                if settings.verbosity >= Verbosity.VERBOSE:
+                    LOGGER.debug(f"An execution of {function} returned {str(result)[:10]}")
                 results.append(result)
             except concurrent.futures.TimeoutError:
+                if settings.verbosity >= Verbosity.ALL:
+                    LOGGER.debug(f"Timed out waiting for an execution of {function} - adding it back to the future results")
                 future_results.append(future_result)
             except Exception as e:
                 exceptions.append(e)
+            if settings.verbosity >= Verbosity.ALL:
+                LOGGER.debug(f"Waiting on {len(future_results)} calls to {function}")
 
         if exceptions:
             raise condense_exceptions(
@@ -378,7 +483,8 @@ def get_time_from_nwm_file(path: pathlib.Path, variable_name: str = 'time') -> t
     """
 
     """
-    dataset: xarray.Dataset = xarray.open_dataset(path)
+    from post_processing.utilities.netcdf import load_netcdf
+    dataset: xarray.Dataset = load_netcdf(path)
     if variable_name not in dataset.variables:
         raise KeyError(f"{variable_name} is not a valid variable name within {path}")
 
@@ -478,20 +584,6 @@ class RecursiveEncoder(json.JSONEncoder):
             converted_dataclass: typing.Dict[str, typing.Any] = dataclasses.asdict(item_to_serialize)
             return self.default(converted_dataclass)
 
-        if hasattr(item_to_serialize, '__dict__'):
-            return {
-                key: self.default(value)
-                for key, value in vars(item_to_serialize).items()
-            }
-
-        if hasattr(item_to_serialize, '__slots__') and len(item_to_serialize.__slots__) > 0:
-            return {
-                key: self.default(getattr(item_to_serialize, key))
-                for key in item_to_serialize.__slots__
-                if hasattr(item_to_serialize, key)
-                   and not inspect.isdatadescriptor(getattr(item_to_serialize.__class__, key))
-            }
-
         if isinstance(item_to_serialize, typing.Mapping):
             return {
                 key: self.default(value)
@@ -509,6 +601,20 @@ class RecursiveEncoder(json.JSONEncoder):
                 self.default(item)
                 for item in item_to_serialize
             ]
+
+        if hasattr(item_to_serialize, '__dict__'):
+            return {
+                key: self.default(value)
+                for key, value in vars(item_to_serialize).items()
+            }
+
+        if hasattr(item_to_serialize, '__slots__') and len(item_to_serialize.__slots__) > 0:
+            return {
+                key: self.default(getattr(item_to_serialize, key))
+                for key in item_to_serialize.__slots__
+                if hasattr(item_to_serialize, key)
+                   and not inspect.isdatadescriptor(getattr(item_to_serialize.__class__, key))
+            }
 
         from enum import Enum
         if isinstance(item_to_serialize, Enum):
