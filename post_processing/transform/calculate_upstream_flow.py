@@ -63,10 +63,20 @@ def calculate_upstream_flow(
     import numpy
     import geopandas
 
+    try:
+        from post_processing.utilities.netcdf import load_netcdf
+    except ImportError:
+        from functools import partial
+        load_netcdf = partial(
+            xarray.open_dataset,
+            chunks={},
+            engine="h5netcdf",
+        )
+
     if encoding is None:
         encoding = {}
 
-    data_to_transform: xarray.Dataset = xarray.open_dataset(input_path, chunks={})
+    data_to_transform: xarray.Dataset = load_netcdf(input_path)
     raw_data = data_to_transform[variable].values
 
     if routelink_format == RoutelinkFormat.GEOPACKAGE:
@@ -78,7 +88,7 @@ def calculate_upstream_flow(
         from_values = routelink[routelink_from_variable]
         to_values = routelink[routelink_to_variable]
     elif routelink_format == RoutelinkFormat.NETCDF:
-        routelink = xarray.open_dataset(routelink_path, chunks={})
+        routelink = load_netcdf(routelink_path)
         from_values = routelink[routelink_from_variable].values
         to_values = routelink[routelink_to_variable].values
     else:

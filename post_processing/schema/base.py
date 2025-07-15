@@ -65,13 +65,16 @@ class BaseModel:
         :return: A newly constructed model
         """
         import json
-        if isinstance(path_or_buffer, (pathlib.Path, str)):
-            with open(path_or_buffer, "r") as json_file:
-                data: typing.Dict = json.load(json_file)
-        elif isinstance(path_or_buffer, typing.IO):
-            data = json.load(path_or_buffer)
 
-        deserialized_model: ModelType = cls.from_dict(**data)
+        try:
+            if isinstance(path_or_buffer, (pathlib.Path, str)):
+                with open(path_or_buffer, "r") as json_file:
+                    data: typing.Dict = json.load(json_file)
+            elif isinstance(path_or_buffer, typing.IO):
+                data = json.load(path_or_buffer)
+            deserialized_model: ModelType = cls.from_dict(**data)
+        except Exception as e:
+            raise Exception(f"Could not load the configuration from {path_or_buffer}: {e}") from e
         return deserialized_model
 
     def _validate(self):

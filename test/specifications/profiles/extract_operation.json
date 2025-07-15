@@ -1,5 +1,22 @@
 {
+    "configuration": "short_range",
+    "output_type": "channel_rt",
+    "region": "conus",
     "operations": [
-
+        {
+            "operation": "extract",
+            "masks": [
+                "test/data/masks/short_range.channel_rt.conus/*"
+            ],
+            "identifier_pattern": "^(?P<region>\\w+)",
+            "output_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.{frame}.{region}.nc",
+            "each": [
+                {
+                    "operation": "save",
+                    "filename_pattern": "{file_name}",
+                    "directory": "<fill in at runtime>"
+                }
+            ]
+        }
     ]
 }

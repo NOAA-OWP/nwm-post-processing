@@ -1,4 +1,7 @@
 {
+    "configuration": "short_range",
+    "output_type": "channel_rt",
+    "region": "conus",
     "operations": [
 
     ]

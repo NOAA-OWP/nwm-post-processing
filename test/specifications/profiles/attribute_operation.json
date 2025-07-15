@@ -1,4 +1,7 @@
 {
+    "configuration": "short_range",
+    "output_type": "channel_rt",
+    "region": "conus",
     "operations": [
         {
             "operation": "attribute",
@@ -17,11 +20,11 @@
             "operation": "attribute",
             "attribute_name": "grid_mapping",
             "field": "streamflow",
-            "mode": "drop"
+            "mode": "delete"
         },
         {
             "operation": "attribute",
-            "mode": "drop",
+            "mode": "delete",
             "attribute_name": "stream_order_output"
         },
         {

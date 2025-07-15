@@ -267,6 +267,22 @@
         "dev_channelBucket_only": 0,
         "dev": "dev_ prefix indicates development/internal meta data"
     },
+    "mask_names": [
+        "abrfc.nc",
+        "aprfc.nc",
+        "cbrfc.nc",
+        "cnrfc.nc",
+        "lmrfc.nc",
+        "marfc.nc",
+        "mbrfc.nc",
+        "ncrfc.nc",
+        "nerfc.nc",
+        "nwrfc.nc",
+        "ohrfc.nc",
+        "serfc.nc",
+        "wgrfc.nc"
+    ],
+    "mask_coordinate": "feature_id",
     "configuration": "short_range",
     "model_output_type": "channel_rt",
     "region": "conus"

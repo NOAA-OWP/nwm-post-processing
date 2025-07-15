@@ -9,6 +9,15 @@
         "detailed": {
             "format":"[%(asctime)s] %(levelname)s %(name)s %(filename)s #%(lineno)d: %(message)s",
             "datefmt": "%Y-%m-%d %H:%M:%S%z"
+        },
+        "level_based": {
+            "()": "post_processing.utilities.logging.LevelBasedFormatter",
+            "fmt": "[%(asctime)s] %(levelname)s %(name)s %(filename)s #%(lineno)d: %(message)s",
+            "datefmt": "%Y-%m-%d %H:%M:%S%z",
+            "level_formats": {
+                "INFO": "[%(asctime)s] %(levelname)s %(name)s: %(message)s",
+                "CRITICAL": "FATAL ERROR: %(message)s"
+            }
         }
     },
     "filters": {
@@ -23,7 +32,7 @@
         "stdout": {
             "class": "logging.StreamHandler",
             "level": "DEBUG",
-            "formatter": "simple",
+            "formatter": "level_based",
             "stream": "ext://sys.stdout",
             "filters": [
                 "exclude_errors"

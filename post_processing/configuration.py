@@ -8,7 +8,6 @@ import pathlib
 
 from collections import UserDict
 
-
 _DEFAULT_DEBUG_SETTING: bool = False
 """
 The default setting for whether or not behavior for debugging purposes is enabled. 
@@ -18,6 +17,64 @@ _DEFAULT_DATE_FORMAT: str = "%Y-%m-%d %H:%M:%S%z"
 """The default date format for the entire project"""
 _DEFAULT_LOG_FORMAT: str = "[%(asctime)s] %(levelname)s %(name)s: %(message)s"
 """The default formatting for log messages when logging is not set up with the logging configuration"""
+
+SENTINEL = object()
+
+
+def _get_env_from_os(key: str, default: typing.Any = None) -> typing.Any:
+    """
+    Get the environment variable by flexible naming
+
+    If we want 'POST_PROCESS_EXAMPLE_VARIABLE' and there is 'POST_PROCESS_EXAMPLE_VARIABLE',
+    we retrieve 'POST_PROCESS_EXAMPLE_VARIABLE'. If that doesn't exist but 'POST_PROCESS_Example_Variable' exists,
+    we'll retrieve 'POST_PROCESS_Example_Variable'. If 'POST_PROCESS_EXAMPLE_VARIABLE' doesn't exist, but there are
+    two or more versions with different casing, we throw an error due to the questionable environment.
+    Otherwise we return the default
+
+    :param key: The name of the environment variable to retrieve
+    :param default: A value to return if there is no entry with a matching name in flexible casing
+    """
+    if key in os.environ:
+        return os.environ[key]
+
+    candidates: typing.Sequence[typing.Any] = list({
+        value
+        for env_key, value in os.environ.items()
+        if env_key.upper() == key.upper()
+    })
+
+    if len(candidates) > 1:
+        raise OSError(f"Cannot get a value for '{key}' - multiple candidates without exact casing: {candidates}")
+
+    return default if not candidates else candidates[0]
+
+
+def _set_env(key: str, value: typing.Any):
+    """
+    Set the environment variable in flexible casing
+
+    If the code says the 'post_process_example_variable' but the available value is "POST_PROCESS_EXAMPLE_VARIABLE",
+    sets it as "POST_PROCESS_EXAMPLE_VARIABLE"
+
+    :param key: The environment variable name whose value to set
+    :param value: The new value of the environment variable
+    """
+    candidate_keys: typing.Sequence[str] = [
+        env_key
+        for env_key in os.environ.keys()
+        if key.upper() == env_key.upper()
+    ]
+
+    if len(candidate_keys) == 1:
+        os.environ[candidate_keys[0]] = value
+        return
+    elif len(candidate_keys) > 2:
+        logging.getLogger("Settings").warning(
+            f"There are multiple keys that might match '{key}'. "
+            f"Using the key as given and not one of the following similar keys: {candidate_keys}"
+        )
+
+    os.environ[key] = value
 
 
 class _Settings(UserDict):
@@ -148,6 +205,56 @@ class _Settings(UserDict):
     @json_log_path.setter
     def json_log_path(self, value: typing.Optional[pathlib.Path]):
         key: str = f"{self.prefix}_json_log_path"
+        self.__setitem__(key=key, item=value)
+
+    @property
+    def log_level_override_path(self) -> typing.Optional[pathlib.Path]:
+        """
+        The path to a json file that dictates log levels to override
+        """
+        key: str = f"{self.prefix}_log_level_override_path"
+
+        if key not in self.keys():
+            value = _get_env_from_os(key=key, default=SENTINEL)
+
+            if value is not SENTINEL:
+                value = pathlib.Path(value)
+
+            self.__setitem__(key=key, item=value)
+
+        configured_value: typing.Union[pathlib.Path, object] = self.__getitem__(key=key)
+
+        if configured_value is SENTINEL:
+            return None
+
+        return configured_value
+
+    @log_level_override_path.setter
+    def log_level_override_path(self, value: typing.Optional[pathlib.Path]):
+        key: str = f"{self.prefix}_log_level_override_path"
+        if value is None:
+            self.__setitem__(key=key, item=value)
+            return
+
+        if isinstance(value, str):
+            value = pathlib.Path(value)
+
+        if not isinstance(value, pathlib.Path):
+            raise TypeError(
+                f"Cannot set the log level override path - it must be none or a pathlib.Path and instead was: "
+                f"{value} (type={type(value)})"
+            )
+
+        if value.is_dir():
+            raise ValueError(
+                f"Cannot set the log level override path to {value} - it is a directory, not a file as required"
+            )
+
+        if not value.is_file():
+            raise FileNotFoundError(
+                f"Cannot set the log level override path to {value} - it is not a file"
+            )
+
         self.__setitem__(key=key, item=value)
 
     @property
@@ -353,6 +460,66 @@ class _Settings(UserDict):
             raise NotADirectoryError(f"Cannot set the profile path to '{value}' - it is not a directory")
         key: str = "{prefix}_profile_path".format(prefix=self.prefix).lower()
         self.__setitem__(key=key, item=value)
+
+    @property
+    def maximum_additional_threads(self) -> int:
+        """
+        The maximum number of threads that may be spun up for additional tasks
+        """
+        key: str = "{prefix}_MAXIMUM_ADDITIONAL_THREADS".format(prefix=self.prefix).lower()
+
+        if key not in self.keys() or not self.__getitem__(key=key):
+            maximum_additional_threads: int = int(_get_env_from_os(key=key, default=os.cpu_count()))
+            self.__setitem__(key=key, item=maximum_additional_threads)
+
+        return int(self.__getitem__(key=key))
+
+    @maximum_additional_threads.setter
+    def maximum_additional_threads(self, value: int):
+        key: str = "{prefix}_MAXIMUM_ADDITIONAL_THREADS".format(prefix=self.prefix).lower()
+
+        self.__setitem__(key=key, item=value)
+
+    @property
+    def verbosity(self) -> int:
+        """
+        A numeric level to further contain messages. When comparing, the lower the value the more likely it
+        should be logged and the higher the verbosity the more likely it should be printed.
+
+        The higher the verbosity, the more verbose the application should be
+
+        Checks should look like:
+
+            >>> if settings.verbosity < 3:
+            ...     message = "regular message"
+            ... else:
+            ...     message = "detailed message"
+            ... LOGGER.debug(message)
+        """
+        key: str = "{prefix}_VERBOSITY".format(prefix=self.prefix).lower()
+
+        if key not in self.keys() or not self.__getitem__(key=key):
+            from post_processing.enums import Verbosity
+            verbosity: int = int(_get_env_from_os(key=key, default=Verbosity.NORMAL))
+            self.__setitem__(key=key, item=verbosity)
+
+        return int(self.__getitem__(key=key))
+
+    @verbosity.setter
+    def verbosity(self, value: int):
+        key: str = "{prefix}_VERBOSITY".format(prefix=self.prefix).lower()
+        if isinstance(value, str):
+            value = int(float(value))
+
+        if not isinstance(value, (int, float)):
+            raise TypeError(
+                f"A new verbosity value must be a string, int, or float, but was '{value}' (type={type(value)})"
+            )
+
+        value = int(value)
+
+        self.__setitem__(key=key, item=value)
+
 
 settings = _Settings()
 """Application wide settings"""

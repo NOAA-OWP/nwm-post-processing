@@ -4,6 +4,7 @@ Defines a profile for how a certain combination of Configuration + Model Output 
 import abc
 import importlib
 import itertools
+import os
 import re
 import shutil
 import types
@@ -194,6 +195,31 @@ class ProfileOperation(BaseModel, OperationHandler[InputType, OutputType], abc.A
         values_to_hash: typing.Tuple[str, ...] = (self.__class__.__name__, to_json(self))
         return hash(values_to_hash)
 
+    def visit(
+        self,
+        operator: typing.Callable[["ProfileOperation"], typing.Any],
+        condition: typing.Callable[["ProfileOperation"], bool] = None
+    ) -> None:
+        """
+        Perform some action on the operation and all of its children that are also operations
+
+        :param operator: The operation to perform
+        :param condition: A condition to apply the visitor operator
+        """
+        if condition is None:
+            condition = lambda x: True
+
+        if condition(self):
+            operator(self)
+
+        for attribute_name, attribute in self.__dict__.items():
+            if not isinstance(attribute, typing.Iterable):
+                continue
+            if all(isinstance(entry, OperationHandler) for entry in attribute):
+                for entry in attribute:
+                    entry.visit(operator=operator, condition=condition)
+
+
     @abc.abstractmethod
     def __call__(
         self,
@@ -315,8 +341,7 @@ class NCOOperation(ProfileOperation[typing.Sequence[pathlib.Path], typing.Sequen
     ) -> typing.Sequence[pathlib.Path]:
         pass
 
-
-@dataclasses.dataclass(unsafe_hash=True)
+@dataclasses.dataclass
 class ExtractOperation(NCOOperation):
     """
     Describes how to extract and operate on individual pieces of data
@@ -331,7 +356,7 @@ class ExtractOperation(NCOOperation):
         profile: "Profile",
         process_identifier: str,
         work_directory: pathlib.Path,
-        files: typing.Sequence[pathlib.Path],
+        data: typing.Sequence[pathlib.Path],
         previous_operations: typing.List[ProfileOperation],
         metadata: typing.Dict[str, typing.Any]
     ) -> typing.Sequence[pathlib.Path]:
@@ -341,26 +366,40 @@ class ExtractOperation(NCOOperation):
         :param profile: The profile that called for this operation
         :param process_identifier: An identifier tying together other output for this post processing task
         :param work_directory: Where intermediate products may be saved
-        :param files: The files to operate on
+        :param data: The files to operate on
         :param metadata: Metadata provided from previous operations that may be used as helpful hints
         :returns: The given paths
         """
+        frame_pattern: re.Pattern = re.compile(r"(?<=\.)(tm|f)\d+(?=\.)")
+        def get_frame_identifier(filename: str) -> str:
+            match: typing.Optional[re.Match] = frame_pattern.search(filename)
+            if match:
+                return match.group(0)
+            return ""
 
         subset_arguments: typing.List[typing.Dict[str, typing.Any]] = [
             {
                 "input_file": input_file,
                 "mask": mask,
                 "coordinate": self.dimension,
-                "work_directory": work_directory
+                "work_directory": work_directory,
+                "identifiers": {
+                    **metadata,
+                    "mask_name": mask.stem,
+                    "input_name": input_file.stem,
+                    "frame": get_frame_identifier(input_file.name),
+                    **identifiers
+                },
+                "output_pattern": self.output_pattern,
             }
-            for input_file, (mask, identifiers) in itertools.product(files, self._identifier_mapping.items())
+            for input_file, (mask, identifiers) in itertools.product(data, self._identifier_mapping.items())
         ]
 
         from post_processing.transform import subset_file_into_file_by_mask
         subset_paths: typing.Sequence[pathlib.Path] = starmap(
             function=subset_file_into_file_by_mask,
             args=subset_arguments,
-            threaded=True
+            thread_count=settings.maximum_additional_threads
         )
 
         arguments_for_each: typing.List[typing.Dict[str, typing.Any]] = [
@@ -376,15 +415,20 @@ class ExtractOperation(NCOOperation):
             for subset_path in subset_paths
         ]
 
-        starmap(function=call_operations, args=arguments_for_each, threaded=True)
-        return files
+        results = starmap(
+            function=call_operations,
+            args=arguments_for_each,
+            thread_count=settings.maximum_additional_threads
+        )
+        return data if isinstance(data, xarray.Dataset) else results
 
     def __post_init__(self):
-        Evaluate the paths for the masks for globs
-            it might make sense to make a utility function for it and find the other locations of that logic
+        from post_processing.utilities.common import expand_paths
+        self.masks = list(expand_paths(self.masks))
+
         missing_masks: typing.List[pathlib.Path] = [path for path in self.masks if not path.is_file()]
 
-        assert not any(missing_masks), f"A {self.__class__.__name__} is missing a required mask(s): {missing_masks}"
+        assert self.masks and not any(missing_masks), f"A {self.__class__.__name__} is missing a required mask(s): {missing_masks}"
 
         try:
             self._pattern = re.compile(self.identifier_pattern)
@@ -433,8 +477,24 @@ class ExtractOperation(NCOOperation):
                     f"{ProfileOperation.__qualname__}"
                 )
 
+    def __hash__(self):
+        try:
+            parent_hash: int = super().__hash__()
+        except:
+            parent_hash = 0
+
+        return hash((
+            parent_hash,
+            *self.masks,
+            self.identifier_pattern,
+            self.output_pattern,
+            *self.each,
+            self.dimension
+        ))
+
     masks: typing.List[pathlib.Path] = dataclasses.field()
     identifier_pattern: str = dataclasses.field()
+    """A pattern used to extract metadata from the mask filename"""
     output_pattern: str = dataclasses.field()
     each: typing.List[typing.Union[ProfileOperation]]
     dimension: str = dataclasses.field(default="feature_id")
@@ -465,7 +525,7 @@ class MergeOperation(NCOOperation):
         :param profile: The profile that called for this operation
         :param process_identifier: An identifier tying together other output for this post processing task
         :param work_directory: Where intermediate products may be saved
-        :param files: The files to operate on
+        :param data: The files to operate on
         :param metadata: Metadata provided from previous operations that may be used as helpful hints
         :returns: The Paths for each created object
         """
@@ -478,7 +538,7 @@ class MergeOperation(NCOOperation):
 
     file_name_pattern: str = dataclasses.field()
 
-@dataclasses.dataclass(unsafe_hash=True)
+@dataclasses.dataclass
 class DropOperation(NCOOperation, InPlaceOperationMixin):
     """
     Tells how to drop variables
@@ -486,6 +546,17 @@ class DropOperation(NCOOperation, InPlaceOperationMixin):
     @classmethod
     def operation(cls) -> OperationType:
         return OperationType.DROP
+
+    def __hash__(self):
+        try:
+            parent_hash: int = super().__hash__()
+        except:
+            parent_hash = 0
+        return hash((
+            parent_hash,
+            *self.fields,
+            self.exclude
+        ))
 
     def __str__(self):
         if self.exclude:
@@ -671,7 +742,7 @@ class AttributeOperation(NCOOperation, InPlaceOperationMixin):
         starmap(
             function=nco.add_or_modify_attribute,
             args=arguments,
-            threaded=True
+            thread_count=True
         )
 
         return data
@@ -741,9 +812,22 @@ class SaveOperation(NCOOperation):
         :returns: The Paths for each created object
         """
         import shutil
+        from post_processing.configuration import settings
+        from post_processing.enums import Verbosity
+
         saved_files: typing.List[pathlib.Path] = []
         for file in data:
             file_specific_metadata: typing.Dict[str, typing.Any] = dict(metadata)
+            file_specific_metadata["file_name"] = file.name
+            file_specific_metadata["file_stem"] = file.stem
+
+            if settings.verbosity >= Verbosity.ALL:
+                LOGGER.debug(
+                    f"{os.linesep}"
+                    f"Available Metadata:{os.linesep}"
+                    f"    - {(os.linesep + '    - ').join([str(key) + ': ' + str(value) for key, value in metadata.items()])}"
+                    f"{os.linesep}"
+                )
 
             if self._compiled_pattern:
                 matching_identifiers: typing.Optional[re.Match] = self._compiled_pattern.search(file.name)
@@ -755,9 +839,26 @@ class SaveOperation(NCOOperation):
                         f"No identifiers were found in '{file.name}' with the pattern: '{self.identifier_pattern}'"
                     )
 
-            filename: str = self.filename_pattern.format(**file_specific_metadata)
-            path: pathlib.Path = self.directory / filename
-            shutil.copy(file, path)
+            try:
+                filename: str = self.filename_pattern.format(**file_specific_metadata)
+            except KeyError as e:
+                import json
+                LOGGER.error(
+                    f"Could not generate a new file name used to save: {e}{os.linesep}"
+                    f"Output Pattern: '{self.filename_pattern}'{os.linesep}"
+                    f"Available Options: {json.dumps(file_specific_metadata, indent=4)}"
+                )
+                raise
+
+            output_directory: pathlib.Path = pathlib.Path(str(self.directory).format(**file_specific_metadata))
+
+            output_directory.mkdir(parents=True, exist_ok=True)
+            path: pathlib.Path = output_directory / filename
+            try:
+                shutil.copy(file, path)
+            except:
+                LOGGER.error(f"Could not copy '{file}' ({'exists' if file.is_file() else 'does not exist'}) to '{path}'")
+                raise
             saved_files.append(path)
             LOGGER.debug(f"Wrote {file} to {path}")
         return saved_files
@@ -796,7 +897,9 @@ class BranchOperation(ProfileOperation[InputType, typing.Sequence[pathlib.Path]]
 
         invalid_ends_names: typing.List[str] = []
         for branch_name, branch_logic in self.branches.items():
-            if not isinstance(branch_logic[-1], (NCOOperation, OutOfPythonOperation)):
+            if len(branch_logic) == 0:
+                invalid_ends_names.append(branch_name)
+            elif not isinstance(branch_logic[-1], (NCOOperation, OutOfPythonOperation)):
                 invalid_ends_names.append(branch_name)
 
         if invalid_ends_names:
@@ -902,10 +1005,12 @@ class LoadOperation(ProfileOperation[typing.Sequence[pathlib.Path], xarray.Datas
     ) -> xarray.Dataset:
         if not data:
             raise ValueError(f"No files were given to load within a load operation in '{profile}'")
-        if len(data) == 1:
-            return xarray.open_dataset(data[0])
-        # Your IDE may complain about the `data` parameter - it is a false positive. A sequence of paths is fine
-        return xarray.open_mfdataset(data, combine='by_coords', **self.load_arguments)
+
+        from post_processing.utilities.netcdf import load_netcdf
+
+        data: xarray.Dataset = load_netcdf(data, **self.load_arguments)
+
+        return data
 
 @dataclasses.dataclass(unsafe_hash=True)
 class PythonOperation(ProfileOperation[InputType, OutputType], abc.ABC):
@@ -1126,6 +1231,20 @@ class Profile(BaseModel):
         :returns: The list of resultant files
         """
         return self.run(date=date, cycle=cycle, files=files)
+
+    def visit(
+        self,
+        operator: typing.Callable[[ProfileOperation], typing.Any],
+        condition: typing.Callable[[ProfileOperation], bool] = None
+    ) -> None:
+        """
+        Visit every operation that this profile performs and apply the operator to it if possible and necessary
+
+        :param operator: The action to perform on profile operations
+        :param condition: A condition that determines what operations the operator should be called on
+        """
+        for operation in self.operations:
+            operation.visit(operator=operator, condition=condition)
 
     def get_output_filename(
         self,
