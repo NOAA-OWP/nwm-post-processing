@@ -1,4 +1,4 @@
-# ![NOAA OWP Logo](https://raw.githubusercontent.com/NOAA-OWP/owp-open-source-project-template/doc/noaa_nws_owp_combo_log.png) National Water Model Post Processing
+# ![](https://raw.githubusercontent.com/NOAA-OWP/nwm-post-processing/doc/noaa_nws_owp_combo_log.png) National Water Model Post Processing
 
 **National Water Model Post Processing** takes [National Water Model](https://water.noaa.gov/about/nwm) data, 
 combines the output, and subsets them based on region in order to make model data easier to work with
