@@ -2,6 +2,13 @@
 
 This tutorial explains how to use NCO (NetCDF Operators) tools like `ncks`, `ncatted`, `ncap2`, `ncrename`, and `ncrcat` to manipulate NetCDF files, especially for hydrological model output like NWM.
 
+<h1 style="color: red">
+  NOTE: Netcdf Operator use has been reduced - many operations lack proper results since National Water Model 
+  data, for the most part, cannot and won't be represented in a
+  <a href="https://cfconventions.org/cf-conventions/cf-conventions.html">CF-compliant</a> fashion.
+  As a result, Netcdf Operators, such as <code>ncks</code> can, and will, either fail outright or produce unwanted 
+  results.
+</h1> 
 ---
 
 ## 1. **Dropping Variables with `ncks`**
@@ -924,3 +931,8 @@ streamflow(feature_id) → shape (3,)
 | `ncpdq`  | Reorder dimensions (transpose) |
 | `ncecat` | Add a new record dimension |
 
+---
+
+#### Sources:
+
+Zender, C. (2025). <i>NCO User Guide</i>. Departments of Earth System Science and Computer Science, University of California, Irvine. https://nco.sourceforge.net/nco.pdf

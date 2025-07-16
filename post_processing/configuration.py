@@ -77,12 +77,45 @@ def _set_env(key: str, value: typing.Any):
     os.environ[key] = value
 
 
+def _parse_env_file(env_path: pathlib.Path) -> typing.Dict[str, typing.Any]:
+    """
+    Parse an .env without involving 3rd party libraries
+
+    :param env_path: The path to the .env file. An empty dictionary is returned if it is not a file,
+    raises an error if it is a directory
+    :returns: A dictionary of all found variables and their values
+    :raises IsADirectoryError: If the .env file path leads to a directory rather than a file
+    """
+    import re
+
+    if not env_path.exists():
+        return {}
+
+    if env_path.is_dir():
+        raise IsADirectoryError(f"{env_path} is a directory, not a file")
+
+    line_pattern: re.Pattern = re.compile(
+        r"^\s*(?<!#)(?P<variable_name>[A-Za-z]\w*)\s*=\s*(?P<variable_value>\"{1}[^\"]+\"{1}|'{1}[^']*'{1}|[^#\"\n]+)(#.+|\s)*$",
+        re.MULTILINE,
+    )
+
+    file_text: str = env_path.read_text()
+
+    configured_variables: typing.Dict[str, typing.Any] = {}
+
+    for match in line_pattern.finditer(file_text):
+        configured_variables[match.group("variable_name")] = match.group("variable_value")
+
+    return configured_variables
+
+
 class _Settings(UserDict):
     """
     An access point for application and environment settings
     """
     def __init__(self, initial_values: typing.Mapping = None, **kwargs):
         super().__init__()
+
         for key, value in os.environ.items():
             self.__setitem__(key=key.lower(), item=value)
 
@@ -91,6 +124,35 @@ class _Settings(UserDict):
 
         for keyword, argument in kwargs.items():
             self.__setitem__(key=keyword, item=argument)
+
+        env_file: pathlib.Path = self.application_path / ".env"
+
+        configured_variables: typing.Mapping[str, typing.Any] = _parse_env_file(env_path=env_file)
+        self.update(configured_variables)
+
+    def _find_key(self, key: str) -> str:
+        """
+        Find a matching case-flexible key in either these settings or in the os environment variables
+
+        :param key: The name of the environment variable to find
+        :returns: The appropriate key
+        """
+        matching_keys: typing.List[str] = [
+            contained_key
+            for contained_key in self.keys()
+            if key.lower() == contained_key.lower()
+        ]
+
+        matching_keys.extend([
+            os_key
+            for os_key in os.environ.keys()
+            if os_key not in matching_keys
+        ])
+
+        if len(matching_keys) == 1:
+            return matching_keys[0]
+
+        return key
 
     @property
     def prefix(self) -> str:
@@ -104,7 +166,9 @@ class _Settings(UserDict):
         """
         Whether this is running in debug mode
         """
-        key: str = "{prefix}_debug".format(prefix=self.prefix).lower()
+        proposed_key: str = "{prefix}_debug".format(prefix=self.prefix).lower()
+        key: str = self._find_key(key=proposed_key)
+
         if key not in self.keys():
             self.__setitem__(key=key, item=_DEFAULT_DEBUG_SETTING)
         
@@ -124,7 +188,8 @@ class _Settings(UserDict):
         """
         How dates should be formatted across the application
         """
-        key: str = "{prefix}_date_format".format(prefix=self.prefix).lower()
+        proposed_key: str = "{prefix}_date_format".format(prefix=self.prefix).lower()
+        key: str = self._find_key(key=proposed_key)
 
         if key not in self.keys() or not self.__getitem__(key=key):
             self.__setitem__(key=key, item=_DEFAULT_DATE_FORMAT)
@@ -136,7 +201,8 @@ class _Settings(UserDict):
         """
         How logs should be formatted
         """
-        key: str = "{prefix}_log_format".format(prefix=self.prefix).lower()
+        proposed_key: str = "{prefix}_log_format".format(prefix=self.prefix).lower()
+        key: str = self._find_key(key=proposed_key)
 
         if key not in self.keys() or not self.__getitem__(key=key) or not isinstance(self.__getitem__(key=key), str):
             self.__setitem__(key=key, item=_DEFAULT_LOG_FORMAT)
@@ -156,7 +222,8 @@ class _Settings(UserDict):
         """
         The names of all loggers that may output errors but not basic INFO
         """
-        key: str = "{prefix}_loggers_to_quiet".format(prefix=self.prefix).lower()
+        proposed_key: str = "{prefix}_loggers_to_quiet".format(prefix=self.prefix).lower()
+        key: str = self._find_key(key=proposed_key)
         entries: typing.Optional[typing.Sequence[str]] = self.get(key)
 
         if entries is None:
@@ -173,7 +240,8 @@ class _Settings(UserDict):
 
     @loggers_to_quiet.setter
     def loggers_to_quiet(self, entries: typing.Sequence[str]) -> None:
-        key: str = "{prefix}_loggers_to_quiet".format(prefix=self.prefix).lower()
+        proposed_key: str = "{prefix}_loggers_to_quiet".format(prefix=self.prefix).lower()
+        key: str = self._find_key(key=proposed_key)
         self.__setitem__(key, entries)
 
     @property
@@ -183,7 +251,8 @@ class _Settings(UserDict):
 
         No log path means no configured json log
         """
-        key: str = f"{self.prefix}_json_log_path"
+        proposed_key: str = f"{self.prefix}_json_log_path"
+        key: str = self._find_key(key=proposed_key)
 
         if key in self.keys():
             path = self.__getitem__(key)
@@ -204,7 +273,8 @@ class _Settings(UserDict):
 
     @json_log_path.setter
     def json_log_path(self, value: typing.Optional[pathlib.Path]):
-        key: str = f"{self.prefix}_json_log_path"
+        proposed_key: str = f"{self.prefix}_json_log_path"
+        key: str = self._find_key(key=proposed_key)
         self.__setitem__(key=key, item=value)
 
     @property
@@ -212,7 +282,8 @@ class _Settings(UserDict):
         """
         The path to a json file that dictates log levels to override
         """
-        key: str = f"{self.prefix}_log_level_override_path"
+        proposed_key: str = f"{self.prefix}_log_level_override_path"
+        key: str = self._find_key(key=proposed_key)
 
         if key not in self.keys():
             value = _get_env_from_os(key=key, default=SENTINEL)
@@ -231,7 +302,8 @@ class _Settings(UserDict):
 
     @log_level_override_path.setter
     def log_level_override_path(self, value: typing.Optional[pathlib.Path]):
-        key: str = f"{self.prefix}_log_level_override_path"
+        proposed_key: str = f"{self.prefix}_log_level_override_path"
+        key: str = self._find_key(key=proposed_key)
         if value is None:
             self.__setitem__(key=key, item=value)
             return
@@ -262,7 +334,8 @@ class _Settings(UserDict):
         """
         The log level of the optional json logger
         """
-        key: str = f"{self.prefix}_json_log_level"
+        proposed_key: str = f"{self.prefix}_json_log_level"
+        key: str = self._find_key(key=proposed_key)
 
         log_level: typing.Union[str, int, None] = self.get(key)
 
@@ -279,7 +352,8 @@ class _Settings(UserDict):
 
     @json_log_level.setter
     def json_log_level(self, value: typing.Optional[int]):
-        key: str = f"{self.prefix}_json_log_level"
+        proposed_key: str = f"{self.prefix}_json_log_level"
+        key: str = self._find_key(key=proposed_key)
         self.__setitem__(key=key, item=value)
 
     @property
@@ -287,7 +361,8 @@ class _Settings(UserDict):
         """
         The maximum size of a json log
         """
-        key: str = f"{self.prefix}_json_log_maximum_bytes"
+        proposed_key: str = f"{self.prefix}_json_log_maximum_bytes"
+        key: str = self._find_key(key=proposed_key)
         log_maximum_bytes: typing.Union[str, int, None] = self.get(key)
         if log_maximum_bytes is None:
             log_maximum_bytes: typing.Union[str, int, None] = int(float(os.environ.get(key, 1024 ** 2)))
@@ -301,7 +376,8 @@ class _Settings(UserDict):
 
     @json_log_maximum_bytes.setter
     def json_log_maximum_bytes(self, value: typing.Optional[int]):
-        key: str = f"{self.prefix}_json_log_maximum_bytes"
+        proposed_key: str = f"{self.prefix}_json_log_maximum_bytes"
+        key: str = self._find_key(key=proposed_key)
         self.__setitem__(key=key, item=None if value is None else int(float(value)))
     
     @property
@@ -309,7 +385,8 @@ class _Settings(UserDict):
         """
         Where to find external resources
         """
-        key: str = "{prefix}_resource_path".format(prefix=self.prefix).lower()
+        proposed_key: str = "{prefix}_resource_path".format(prefix=self.prefix).lower()
+        key: str = self._find_key(key=proposed_key)
 
         if key not in self.keys() or not self.__getitem__(key=key) or not isinstance(self.__getitem__(key=key), (pathlib.Path, str)):
             path: pathlib.Path = self.application_path / "resources"
@@ -347,7 +424,8 @@ class _Settings(UserDict):
         """
         The intended path to a logging config
         """
-        key: str = "{prefix}_log_config_path".format(prefix=self.prefix).lower()
+        proposed_key: str = "{prefix}_log_config_path".format(prefix=self.prefix).lower()
+        key: str = self._find_key(key=proposed_key)
 
         if key not in self.keys() or not self.__getitem__(key=key) or not isinstance(self.__getitem__(key=key), (str, pathlib.Path)):
             resource_path: pathlib.Path = self.resource_path
@@ -371,7 +449,8 @@ class _Settings(UserDict):
         """
         The setter for logging_config_path
         """
-        key: str = "{prefix}_log_config_path".format(prefix=self.prefix).lower()
+        proposed_key: str = "{prefix}_log_config_path".format(prefix=self.prefix).lower()
+        key: str = self._find_key(key=proposed_key)
         self.__setitem__(key=key, item=value)
 
     @property
@@ -379,7 +458,8 @@ class _Settings(UserDict):
         """
         Where generated products that serve as input for other products should be written
         """
-        key: str = "{prefix}_intermediate_directory".format(prefix=self.prefix).lower()
+        proposed_key: str = "{prefix}_intermediate_directory".format(prefix=self.prefix).lower()
+        key: str = self._find_key(key=proposed_key)
 
         if key not in self.keys() or not self.__getitem__(key=key):
             path: pathlib.Path = self.application_path / "intermediate"
@@ -403,7 +483,8 @@ class _Settings(UserDict):
         if not value.is_dir():
             raise NotADirectoryError(f"Cannot set the intermediate directory to '{value}' - it is not a directory")
 
-        key: str = "{prefix}_intermediate_directory".format(prefix=self.prefix).lower()
+        proposed_key: str = "{prefix}_intermediate_directory".format(prefix=self.prefix).lower()
+        key: str = self._find_key(key=proposed_key)
         self.__setitem__(key=key, item=value)
 
     @property
@@ -411,7 +492,8 @@ class _Settings(UserDict):
         """
         A preconfigured location for where to put output files
         """
-        key: str = "{prefix}_output_directory".format(prefix=self.prefix).lower()
+        proposed_key: str = "{prefix}_output_directory".format(prefix=self.prefix).lower()
+        key: str = self._find_key(key=proposed_key)
 
         if key not in self.keys() or not self.__getitem__(key=key):
             return None
@@ -444,7 +526,8 @@ class _Settings(UserDict):
         """
         The path where you should expect to find profile confingurations
         """
-        key: str = "{prefix}_profile_path".format(prefix=self.prefix).lower()
+        proposed_key: str = "{prefix}_profile_path".format(prefix=self.prefix).lower()
+        key: str = self._find_key(key=proposed_key)
 
         if key not in self.keys() or not self.__getitem__(key=key):
             profile_path: pathlib.Path = pathlib.Path(os.environ.get(key, self.resource_path / "profiles"))
@@ -458,7 +541,8 @@ class _Settings(UserDict):
     def profile_path(self, value: pathlib.Path):
         if not value.is_dir():
             raise NotADirectoryError(f"Cannot set the profile path to '{value}' - it is not a directory")
-        key: str = "{prefix}_profile_path".format(prefix=self.prefix).lower()
+        proposed_key: str = "{prefix}_profile_path".format(prefix=self.prefix).lower()
+        key: str = self._find_key(key=proposed_key)
         self.__setitem__(key=key, item=value)
 
     @property
@@ -466,7 +550,8 @@ class _Settings(UserDict):
         """
         The maximum number of threads that may be spun up for additional tasks
         """
-        key: str = "{prefix}_MAXIMUM_ADDITIONAL_THREADS".format(prefix=self.prefix).lower()
+        proposed_key: str = "{prefix}_MAXIMUM_ADDITIONAL_THREADS".format(prefix=self.prefix).lower()
+        key: str = self._find_key(key=proposed_key)
 
         if key not in self.keys() or not self.__getitem__(key=key):
             maximum_additional_threads: int = int(_get_env_from_os(key=key, default=os.cpu_count()))
@@ -476,7 +561,8 @@ class _Settings(UserDict):
 
     @maximum_additional_threads.setter
     def maximum_additional_threads(self, value: int):
-        key: str = "{prefix}_MAXIMUM_ADDITIONAL_THREADS".format(prefix=self.prefix).lower()
+        proposed_key: str = "{prefix}_MAXIMUM_ADDITIONAL_THREADS".format(prefix=self.prefix).lower()
+        key: str = self._find_key(key=proposed_key)
 
         self.__setitem__(key=key, item=value)
 
@@ -494,9 +580,10 @@ class _Settings(UserDict):
             ...     message = "regular message"
             ... else:
             ...     message = "detailed message"
-            ... LOGGER.debug(message)
+            ... logging.getLogger().debug(message)
         """
-        key: str = "{prefix}_VERBOSITY".format(prefix=self.prefix).lower()
+        proposed_key: str = "{prefix}_VERBOSITY".format(prefix=self.prefix).lower()
+        key: str = self._find_key(key=proposed_key)
 
         if key not in self.keys() or not self.__getitem__(key=key):
             from post_processing.enums import Verbosity
@@ -507,7 +594,8 @@ class _Settings(UserDict):
 
     @verbosity.setter
     def verbosity(self, value: int):
-        key: str = "{prefix}_VERBOSITY".format(prefix=self.prefix).lower()
+        proposed_key: str = "{prefix}_VERBOSITY".format(prefix=self.prefix).lower()
+        key: str = self._find_key(key=proposed_key)
         if isinstance(value, str):
             value = int(float(value))
 
