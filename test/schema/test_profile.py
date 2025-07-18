@@ -3,6 +3,7 @@ import unittest
 import typing
 import logging
 import pathlib
+import re
 
 from post_processing.configuration import settings
 from post_processing.schema import profile
@@ -19,7 +20,6 @@ class ProfileTest(DataTest):
     def setUpClass(cls):
         super().setUpClass()
         cls.profile_directory = settings.application_path / "test" / "specifications" / "profiles"
-        LOGGER.info(f"The test for {cls.__name__} has been set up and will run in PID: {os.getpid()}")
 
     def test_get_function_by_name(self):
         logger: logging.Logger = logging.getLogger("test_get_function_by_name")
@@ -155,9 +155,96 @@ class ProfileTest(DataTest):
             cycle=self.get_test_forecast_cycle(),
             files=self.get_input_files()
         )
+        self.assertTrue(isinstance(results, typing.Sequence))
+        self.assertTrue(
+            all(isinstance(path, pathlib.Path) for path in results),
+            f"All members of the result set should have been paths but instead received: "
+            f"{set([type(result) for result in results])}"
+        )
         logger.info("Data has been extracted into separate files")
-        # TODO: Ensure that each expected file is present
-        self.assertFalse(True, "Implement the test for profile.ExtractOperation")
+
+        extraction_step: profile.ExtractOperation = extract_profile.operations[0]
+
+        filename_pattern: str = extraction_step.output_pattern
+        mask_identifier_pattern: re.Pattern = re.compile(extraction_step.identifier_pattern)
+
+        frame_pattern: re.Pattern = re.compile(r"(?<=\.)(tm|f)\d+(?=\.)")
+
+        def get_frame_identifier(filename: str) -> str:
+            match: typing.Optional[re.Match] = frame_pattern.search(filename)
+            if match:
+                return match.group(0)
+            return ""
+
+        from post_processing.utilities.common import first
+        from post_processing.nwm_file import NWMFile
+        import xarray
+        import numpy
+
+        mask_coordinates: typing.Dict[pathlib.Path, numpy.ndarray] = {}
+
+        for input_file in self.get_input_files():
+            nwm_file: NWMFile = NWMFile.parse(path=input_file)
+            base_name_metadata: typing.Dict[str, typing.Any] = {
+                "Configuration": nwm_file.configuration,
+                "ModelOutputType": nwm_file.model_output_type,
+                "cycle": str(nwm_file.cycle).zfill(2),
+                "frame": get_frame_identifier(input_file.stem),
+                "region": nwm_file.region,
+                "input_name": input_file.stem,
+            }
+
+            for mask_path in map(pathlib.Path, extraction_step.masks):
+                naming_metadata: typing.Dict[str, typing.Any] = {
+                    "mask": mask_path.stem,
+                    **base_name_metadata,
+                }
+                mask_identifier_match: typing.Optional[re.Match] = mask_identifier_pattern.search(mask_path.name)
+
+                if mask_identifier_match:
+                    naming_metadata.update(mask_identifier_match.groupdict())
+
+                output_name_for_mask: str = filename_pattern.format(**naming_metadata)
+                output_path: typing.Optional[pathlib.Path] = first(
+                    results,
+                    condition=lambda path: path.name == output_name_for_mask
+                )
+                self.assertIsNotNone(
+                    output_path,
+                    f"Could not find a match for the '{output_name_for_mask}' file associated with the mask at '{mask_path.name}'"
+                )
+                self.assertTrue(output_path.is_file())
+
+                if mask_path not in mask_coordinates:
+                    with xarray.open_dataset(filename_or_obj=mask_path, chunks={}, engine="h5netcdf") as mask:
+                        coordinates: numpy.ndarray = mask[extraction_step.dimension].values
+                        mask_coordinates[mask_path] = coordinates
+
+                with xarray.open_dataset(filename_or_obj=output_path, chunks={}, engine="h5netcdf") as output:
+                    coordinates_for_mask: numpy.ndarray = mask_coordinates[mask_path]
+                    dimension_variable: xarray.DataArray = output[extraction_step.dimension]
+                    coordinate_in_mask: numpy.ndarray = numpy.isin(dimension_variable.values, coordinates_for_mask)
+                    extra_output_coordinates: xarray.DataArray = dimension_variable.sel(**{
+                        extraction_step.dimension: ~coordinate_in_mask
+                    })
+                    self.assertEqual(
+                        extra_output_coordinates.size,
+                        0,
+                        f"The masked data at '{output_path}' has {extra_output_coordinates.size} "
+                        f"more coordinates than the mask at '{mask_path}' - "
+                        f"{dimension_variable.size} vs {coordinates_for_mask.size}"
+                    )
+
+                    missing_output_coordinates: numpy.ndarray = coordinates_for_mask[
+                        ~numpy.isin(coordinates_for_mask, dimension_variable.values)
+                    ]
+
+                    self.assertEqual(
+                        len(missing_output_coordinates),
+                        0,
+                        f"There are {len(missing_output_coordinates)} coordinates from the mask ('{mask_path}') "
+                        f"that aren't in the output ('{output_path}')"
+                    )
         logger.info("Test Complete")
         
     def test_drop_operation(self):
@@ -389,7 +476,33 @@ class ProfileTest(DataTest):
 
         self.assertFalse(True, "Implement the test for profile.OutOfPythonOperation")
         logger.info("Test Complete")
-        
+
+    def test_on_each_operation(self):
+        """
+        This tests a fully defined, semi-real world example of how to process an entire profile
+        """
+        logger: logging.Logger = logging.getLogger("on_each")
+        logger.info("Running test")
+        profile_path: pathlib.Path = self.profile_directory / "on_each.json"
+        on_each_profile: profile.Profile = profile.Profile.from_json(path_or_buffer=profile_path)
+
+        output_directory: pathlib.Path = self.get_output_directory() / logger.name
+
+        try:
+            results: typing.Sequence[pathlib.Path] = on_each_profile.run(
+                date=self.get_date(),
+                cycle=self.get_test_forecast_cycle(),
+                files=self.get_input_files(),
+                output_path=output_directory
+            )
+        except:
+            logger.error(f"Failed to run the profile defined at '{profile_path}'")
+            raise
+
+        # TODO: Ensure that all products were generated in the expected fashion
+
+        logger.info("Test Complete")
+
     def test_profile(self):
         """
         This tests a fully defined, semi-real world example of how to process an entire profile
@@ -412,7 +525,8 @@ class ProfileTest(DataTest):
             results: typing.Sequence[pathlib.Path] = full_profile.run(
                 date=self.get_date(),
                 cycle=self.get_test_forecast_cycle(),
-                files=self.get_input_files()
+                files=self.get_input_files(),
+                output_path=output_directory
             )
         except:
             logger.error(f"Failed to run the profile defined at '{full_profile_path}'")

@@ -21,8 +21,8 @@ class NWMFile:
     model_output_type: enums.ModelOutputType
     configuration: enums.Configuration
     region: enums.Region
-    frame: typing.Optional[int] = dataclasses.field(default=None)
-    t_minus: typing.Optional[int] = dataclasses.field(default=None)
+    frame: typing.Optional[str] = dataclasses.field(default=None)
+    t_minus: typing.Optional[str] = dataclasses.field(default=None)
     member: typing.Optional[int] = dataclasses.field(default=None)
     path: typing.Optional[pathlib.Path] = dataclasses.field(default=None)
 
@@ -83,10 +83,10 @@ class NWMFile:
         member: typing.Optional[int] = int(caught_member) if caught_member is not None else None
 
         caught_frame: typing.Optional[str] = raw_data.get(common.FRAME_PATTERN_VARIABLE)
-        frame: typing.Optional[int] = int(caught_frame) if caught_frame is not None else None
+        frame: typing.Optional[str] = caught_frame if caught_frame is not None else None
 
-        caught_tminus: typing.Optional[int] = raw_data.get(common.TMINUS_PATTERN_VARIABLE)
-        t_minus: typing.Optional[int] = int(caught_tminus) if caught_tminus is not None else None
+        caught_tminus: typing.Optional[str] = raw_data.get(common.TMINUS_PATTERN_VARIABLE)
+        t_minus: typing.Optional[str] = caught_tminus if caught_tminus is not None else None
 
         return cls(
             cycle=cycle,
