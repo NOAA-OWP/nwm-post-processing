@@ -10,14 +10,19 @@ import json
 
 from datetime import datetime
 
-import numpy
-import numpy.typing
-import xarray
-
 LOGGER: logging.Logger = logging.getLogger(pathlib.Path(__file__).stem)
+
+if typing.TYPE_CHECKING:
+    import numpy
+    import numpy.typing
+    import xarray
+    from concurrent.futures import Future
 
 T = typing.TypeVar("T")
 """A generic type"""
+
+KT = typing.TypeVar("KT")
+"""A generic Key type"""
 
 VT = typing.TypeVar("VT")
 """A value type"""
@@ -46,7 +51,7 @@ TMINUS_PATTERN_VARIABLE: str = "tminus"
 REGION_PATTERN_VARIABLE: str = "region"
 
 NWM_FILENAME_PATTERN: re.Pattern = re.compile(
-    r"^nwm\."
+    r"nwm\."
     rf"t(?P<{CYCLE_PATTERN_VARIABLE}>[0-2]\d)z\."
     rf"(?P<{CONFIGURATION_PATTERN_VARIABLE}>[^.]+)\."
     rf"(?P<{OUTPUT_TYPE_PATTERN_VARIABLE}>channel_rt|land|forcing)(_(?P<{MEMBER_PATTERN_VARIABLE}>\d))?\."
@@ -245,23 +250,7 @@ def starmap_threaded(
         if settings.verbosity >= Verbosity.ALL:
             LOGGER.debug(f"{len(future_results)} jobs have been scheduled for {function}")
 
-        exceptions: typing.List[Exception] = []
-
-        while future_results:
-            future_result: concurrent.futures.Future[RT] = future_results.pop(0)
-            try:
-                result: RT = future_result.result(timeout=1)
-                if settings.verbosity >= Verbosity.VERBOSE:
-                    LOGGER.debug(f"An execution of {function} returned {str(result)[:10]}")
-                results.append(result)
-            except concurrent.futures.TimeoutError:
-                if settings.verbosity >= Verbosity.ALL:
-                    LOGGER.debug(f"Timed out waiting for an execution of {function} - adding it back to the future results")
-                future_results.append(future_result)
-            except Exception as e:
-                exceptions.append(e)
-            if settings.verbosity >= Verbosity.ALL:
-                LOGGER.debug(f"Waiting on {len(future_results)} calls to {function}")
+        results, exceptions = cycle_futures(futures=future_results)
 
         if exceptions:
             raise condense_exceptions(
@@ -346,9 +335,266 @@ def last(
 
     return collection[-1] if collection else None
 
+
+@typing.overload
+def cycle_future_list(
+    values: typing.List["Future[T]"],
+    *,
+    block_seconds: float = 1.0,
+    backoff_seconds: float = 1.0,
+    exception_handler: typing.Callable[[Exception], Exception] = None,
+) -> typing.Tuple[typing.Union[typing.Sequence[T], typing.Sequence[VT]], typing.Sequence[Exception]]:
+    ...
+
+@typing.overload
+def cycle_future_list(
+    futures: typing.Sequence["Future[T]"],
+    *,
+    transform: typing.Callable[[T, typing.Sequence[T]], VT],
+    block_seconds: float = 1.0,
+    backoff_seconds: float = 1.0,
+    exception_handler: typing.Callable[[Exception], Exception] = None,
+) -> typing.Tuple[typing.Union[typing.Sequence[T], typing.Sequence[VT]], typing.Sequence[Exception]]:
+    ...
+
+
+def cycle_future_list(
+    futures: typing.Iterable["Future[T]"],
+    *,
+    transform: typing.Callable[[T, typing.Sequence[T]], VT] = None,
+    block_seconds: float = 1.0,
+    backoff_seconds: float = 1.0,
+    exception_handler: typing.Callable[[Exception], Exception] = None,
+) -> typing.Tuple[typing.Union[typing.Sequence[T], typing.Sequence[VT]], typing.Sequence[Exception]]:
+    """
+    Cycle through the list of values and apply and transforms as the contents are generated
+
+    :param futures: The list of values to cycle through
+    :param transform: The function to apply to each value
+    :param block_seconds: The number of seconds to wait for a result
+    :param backoff_seconds: The number of seconds to wait after timing out while waiting for a result that just timed out
+    :param exception_handler: Special handling for exceptions
+    :returns: The results from all the futures
+    """
+    from concurrent.futures import Future
+    import time
+
+    if transform is None:
+        transform = lambda x, _: x
+    elif not callable(transform):
+        raise TypeError("transform must be callable")
+
+    if exception_handler is None:
+        exception_handler = lambda exc: exc
+    elif not callable(exception_handler):
+        raise ValueError(f"{exception_handler} (type={type(exception_handler)}) is not callable")
+
+    current_values: typing.List[Future[T]] = list(futures)
+
+    results: typing.List[VT] = []
+    last_item_id: typing.Optional[int] = None
+    exceptions: typing.List[Exception] = []
+
+    while current_values:
+        value: Future[T] = current_values.pop(0)
+
+        try:
+            result: T = value.result(timeout=block_seconds)
+            transformed_result: VT = transform(result, results)
+            results.append(transformed_result)
+        except TimeoutError:
+            current_values.append(value)
+            future_id: int = id(value)
+            if future_id == last_item_id:
+                time.sleep(backoff_seconds)
+            last_item_id = future_id
+        except Exception as e:
+            processed_exception: Exception = exception_handler(e)
+            exceptions.append(processed_exception)
+
+    return results, exceptions
+
+@typing.overload
+def cycle_future_mapping(
+    futures: typing.Mapping[KT, "Future[T]"],
+    *,
+    block_seconds: float = 1.0,
+    backoff_seconds: int = 1.0,
+    exception_handler: typing.Callable[[Exception], Exception] = None,
+) -> typing.Tuple[typing.Union[typing.Sequence[T], typing.Sequence[VT]], typing.Sequence[Exception]]:
+    ...
+
+@typing.overload
+def cycle_future_mapping(
+    futures: typing.Mapping[KT, "Future[T]"],
+    *,
+    transform: typing.Callable[[KT, T, typing.Sequence[T]], VT],
+    block_seconds: float = 1.0,
+    backoff_seconds: int = 1.0,
+    exception_handler: typing.Callable[[Exception], Exception] = None,
+) -> typing.Tuple[typing.Union[typing.Sequence[T], typing.Sequence[VT]], typing.Sequence[Exception]]:
+    ...
+
+def cycle_future_mapping(
+    futures: typing.Mapping[KT, "Future[T]"],
+    *,
+    transform: typing.Callable[[KT, T, typing.Sequence[T]], VT] = None,
+    block_seconds: float = 1.0,
+    backoff_seconds: float = 1.0,
+    exception_handler: typing.Callable[[Exception], Exception] = None,
+) -> typing.Tuple[typing.Union[typing.Sequence[T], typing.Sequence[VT]], typing.Sequence[Exception]]:
+    """
+    Cycle through the list of values and apply and transforms as the contents are generated
+
+    :param futures: The list of values to cycle through
+    :param transform: The function to apply to each value
+    :param block_seconds: The number of seconds to wait for a result
+    :param backoff_seconds: The number of seconds to wait after timing out while waiting for a result that just timed out
+    :param exception_handler: Special handling for exceptions
+    :returns: The results from all the futures
+    """
+    from concurrent.futures import Future
+    import time
+
+    if transform is None:
+        transform = lambda _, future_result, __: future_result
+    elif not callable(transform):
+        raise TypeError("transform must be callable")
+
+    if exception_handler is None:
+        exception_handler = lambda exc: exc
+    elif not callable(exception_handler):
+        raise ValueError(f"{exception_handler} (type={type(exception_handler)}) is not callable")
+
+    current_values: typing.Dict[KT, Future[T]] = dict(**futures)
+
+    results: typing.List[VT] = []
+    last_item_id: typing.Optional[int] = None
+    exceptions: typing.List[Exception] = []
+
+    while current_values:
+        key, future = current_values.popitem()
+
+        try:
+            result: T = future.result(timeout=block_seconds)
+            transformed_result: VT = transform(key, result, results)
+            results.append(transformed_result)
+        except TimeoutError:
+            current_values[key] = future
+            future_id: int = id(key)
+            if future_id == last_item_id:
+                time.sleep(backoff_seconds)
+            last_item_id = future_id
+        except Exception as e:
+            processed_exception: Exception = exception_handler(e)
+            exceptions.append(processed_exception)
+
+    return results, exceptions
+
+
+@typing.overload
+def cycle_futures(
+    futures: typing.Sequence["Future[T]"],
+    *,
+    block_seconds: float = 1.0,
+    backoff_seconds: float = 1.0
+) -> typing.Tuple[typing.Sequence[T], typing.Sequence[Exception]]:
+    ...
+
+@typing.overload
+def cycle_futures(
+    futures: typing.Sequence["Future[T]"],
+    *,
+    transform: typing.Callable[[T, typing.Sequence[T]], VT],
+    block_seconds: float = 1.0,
+    backoff_seconds: float = 1.0
+) -> typing.Tuple[typing.Sequence[VT], typing.Sequence[Exception]]:
+    ...
+
+@typing.overload
+def cycle_futures(
+    futures: typing.Mapping[KT, "Future[T]"],
+    *,
+    block_seconds: float = 1.0,
+    backoff_seconds: int = 1.0,
+    exception_handler: typing.Callable[[Exception], Exception] = None,
+) -> typing.Tuple[typing.Sequence[T], typing.Sequence[Exception]]:
+    ...
+
+@typing.overload
+def cycle_futures(
+    futures: typing.Mapping[KT, "Future[T]"],
+    *,
+    transform: typing.Callable[[KT, T, typing.Sequence[T]], VT],
+    block_seconds: float = 1.0,
+    backoff_seconds: int = 1.0,
+    exception_handler: typing.Callable[[Exception], Exception] = None,
+) -> typing.Tuple[typing.Sequence[VT], typing.Sequence[Exception]]:
+    ...
+
+
+def cycle_futures(
+    futures: typing.Union[typing.Mapping[KT, "Future[T]"], typing.Sequence["Future[T]"]],
+    *,
+    transform: typing.Union[typing.Callable[[KT, T, typing.Sequence[T]], VT], typing.Callable[[T, typing.Sequence[T]], VT]] = None,
+    block_seconds: float = 1.0,
+    backoff_seconds: float = 1.0,
+    exception_handler: typing.Callable[[Exception], Exception] = None,
+) -> typing.Tuple[typing.Union[typing.Sequence[VT], typing.Sequence[T]], typing.Sequence[Exception]]:
+    """
+    Step through a collection of futures, trying to process and act on them as soon as possible rather than
+    waiting for each to finish
+
+    Similar to 'as_completed' but offers extra flexibility for error handling and processing
+
+    :param futures: The collection of futures
+    :param transform: An optional function to process results as they come in
+    :param block_seconds: How many seconds to wait for a future's result before timing out
+    :param backoff_seconds: How many seconds to wait for a future's result when before querying it again
+    :param exception_handler: An optional handler for any exceptions thrown
+    :returns: The results from all the futures along with all encountered exceptions
+    """
+    cycler: typing.Callable = cycle_future_mapping if isinstance(futures, typing.Mapping) else cycle_future_list
+
+    results, exceptions = cycler(
+        futures=futures,
+        transform=transform,
+        block_seconds=block_seconds,
+        backoff_seconds=backoff_seconds,
+        exception_handler=exception_handler,
+    )
+
+    assert isinstance(results, typing.Sequence)
+    assert isinstance(exceptions, typing.Sequence)
+    return results, exceptions
+
+
+def get_property_values(obj: object) -> typing.Dict[str, typing.Any]:
+    """
+    Get the values of properties on an object
+
+    :param obj: The object to get properties from
+    :returns: The values of properties on an object mapped to their keys
+    """
+    if isinstance(obj, type):
+        raise TypeError(f"Cannot get property values from {obj} - it is a type and an instance of the type is required")
+
+    if obj is None:
+        raise ValueError("Cannot get property values from 'None'. Pass a non-null object")
+
+    import inspect
+    properties: typing.Dict[str, typing.Any] = {
+        name: prop.fget(obj)
+        for name, prop in inspect.getmembers(obj.__class__, lambda member: isinstance(member, property))
+        if not name.startswith("_")
+    }
+    return properties
+
+
 def flatten_iterable(
     iterable: typing.Iterable[typing.Iterable[T]],
-    condition: typing.Callable[[T], bool] = None
+    condition: typing.Callable[[T], bool] = None,
+    return_unique: bool = False,
 ) -> typing.Sequence[T]:
     """
     Flatten a collections of collections into a single list.
@@ -358,17 +604,20 @@ def flatten_iterable(
 
     :param iterable: A collection of collections to flatten
     :param condition: A function that may be used to test for inclusion - if the input returns True, it will end up in the final collection
+    :param return_unique: Only return unique values
     :returns: The collection flattened by 1 dimension
     """
     if condition is None:
         condition = lambda item: True
 
-    flattened_collections: typing.Set[T] = set()
+    if return_unique:
+        flattened_collections: typing.Set[T] = set()
 
-    for collection in iterable:
-        flattened_collections.update(filter(condition, collection))
+        for collection in iterable:
+            flattened_collections.update(filter(condition, collection))
 
-    return list(flattened_collections)
+        return list(flattened_collections)
+    return [value for inner_collection in iterable for value in inner_collection]
 
 
 def get_template_variables(template: str) -> typing.Sequence[str]:
@@ -437,13 +686,14 @@ def get_cycle_files(filepath: pathlib.Path, expected_count: int = None) -> typin
 
     return cycle_files
 
-def datetime64_to_datetime(numpy_date: numpy.datetime64) -> datetime:
+def datetime64_to_datetime(numpy_date: "numpy.datetime64") -> datetime:
     """
     Convert a numpy datetime to the vanilla python datetime object
 
     :param numpy_date: The numpy datetime to convert
     :returns: The vanilla python datetime object
     """
+    import numpy
     if not isinstance(numpy_date, numpy.datetime64):
         raise TypeError(f"{numpy_date} is not a numpy datetime64")
 
@@ -458,13 +708,14 @@ def datetime64_to_datetime(numpy_date: numpy.datetime64) -> datetime:
     return python_date
 
 
-def get_datetime64_resolution(numpy_date: numpy.datetime64) -> str:
+def get_datetime64_resolution(numpy_date: "numpy.datetime64") -> str:
     """
     Get the time resolution of a datetime64
 
     :param numpy_date: The numpy datetime64 to interpret
     :returns: The time resolution, either "s" for seconds, "us" for microseconds, "ms" for milliseconds, "ns" for nanoseconds
     """
+    import numpy
     if not isinstance(numpy_date, numpy.datetime64):
         raise TypeError(f"{numpy_date} is not a numpy datetime64")
 
@@ -479,10 +730,13 @@ def get_datetime64_resolution(numpy_date: numpy.datetime64) -> str:
     return resolution
 
 
-def get_time_from_nwm_file(path: pathlib.Path, variable_name: str = 'time') -> typing.Tuple[pathlib.Path, numpy.datetime64]:
+def get_time_from_nwm_file(path: pathlib.Path, variable_name: str = 'time') -> typing.Tuple[pathlib.Path, "numpy.datetime64"]:
     """
 
     """
+    import xarray
+    import numpy
+    import numpy.typing
     from post_processing.utilities.netcdf import load_netcdf
     dataset: xarray.Dataset = load_netcdf(path)
     if variable_name not in dataset.variables:
@@ -505,6 +759,7 @@ def sort_nwm_filepaths(filepaths: typing.Sequence[pathlib.Path]) -> typing.Seque
     :returns: A list of sorted filepaths
     """
     import concurrent.futures
+    import numpy
 
     with concurrent.futures.ProcessPoolExecutor() as executor:
         paths_and_times: typing.List[typing.Tuple[pathlib.Path, numpy.datetime64]] = list(
@@ -544,7 +799,7 @@ def condense_exceptions(
     *additional_exceptions: Exception
 ) -> ExceptionGroup:
     """
-    Condences multiple exceptions into a single exception group containing unique errors or just a single error if it becomes one
+    Condenses multiple exceptions into a single exception group containing unique errors or just a single error if it becomes one
     """
     import traceback
     all_exceptions: typing.List[Exception] = [*exceptions, *additional_exceptions]

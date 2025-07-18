@@ -98,6 +98,8 @@ class OperationType(enum.StrEnum):
     """Pass python based netcdf structures to another python function"""
     OUT_OF_PYTHON = "out_of_python"
     """Convert netcdf structures within python code to files"""
+    FUNCTION = "function"
+    """Call a function on the input data"""
     LOAD = "load"
     """Load one or more netcdf files into memory"""
     WRITE = "write"
@@ -108,6 +110,8 @@ class OperationType(enum.StrEnum):
     """Output a message"""
     RAISE = "raise"
     """Raise an exception"""
+    ON_EACH = "on_each"
+    """Run each contained operation on each input separately"""
 
 
 class InPlaceOperationMixin:
@@ -183,6 +187,9 @@ class ProfileOperation(BaseModel, OperationHandler[InputType, OutputType], abc.A
     """
     Represents an operation that a profile may perform
     """
+    comment: typing.Optional[str] = dataclasses.field(default=None, kw_only=True)
+    """A comment from the writer explaining what this operation does"""
+
     @classmethod
     @abc.abstractmethod
     def operation(cls) -> OperationType:
@@ -415,12 +422,13 @@ class ExtractOperation(NCOOperation):
             for subset_path in subset_paths
         ]
 
-        results = starmap(
+        results: typing.Sequence[typing.Sequence[typing.Union[pathlib.Path]]] = starmap(
             function=call_operations,
             args=arguments_for_each,
             thread_count=settings.maximum_additional_threads
         )
-        return data if isinstance(data, xarray.Dataset) else results
+
+        return [path for inner_results in results for path in inner_results]
 
     def __post_init__(self):
         from post_processing.utilities.common import expand_paths
@@ -814,12 +822,23 @@ class SaveOperation(NCOOperation):
         import shutil
         from post_processing.configuration import settings
         from post_processing.enums import Verbosity
+        from post_processing.utilities.netcdf import load_metadata
+        from post_processing.utilities.common import NWM_FILENAME_PATTERN
 
         saved_files: typing.List[pathlib.Path] = []
         for file in data:
-            file_specific_metadata: typing.Dict[str, typing.Any] = dict(metadata)
-            file_specific_metadata["file_name"] = file.name
-            file_specific_metadata["file_stem"] = file.stem
+            file_specific_metadata: typing.Dict[str, typing.Any] = {}
+            file_name_match: typing.Optional[re.Match] = NWM_FILENAME_PATTERN.search(file.name)
+
+            if file_name_match:
+                file_specific_metadata.update(file_name_match.groupdict())
+
+            file_specific_metadata.update({
+                **load_metadata(path=file),
+                **metadata,
+                "file_name": file.name,
+                "file_stem": file.stem
+            })
 
             if settings.verbosity >= Verbosity.ALL:
                 LOGGER.debug(
@@ -842,11 +861,11 @@ class SaveOperation(NCOOperation):
             try:
                 filename: str = self.filename_pattern.format(**file_specific_metadata)
             except KeyError as e:
-                import json
+                from post_processing.utilities.common import to_json
                 LOGGER.error(
                     f"Could not generate a new file name used to save: {e}{os.linesep}"
                     f"Output Pattern: '{self.filename_pattern}'{os.linesep}"
-                    f"Available Options: {json.dumps(file_specific_metadata, indent=4)}"
+                    f"Available Options: {to_json(file_specific_metadata)}"
                 )
                 raise
 
@@ -860,7 +879,7 @@ class SaveOperation(NCOOperation):
                 LOGGER.error(f"Could not copy '{file}' ({'exists' if file.is_file() else 'does not exist'}) to '{path}'")
                 raise
             saved_files.append(path)
-            LOGGER.debug(f"Wrote {file} to {path}")
+            LOGGER.info(f"Wrote {file} to {path}")
         return saved_files
 
     directory: pathlib.Path = dataclasses.field()
@@ -933,9 +952,6 @@ class BranchOperation(ProfileOperation[InputType, typing.Sequence[pathlib.Path]]
         import concurrent.futures
         future_results: typing.Dict[str, concurrent.futures.Future[typing.Sequence[pathlib.Path]]] = {}
 
-        results: typing.List[pathlib.Path] = []
-        failing_branches: typing.List[Exception] = []
-
         with concurrent.futures.ThreadPoolExecutor() as executor:
             for branch_name, branch_logic in self.branches.items():
                 future_result = executor.submit(
@@ -950,38 +966,54 @@ class BranchOperation(ProfileOperation[InputType, typing.Sequence[pathlib.Path]]
                 )
                 future_results[branch_name] = future_result
 
-            while future_results:
-                branch_name, future_result = future_results.popitem()
-                try:
-                    returned_paths: typing.Sequence[pathlib.Path] = future_result.result(timeout=1)
-                    preexisting_paths, new_paths = partition(lambda path: path in results, returned_paths)
-                    if preexisting_paths:
-                        LOGGER.warning(
-                            f"Processing from the '{branch_name}' branch in '{profile}' for {metadata['cycle']}z on "
-                            f"{metadata['date']} encountered duplicate results at: "
-                            f"{', '.join(map(str, preexisting_paths))}"
-                        )
-                    results.extend(new_paths)
-                except concurrent.futures.TimeoutError:
-                    future_results[branch_name] = future_result
-                except BaseException as error:
-                    new_error = RuntimeError(
-                        f"Could not perform the branching operation named '{branch_name}' "
-                        f"from the '{profile}' profile: {error}"
-                    )
-                    new_error.with_traceback(error.__traceback__)
-                    failing_branches.append(new_error)
+            def process_error(error: Exception) -> Exception:
+                new_error: Exception = RuntimeError(
+                    f"Could not perform the branching operation named '{branch_name}' "
+                    f"from the '{profile}' profile: {error}"
+                )
+                new_error.with_traceback(error.__traceback__)
+                return new_error
 
-        if failing_branches:
-            raise ExceptionGroup(
-                f"One or more branches failed to process for {profile} on cycle {metadata['cycle']}z on "
-                f"{metadata['date']}",
-                failing_branches
+            from post_processing.utilities.common import cycle_futures
+
+            def log_duplicates(
+                branch: str,
+                returned_paths: typing.Sequence[pathlib.Path],
+                current_paths: typing.Sequence[typing.Sequence[pathlib.Path]]
+            ) -> typing.Sequence[pathlib.Path]:
+                current_paths = set(path for resultant_paths in current_paths for path in resultant_paths)
+                preexisting_paths, new_paths = partition(lambda path: path in current_paths, returned_paths)
+                if preexisting_paths:
+                    LOGGER.warning(
+                        f"Processing from the '{branch}' branch in '{profile}' for {metadata['cycle']}z on "
+                        f"{metadata['date']} encountered duplicate results at: "
+                        f"{', '.join(map(str, preexisting_paths))}"
+                    )
+                return returned_paths
+
+            results, exceptions = cycle_futures(
+                futures=future_results,
+                transform=log_duplicates,
+                exception_handler=process_error
             )
-        return results
+
+            if exceptions:
+                raise ExceptionGroup(
+                    f"One or more branches failed to process for {profile} on cycle {metadata['cycle']}z on "
+                    f"{metadata['date']}",
+                    exceptions
+                )
+
+            melted_results: typing.Sequence[pathlib.Path] = list(set([
+                path
+                for branch_results in results
+                for path in branch_results
+            ]))
+
+        return melted_results
 
 @dataclasses.dataclass(unsafe_hash=True)
-class LoadOperation(ProfileOperation[typing.Sequence[pathlib.Path], xarray.Dataset]):
+class LoadOperation(ProfileOperation[typing.Sequence[pathlib.Path], typing.Iterator[xarray.Dataset]]):
     """
     An operation that loads data within paths into a single xarray dataset
     """
@@ -1012,10 +1044,164 @@ class LoadOperation(ProfileOperation[typing.Sequence[pathlib.Path], xarray.Datas
 
         return data
 
+@dataclasses.dataclass
+class OnEachOperation(
+    ProfileOperation[typing.Union[typing.Iterator[InputType], typing.Iterable[InputType]], typing.Union[typing.Iterator[OutputType], typing.Iterable[OutputType]]]
+):
+    """
+    An operation that applies each function to each input separately and returns the combined results
+
+    Differs from Branch in that each operation is performed on each input in a vacuum rather than each operation
+    being performed on the set of input at once
+    """
+
+    @classmethod
+    def operation(cls) -> OperationType:
+        return OperationType.ON_EACH
+
+    def __post_init__(self):
+        for operation_index, operation in enumerate(self.on_each):
+            if isinstance(operation, typing.Mapping):
+                operation = load_operation(specification=operation)
+                self.on_each[operation_index] = operation
+            elif not isinstance(operation, ProfileOperation):
+                raise ValueError(
+                    f"Encountered an invalid sub-operation for a {self.__class__.__qualname__} - item "
+                    f"{operation_index}  holds a '{type(operation)}', which cannot "
+                    f"be converted into a {ProfileOperation.__qualname__}"
+                )
+
+    def __call__(
+        self,
+        profile: "Profile",
+        process_identifier: str,
+        work_directory: pathlib.Path,
+        data: typing.Union[typing.Iterator[InputType], typing.Iterable[InputType]],
+        previous_operations: typing.List["ProfileOperation"],
+        metadata: typing.Dict[str, typing.Any]
+    ) -> typing.Union[typing.Iterator[OutputType], typing.Iterable[OutputType]]:
+        results: typing.Sequence[OutputType] = fan_out_operations(
+            operations=self.on_each,
+            profile=profile,
+            process_identifier=process_identifier,
+            work_directory=work_directory,
+            data=data,
+            previous_operations=previous_operations,
+            metadata=metadata,
+            thread_count=self.thread_count,
+        )
+        return results
+
+    def __hash__(self):
+        try:
+            parent_hash = super().__hash__()
+        except:
+            parent_hash = 0
+
+        values_to_hash = tuple([parent_hash, *[hash(operation) for operation in self.on_each]])
+        return hash(values_to_hash)
+
+
+    on_each: typing.List[ProfileOperation] = dataclasses.field(default_factory=list)
+    thread_count: int = dataclasses.field(default_factory=lambda: settings.maximum_additional_threads)
+
+
+@dataclasses.dataclass
+class FunctionOperation(ProfileOperation[InputType, OutputType]):
+    """
+    Pass input through python code by passing preconfigured keyword arguments and mapped variables
+    """
+    @classmethod
+    def operation(cls) -> OperationType:
+        return OperationType.FUNCTION
+
+    function_name: str
+    kwargs: typing.Dict[str, typing.Any] = dataclasses.field(default_factory=dict)
+    argument_mapping: typing.Dict[str, str] = dataclasses.field(default_factory=dict)
+    _function: PythonHandler[InputType, OutputType] = member(default=None)
+
+    def __hash__(self):
+        try:
+            parent_hash = super().__hash__()
+        except:
+            parent_hash = 0
+
+        values_to_hash: typing.Tuple[typing.Hashable, ...] = tuple([
+            parent_hash,
+            *[(key, value) for key, value in self.argument_mapping.items()],
+            *[(key, value) for key, value in self.kwargs.items()]
+        ])
+        return hash(values_to_hash)
+
+    def __str__(self):
+        return f"{self.operation().replace('_', ' ').title()}: {self.function_name}"
+
+    def __post_init__(self):
+        self._function = get_function_by_name(function_name=self.function_name)
+
+    def __call__(
+        self,
+        profile: "Profile",
+        process_identifier: str,
+        work_directory: pathlib.Path,
+        data: InputType,
+        previous_operations: typing.List[ProfileOperation],
+        metadata: typing.Dict[str, typing.Any],
+    ) -> OutputType:
+        from post_processing.utilities.common import get_property_values
+
+        mapping_source: typing.Dict[str, typing.Any] = {
+            **get_property_values(settings),
+            **metadata,
+            'profile': profile,
+            'process_identifier': process_identifier,
+            'work_directory': work_directory,
+            'data': data
+        }
+
+        if isinstance(data, pathlib.Path):
+            mapping_source['input_name'] = data.name
+            mapping_source['input_stem'] = data.stem
+            mapping_source['input_suffix'] = data.suffix
+
+        kwargs = {
+            key: value.format(**mapping_source) if isinstance(value, str) else value
+            for key, value in self.kwargs.items()
+        }
+
+        args: typing.Dict[str, typing.Any] = {}
+
+        for target_variable_name, available_variable_name in self.argument_mapping.items():
+            if available_variable_name in mapping_source.keys():
+                mapped_value = mapping_source[available_variable_name]
+                if callable(mapped_value):
+                    mapped_value = mapped_value()
+                if isinstance(mapped_value, str):
+                    mapped_value = mapped_value.format(**mapping_source)
+                args[target_variable_name] = mapped_value
+            elif hasattr(self, available_variable_name):
+                target_variable = getattr(self, available_variable_name)
+                if callable(target_variable):
+                    target_variable = target_variable()
+                if isinstance(target_variable, str):
+                    target_variable = target_variable(**mapping_source)
+                args[target_variable_name] = target_variable
+            else:
+                raise KeyError(
+                    f"There is not a variable available named '{available_variable_name}' to map to "
+                    f"'{target_variable_name}' for '{self.function_name}'. Should it have been a 'kwarg' value "
+                    f"instead of a mapping?"
+                )
+
+        kwargs.update(args)
+        result: OutputType = self._function(**kwargs)
+        return result
+
+
 @dataclasses.dataclass(unsafe_hash=True)
 class PythonOperation(ProfileOperation[InputType, OutputType], abc.ABC):
     """
-    Base class for operations implemented via python
+    Base class for operations implemented via python. Functions must match the standard Operation signature
     """
     function_name: str
     kwargs: typing.Dict[str, typing.Any] = dataclasses.field(default_factory=dict)
@@ -1047,8 +1233,9 @@ class PythonOperation(ProfileOperation[InputType, OutputType], abc.ABC):
         )
         return result
 
+
 @dataclasses.dataclass(unsafe_hash=True)
-class IntoPythonOperation(PythonOperation[typing.Sequence[pathlib.Path], xarray.Dataset]):
+class IntoPythonOperation(PythonOperation[typing.Sequence[pathlib.Path], typing.Iterator[xarray.Dataset]]):
     """
     An operation that transforms raw files into python objects
     """
@@ -1056,8 +1243,22 @@ class IntoPythonOperation(PythonOperation[typing.Sequence[pathlib.Path], xarray.
     def operation(cls) -> OperationType:
         return OperationType.INTO_PYTHON
 
+    def __call__(
+        self,
+        profile: "Profile",
+        process_identifier: str,
+        work_directory: pathlib.Path,
+        data: typing.Sequence[pathlib.Path],
+        previous_operations: typing.List[ProfileOperation],
+        metadata: typing.Dict[str, typing.Any],
+    ) -> typing.Iterator[xarray.Dataset]:
+        from post_processing.utilities.netcdf import load_netcdf
+        for path in data:
+            with load_netcdf(path=path, **self.kwargs) as dataset:
+                yield dataset
+
 @dataclasses.dataclass(unsafe_hash=True)
-class ToPythonOperation(PythonOperation[xarray.Dataset, xarray.Dataset]):
+class ToPythonOperation(PythonOperation[typing.Iterator[xarray.Dataset], typing.Iterator[xarray.Dataset]]):
     """
     An operation that transforms python objects and returns python objects
     """
@@ -1067,7 +1268,7 @@ class ToPythonOperation(PythonOperation[xarray.Dataset, xarray.Dataset]):
 
 
 @dataclasses.dataclass(unsafe_hash=True)
-class OutOfPythonOperation(PythonOperation[xarray.Dataset, typing.Sequence[pathlib.Path]]):
+class OutOfPythonOperation(PythonOperation[typing.Iterator[xarray.Dataset], typing.Sequence[pathlib.Path]]):
     """
     An operation that transforms python objects and returns paths to objects
     """
@@ -1091,6 +1292,7 @@ class Profile(BaseModel):
     output_directory: typing.Optional[pathlib.Path] = dataclasses.field(default=None)
     intermediate_directory: typing.Optional[pathlib.Path] = dataclasses.field(default_factory=lambda: settings.intermediate_directory)
     source_file: typing.Optional[pathlib.Path] = dataclasses.field(default=None)
+    comment: typing.Optional[str] = dataclasses.field(default=None, kw_only=True)
 
     def __str__(self):
         description = (
@@ -1139,7 +1341,11 @@ class Profile(BaseModel):
                 )
 
         first_operation: ProfileOperation = self.operations[0]
-        if not isinstance(first_operation, (NCOOperation, BranchOperation, EchoOperation)) or first_operation.operation() == OperationType.INTO_PYTHON:
+        first_operation_type_is_entry: bool = isinstance(
+            first_operation,
+            (NCOOperation, BranchOperation, EchoOperation, FunctionOperation, LoadOperation, OnEachOperation)
+        )
+        if not first_operation_type_is_entry or first_operation.operation() == OperationType.INTO_PYTHON:
             raise ValueError(
                 f"The first operation in {self} must operate on files, but the first operation was instead "
                 f"{type(first_operation)}({first_operation})"
@@ -1149,7 +1355,8 @@ class Profile(BaseModel):
         self,
         date: datetime,
         cycle: typing.Union[str, int],
-        files: typing.Sequence[pathlib.Path]
+        files: typing.Sequence[pathlib.Path],
+        **additional_metadata
     ) -> typing.Sequence[pathlib.Path]:
         """
         Perform all operations configured for this profile
@@ -1157,9 +1364,11 @@ class Profile(BaseModel):
         :param date: The date that the cycle is for
         :param cycle: The cycle of the data to be evaluated (t00z, t06z, etc)
         :param files: The files to operate on
+        :param additional_metadata: Additional values that may be passed to use as metadata for value replacement
         :returns: The list of resultant files
         """
         metadata: typing.Dict[str, typing.Any] = {
+            **additional_metadata,
             self.output_type.__class__.__name__: str(self.output_type.value),
             self.region.__class__.__name__: self.region.value,
             self.configuration.__class__.__name__: self.configuration.value,
@@ -1384,6 +1593,72 @@ def get_function_by_name(
         raise ValueError(f"The object '{function_name}' is not callable")
 
     return function
+
+def fan_out_operations(
+    operations: typing.Iterable[ProfileOperation],
+    profile: Profile,
+    process_identifier: str,
+    work_directory: pathlib.Path,
+    data: typing.Union[typing.Iterator[InputType], typing.Iterable[InputType]],
+    previous_operations: typing.List[ProfileOperation],
+    metadata: typing.Dict[str, typing.Any],
+    thread_count: int = 0
+) -> typing.Sequence[OutputType]:
+    """
+    Call each operation on each member from data and return the accumulated results
+
+    :param operations: The operations to perform on each input
+    :param profile: The profile that defined this set of operations
+    :param process_identifier: The process identifier that defines this set of operations
+    :param work_directory: The directory where intermediate values may be written
+    :param data: The data to process
+    :param previous_operations: The previously processed operations
+    :param metadata: The metadata that may be used for purposes like identification
+    :param thread_count: How many threads to parallelize across
+    :returns: The accumulated results from each series of operations
+    """
+    results: typing.Sequence[OutputType] = starmap(
+        function=call_generic_operations,
+        args=[
+            {
+                "operations": list(operations),
+                "profile": profile,
+                "process_identifier": process_identifier,
+                "work_directory": work_directory,
+                "data": data_member,
+                "previous_operations": previous_operations,
+                "metadata": metadata,
+            }
+            for data_member in data
+        ],
+        thread_count=thread_count
+    )
+    return results
+
+
+def call_generic_operations(
+    operations: typing.Iterable[ProfileOperation],
+    profile: Profile,
+    process_identifier: str,
+    work_directory: pathlib.Path,
+    data: InputType,
+    previous_operations: typing.List[ProfileOperation],
+    metadata: typing.Dict[str, typing.Any]
+) -> OutputType:
+    current_data = data
+
+    for operation in operations:
+        current_data = operation(
+            profile=profile,
+            process_identifier=process_identifier,
+            work_directory=work_directory,
+            data=current_data,
+            previous_operations=previous_operations,
+            metadata=metadata
+        )
+        previous_operations.append(operation)
+
+    return current_data
 
 def call_operations(
     operations: typing.Iterable[ProfileOperation],

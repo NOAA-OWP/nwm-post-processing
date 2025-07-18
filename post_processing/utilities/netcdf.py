@@ -14,7 +14,7 @@ LOGGER: logging.Logger = logging.getLogger(pathlib.Path(__file__).stem)
 
 def load_netcdf(
     path: typing.Union[pathlib.Path, str, typing.Sequence[typing.Union[pathlib.Path, str]]],
-    engine: typing.Literal["h5netcdf", "scipy", "zarr"] = "h5netcdf",
+    engine: typing.Union[str, typing.Literal["h5netcdf", "zarr", "netcdf4"]] = "h5netcdf",
     chunks: typing.Union[typing.Mapping[str, typing.Any], typing.Literal['auto']] = 'auto',
     **kwargs
 ) -> "xarray.Dataset":
@@ -31,14 +31,8 @@ def load_netcdf(
 
     engine = engine.strip().lower()
 
-    if engine not in ("h5netcdf", "zarr", "scipy"):
-        raise ValueError(f"{engine} is not a supported engine - only 'h5netcdf', 'zarr' and 'scipy' are supported")
-
-    if engine == "scipy":
-        LOGGER.warning(
-            f"Opening the following netcdf file via the scipy engine - "
-            f"C extensions and lazy evaluation will not be employed: {path}"
-        )
+    if engine not in ("h5netcdf", "zarr", "netcdf4"):
+        raise ValueError(f"{engine} is not a supported engine - only 'h5netcdf' and 'zarr' are supported")
 
     try:
         import dask
@@ -60,6 +54,9 @@ def load_netcdf(
 
     import xarray
 
+    if isinstance(path, typing.Sequence) and len(path) == 1:
+        path = path[0]
+
     if isinstance(path, (pathlib.Path, str)):
         dataset: xarray.Dataset = xarray.open_dataset(path, engine=engine, chunks=chunks, **kwargs)
     else:
@@ -73,6 +70,78 @@ def load_netcdf(
         )
 
     return dataset
+
+
+def load_metadata(
+    path: typing.Union[pathlib.Path, str, typing.Sequence[typing.Union[pathlib.Path, str]]],
+    engine: typing.Union[str, typing.Literal["h5netcdf", "zarr", "netcdf4"]] = "h5netcdf"
+) -> typing.Dict[str, typing.Any]:
+    """
+    Get the metadata attached to a netcdf file and its variables
+
+    Variable attributes will be prefixed by the variable name. If variable 'streamflow' has an attribute named
+    'standard_name', the value will be found at 'streamflow.standard_name'
+
+    :param path: The path (or paths) to the netcdf data to inspect
+    :param engine: The engine that will load and interpret the data
+    :returns: A dictionary containing all the attributes in it and on its variables. Variable attributes will be prefixed by the variable name
+    """
+    source: xarray.Dataset = load_netcdf(path=path, engine=engine)
+    metadata: typing.Dict[str, typing.Any] = {
+        str(key): format_attribute_value(value)
+        for key, value in source.attrs.items()
+    }
+
+    for coordinate_name, coordinate_data in source.coords.items():
+        metadata.update(_get_variable_metadata(variable=coordinate_data))
+
+    for variable_name, variable_data in source.data_vars.items():
+        metadata.update(_get_variable_metadata(variable=variable_data))
+
+
+    return metadata
+
+
+def _get_variable_metadata(variable: "xarray.DataArray") -> typing.Dict[str, typing.Any]:
+    import numpy
+    metadata = {
+        f"{variable.name}.{attribute_name}": format_attribute_value(attribute_value)
+        for attribute_name, attribute_value in variable.attrs.items()
+    }
+    if variable.shape == (1,):
+        if isinstance(variable.values, typing.Iterable):
+            value: typing.Any = variable.values[0]
+        else:
+            value: typing.Any = variable.values
+
+        if isinstance(value, numpy.datetime64):
+            from datetime import datetime
+            value: datetime = value.astype('datetime64[ms]').item()
+            metadata[f"{variable.name}__date"] = value.strftime("%Y%m%d")
+            metadata[f"{variable.name}__hour"] = value.hour
+            metadata[f"{variable.name}__minute"] = value.minute
+            metadata[f"{variable.name}__second"] = value.second
+            metadata[f"{variable.name}__day"] = value.day
+            metadata[f"{variable.name}__month"] = value.month
+            metadata[f"{variable.name}__year"] = value.year
+        else:
+            metadata[str(variable.name)] = value.item()
+    return metadata
+
+
+def format_attribute_value(value: typing.Any) -> typing.Any:
+    import numpy
+    if isinstance(value, numpy.datetime64):
+        value = value.astype('datetime64[ms]').item()
+    elif isinstance(value, numpy.ndarray):
+        value = value.tolist()
+    elif hasattr(value, "item"):
+        try:
+            value = value.item()
+        except:
+            value = str(value)
+    return value
+
 
 
 def save_netcdf(
