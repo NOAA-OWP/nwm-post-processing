@@ -306,6 +306,18 @@ class Variable:
         return array
 
 @dataclasses.dataclass
+class RouteLink:
+    """
+
+    """
+    dimension: str = dataclasses.field(default="feature_id")
+    from_column_name: str = dataclasses.field(default="from")
+    to_column_name: str = dataclasses.field(default="to")
+    seed: int = dataclasses.field(default=12345)
+    none_ratio: float = dataclasses.field(default=0.25)
+    none_value: int = dataclasses.field(default=-1)
+
+@dataclasses.dataclass
 class Dataset:
     """
     Represents a Post Processing Output Netcdf
@@ -332,6 +344,8 @@ class Dataset:
     """The ensemble member that this dataset reflects"""
     mask_seed: int = dataclasses.field(default=123456)
     """A seed number to use for generating consistent partitions for masks"""
+    routelink: RouteLink = dataclasses.field(default_factory=RouteLink)
+    """Specifications for how to generate a routelink"""
 
 
     def __str__(self):
@@ -423,6 +437,67 @@ class Dataset:
             for filename in filenames
         ]
         return output_paths
+
+    def generate_routelink(
+        self,
+        sample_path: pathlib.Path,
+        output_path: pathlib.Path,
+        none_ratio: float = 0.75,
+        none_value: int = -1,
+        from_column_name: str = "from",
+        to_column_name: str = "to",
+        dimension: str = "feature_id",
+        seed: int = 12345,
+    ) -> pathlib.Path:
+        """
+        Generate a routelink file for the generated netcdf data
+
+        :param sample_path: The path to a sample of the generated data
+        :param output_path: Where to put the routelink
+        :param none_ratio: What percentage of features in the routelink should point to nothing
+        :param none_value: The value to use to indicate that the feature doesn't lead to anything
+        :param from_column_name: The column name to use the indicates the primary id that might point to another 'from_column_name' value
+        :param to_column_name: The name of the column that shows what id that the 'from_column_name' value points to
+        :param dimension: The name of the dimension used as the index for these values. This should match up with the primary dimension of the sample
+        :param seed: A seed for the random number generator
+        :returns: The path to the generated routelink file
+        """
+        if output_path.is_file():
+            LOGGER.info(f"There appears to already be a routelink at {output_path} - nothing needs to be generated")
+            return output_path
+
+        if not sample_path.is_file():
+            raise FileNotFoundError(f"No sample data could be found at {sample_path}")
+
+        if none_ratio <= 0 or none_ratio >= 1:
+            raise ValueError(f"The `none_ratio` must be within the bounds of (0, 1). Received: {none_ratio}")
+
+        generator: numpy.random.Generator = numpy.random.default_rng(seed=seed)
+        sample_data: xarray.Dataset = xarray.open_dataset(sample_path, chunks={}, engine="h5netcdf")
+        features: numpy.array = sample_data[dimension].values
+        number_of_nones: int = int(len(features) * none_ratio)
+        number_of_values: int = len(features) - number_of_nones
+
+        chosen_values: numpy.typing.NDArray[int] = generator.choice(features, size=number_of_values, replace=True)
+
+        to_array: numpy.ndarray = numpy.empty(len(features), dtype=features.dtype)
+        to_array[:number_of_nones] = none_value
+        to_array[number_of_nones:] = chosen_values
+        generator.shuffle(to_array)
+
+        routelink: xarray.Dataset = xarray.Dataset(
+            {
+                from_column_name: (dimension, features),
+                to_column_name: (dimension, to_array),
+            },
+            attrs={
+                "generated_for": f"RouteLink for {self}",
+                "generated_on": datetime.now().astimezone().strftime(settings.date_format)
+            }
+        )
+        routelink.to_netcdf(output_path)
+        return output_path
+
 
     def generate_masks(
         self,

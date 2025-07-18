@@ -28,9 +28,9 @@ class RoutelinkFormat(enum.StrEnum):
 
 
 def calculate_upstream_flow(
-    input_path: pathlib.Path,
-    output_path: pathlib.Path,
-    routelink_path: pathlib.Path,
+    input_path: typing.Union[pathlib.Path, str],
+    output_path: typing.Union[pathlib.Path, str],
+    routelink_path: typing.Union[pathlib.Path, str],
     variable: str = "streamflow",
     target_variable: str = "upstreamflow",
     routelink_to_variable: str = "to",
@@ -58,6 +58,16 @@ def calculate_upstream_flow(
     :param attributes: Specialized attributes to add to the resulting variable
     :returns: The path to the generated data
     """
+    if isinstance(input_path, str):
+        input_path = pathlib.Path(input_path)
+    if isinstance(output_path, str):
+        output_path = pathlib.Path(output_path)
+    if isinstance(routelink_path, str):
+        routelink_path = pathlib.Path(routelink_path)
+    if input_path == output_path:
+        raise ValueError(
+            f"Upstreamflow calculation is not an inplace operation - the input path and output path cannot match"
+        )
     import xarray
     import pandas
     import numpy
@@ -65,6 +75,7 @@ def calculate_upstream_flow(
 
     try:
         from post_processing.utilities.netcdf import load_netcdf
+        from post_processing.utilities.netcdf import save_netcdf
     except ImportError:
         from functools import partial
         load_netcdf = partial(
@@ -72,6 +83,11 @@ def calculate_upstream_flow(
             chunks={},
             engine="h5netcdf",
         )
+        def save_netcdf(path: typing.Union[str, pathlib.Path], dataset: xarray.Dataset):
+            dataset.to_netcdf(
+                path=path,
+                engine="h5netcdf"
+            )
 
     if encoding is None:
         encoding = {}
@@ -103,7 +119,8 @@ def calculate_upstream_flow(
     # Create a series containing the raw data, then group it by where the values lead
     #   * Based on the routelink structure, a single feature may have multiple features pointing at it,
     #       but will only ever point to, at most, one feature
-    upstream_values: pandas.Series = pandas.Series(raw_data).groupby(to_values).sum()
+    series: pandas.Series = pandas.Series(raw_data)
+    upstream_values: pandas.Series = series.groupby(to_values).sum()
 
     # Create a mapping of feature ids to their upstream flow values
     #   * Provides an easier access pattern to the values based off of feature_id - going by Series isn't worth it
@@ -148,7 +165,15 @@ def calculate_upstream_flow(
         fill_value += add_offset
 
     data_to_transform[target_variable] = upstreamflow_variable.fillna(fill_value)
-    data_to_transform.to_netcdf(output_path)
+
+    try:
+        save_netcdf(path=output_path, dataset=data_to_transform)
+        LOGGER.info(f"Saved the updated version of '{input_path}' to '{output_path}'")
+    except OSError:
+        LOGGER.error(
+            f"Could not write the modified version of '{input_path}' with the new '{target_variable}' variable to '{output_path}'"
+        )
+        raise
 
     return output_path
 

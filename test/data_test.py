@@ -38,6 +38,12 @@ NPP_MASK_DATA_DIRECTORY: pathlib.Path = pathlib.Path(
         settings.application_path / "test" / "data" / "masks"
     )
 )
+NPP_ROUTELINK_DIRECTORY: pathlib.Path = pathlib.Path(
+    os.environ.get(
+        "NPP_TEST_ROUTELINK_DIRECTORY",
+        settings.application_path / "test" / "data" / "routelink"
+    )
+)
 OVERWRITE_PREEXISTING_TEST_DATA: bool = False
 """Whether to write new test data if preexisting test data was found"""
 
@@ -54,6 +60,8 @@ class DataTest(unittest.TestCase, abc.ABC):
     """Where raw input data should be stored"""
     _mask_directory: typing.Optional[pathlib.Path] = None
     """Where masks for input data should be stored"""
+    _routelink_directory: typing.Optional[pathlib.Path] = None
+    """The directory that the routelink will be saved in"""
     _created_data_directory: bool = False
     """Whether this test created a temporary data directory"""
     _output_directory: typing.Optional[pathlib.Path] = None
@@ -64,6 +72,8 @@ class DataTest(unittest.TestCase, abc.ABC):
     """The files to use as input for tests"""
     _masks: typing.Optional[typing.Sequence[pathlib.Path]] = None
     """The masks to use for subsetting in tests"""
+    _routelink_path: typing.Optional[pathlib.Path] = None
+    """The path to the routelink for this dataset"""
     _date: typing.Optional[datetime] = None
     """The date to use on tests"""
     _region: typing.Optional[Region] = None
@@ -241,11 +251,27 @@ class DataTest(unittest.TestCase, abc.ABC):
             return cls._mask_directory
 
     @classmethod
+    def get_routelink_directory(cls) -> pathlib.Path:
+        """
+        Get the directory where the routelink should be saved
+        """
+        with cls._resource_lock:
+            if cls._routelink_directory is None:
+                if isinstance(NPP_ROUTELINK_DIRECTORY, pathlib.Path):
+                    routelink_directory = NPP_ROUTELINK_DIRECTORY
+                    routelink_directory.mkdir(parents=True, exist_ok=True)
+                    cls._routelink_directory = routelink_directory
+                else:
+                    cls._routelink_directory = cls.make_temporary_directory()
+            return cls._routelink_directory
+
+    @classmethod
     def setUpClass(cls):
         """Build up everything that this testing class needs"""
         cls.get_input_files()
         cls.get_masks()
         cls.get_output_directory()
+        cls.get_routelink_path()
 
     @classmethod
     def get_input_files(cls) -> typing.Sequence[pathlib.Path]:
@@ -279,6 +305,26 @@ class DataTest(unittest.TestCase, abc.ABC):
                     step=cls.get_model_forecast_interval(),
                 )
             return cls._masks
+
+    @classmethod
+    def get_routelink_path(cls) -> pathlib.Path:
+        """
+        Get the path to the routelink
+        """
+        with cls._resource_lock:
+            if cls._routelink_path is None or not cls._routelink_path.exists():
+                cls._routelink_path = cls.get_input_dataset().generate_routelink(
+                    sample_path=cls.get_input_files()[0],
+                    output_path=cls.get_routelink_directory() / f"{cls.dataset_identifier()}.nc",
+                    none_ratio=cls.get_input_dataset().routelink.none_ratio,
+                    none_value=cls.get_input_dataset().routelink.none_value,
+                    from_column_name=cls.get_input_dataset().routelink.from_column_name,
+                    to_column_name=cls.get_input_dataset().routelink.to_column_name,
+                    dimension=cls.get_input_dataset().routelink.dimension,
+                    seed=cls.get_input_dataset().routelink.seed,
+                )
+            return cls._routelink_path
+
 
 
     @classmethod
