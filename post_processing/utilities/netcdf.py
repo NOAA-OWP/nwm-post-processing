@@ -5,6 +5,8 @@ import typing
 import logging
 import pathlib
 
+from functools import lru_cache
+
 if typing.TYPE_CHECKING:
     import xarray
 
@@ -86,18 +88,22 @@ def load_metadata(
     :param engine: The engine that will load and interpret the data
     :returns: A dictionary containing all the attributes in it and on its variables. Variable attributes will be prefixed by the variable name
     """
-    source: xarray.Dataset = load_netcdf(path=path, engine=engine)
-    metadata: typing.Dict[str, typing.Any] = {
-        str(key): format_attribute_value(value)
-        for key, value in source.attrs.items()
-    }
+    if isinstance(path, pathlib.Path):
+        path = [path]
 
-    for coordinate_name, coordinate_data in source.coords.items():
-        metadata.update(_get_variable_metadata(variable=coordinate_data))
+    metadata: typing.Dict[str, typing.Any] = {}
+    for input_path in path:
+        source: xarray.Dataset = load_netcdf(path=input_path, engine=engine)
+        metadata.update({
+            str(key): format_attribute_value(value)
+            for key, value in source.attrs.items()
+        })
 
-    for variable_name, variable_data in source.data_vars.items():
-        metadata.update(_get_variable_metadata(variable=variable_data))
+        for coordinate_name, coordinate_data in source.coords.items():
+            metadata.update(_get_variable_metadata(variable=coordinate_data))
 
+        for variable_name, variable_data in source.data_vars.items():
+            metadata.update(_get_variable_metadata(variable=variable_data))
 
     return metadata
 

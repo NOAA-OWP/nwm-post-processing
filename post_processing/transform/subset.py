@@ -13,6 +13,7 @@ def subset_file_into_file_by_mask(
     mask: pathlib.Path,
     coordinate: str,
     work_directory: pathlib.Path,
+    mask_coordinate: str = None,
     output_filename: str = None,
     identifiers: typing.Mapping[str, typing.Any] = None,
     output_pattern: str = None,
@@ -22,13 +23,17 @@ def subset_file_into_file_by_mask(
 
     :param input_file: The path to the file to subset
     :param mask: the path to the file containing what values to include in the coordinate
-    :param coordinate: The name of the coordinate variable containing the values to keep
+    :param coordinate: The name of the coordinate variable within the input file that will be masked
     :param work_directory: The directory where data may be written
+    :param mask_coordinate: The name of the coordinate variable in the mask containing the coordinates to keep
     :param output_filename: What to name the extracted data. The name will be generated as a mix between the mask and input file if not provided
     :param identifiers: Dictionary of identifiers to use when generating a name
     :param output_pattern: The format string to use when generating a name
     :returns: The path to the subset data
     """
+    if mask_coordinate is None:
+        mask_coordinate = coordinate
+
     if identifiers is None:
         identifiers = {}
 
@@ -71,9 +76,9 @@ def subset_file_into_file_by_mask(
         LOGGER.debug(f"Loaded the mask at '{mask}'")
 
     if this_is_verbose:
-        LOGGER.debug(f"Loading '{coordinate}' values from the mask ({mask})")
+        LOGGER.debug(f"Loading '{mask_coordinate}' values from the mask ({mask})")
 
-    allowable_ids: numpy.ndarray = mask_data[coordinate].values
+    allowable_ids: numpy.ndarray = mask_data[mask_coordinate].values
 
     if this_is_verbose:
         LOGGER.debug(f"Loading '{coordinate}' values from the input ({input_file})")

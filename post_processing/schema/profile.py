@@ -118,6 +118,8 @@ class OperationType(enum.StrEnum):
     """Run each contained operation on each input separately"""
     ANOMALY = "anomaly"
     """Bin values by threshold"""
+    PEEK = "peek"
+    """Print information about the current set of data to the logs"""
 
 
 class InPlaceOperationMixin:
@@ -149,7 +151,7 @@ class InPlaceOperationMixin:
             return []
         return get_template_variables(self.output_pattern)
 
-    def render_output_name(self, **context: typing.Any) -> str:
+    def render_output_name(self, input_file: str, **context: typing.Any) -> str:
         """
         Attempt to render a filename from the output pattern
 
@@ -161,6 +163,9 @@ class InPlaceOperationMixin:
         :param context: key-value pairs describing variable values that might be needed to fulfill variables within the template
         :returns: The formatted output name
         """
+        if self.output_pattern is None:
+            return f"{input_file}.nc"
+
         template_arguments: typing.Dict[str, typing.Optional[str]] = {
             variable_name: None
             for variable_name in self.output_pattern_variables
@@ -395,6 +400,7 @@ class ExtractOperation(NCOOperation):
                 "mask": mask,
                 "coordinate": self.dimension,
                 "work_directory": work_directory,
+                "mask_coordinate": self.mask_coordinate,
                 "identifiers": {
                     **metadata,
                     "mask_name": mask.stem,
@@ -437,7 +443,7 @@ class ExtractOperation(NCOOperation):
 
     def __post_init__(self):
         from post_processing.utilities.common import expand_paths
-        self.masks = list(expand_paths(self.masks))
+        self.masks = expand_paths(self.masks, base_path=settings.application_path)
 
         missing_masks: typing.List[pathlib.Path] = [path for path in self.masks if not path.is_file()]
 
@@ -511,6 +517,7 @@ class ExtractOperation(NCOOperation):
     output_pattern: str = dataclasses.field()
     each: typing.List[typing.Union[ProfileOperation]]
     dimension: str = dataclasses.field(default="feature_id")
+    mask_coordinate: typing.Optional[str] = dataclasses.field(default=None)
     _pattern: typing.Optional[re.Pattern] = member(default=None)
     _identifier_mapping: typing.Dict[pathlib.Path, typing.Dict[str, str]] = member(default_factory=dict)
 
@@ -542,7 +549,11 @@ class MergeOperation(NCOOperation):
         :param metadata: Metadata provided from previous operations that may be used as helpful hints
         :returns: The Paths for each created object
         """
-        filename: str = self.file_name_pattern.format_map(metadata)
+        from post_processing.utilities.netcdf import load_metadata
+
+        operation_metadata: typing.Dict[str, typing.Any] = load_metadata(path=data)
+        operation_metadata.update(metadata)
+        filename: str = self.file_name_pattern.format_map(operation_metadata)
         output_path: pathlib.Path = work_directory / filename
 
         from post_processing.transform import merge_files_into_file
@@ -550,6 +561,34 @@ class MergeOperation(NCOOperation):
         return [output_path]
 
     file_name_pattern: str = dataclasses.field()
+
+
+@dataclasses.dataclass(unsafe_hash=True)
+class Peek(NCOOperation):
+    """
+
+    """
+    @classmethod
+    def operation(cls) -> OperationType:
+        return OperationType.PEEK
+
+    def __call__(
+        self,
+        profile: "Profile",
+        process_identifier: str,
+        work_directory: pathlib.Path,
+        data: typing.Sequence[pathlib.Path],
+        previous_operations: typing.List[ProfileOperation],
+        metadata: typing.Dict[str, typing.Any]
+    ) -> typing.Sequence[pathlib.Path]:
+        from post_processing.utilities.netcdf import load_netcdf
+        LOGGER.warning(f"Peeking into operations. Do not do this in production!")
+
+        for path in data:
+            with load_netcdf(path) as netcdf_file:
+                LOGGER.info(f"{os.linesep * 2}{path}:{os.linesep * 2}{netcdf_file}")
+
+        return data
 
 @dataclasses.dataclass
 class DropOperation(NCOOperation, InPlaceOperationMixin):
@@ -603,33 +642,37 @@ class DropOperation(NCOOperation, InPlaceOperationMixin):
         else:
             drop_function = nco.remove_variables
 
-        arguments: typing.List[typing.Dict[str, typing.Any]] = []
 
-        for file in data:
-            arguments_for_file: typing.Dict[str, typing.Any] = {
-                "input_file": file,
-                "output_file": self.get_output_path(
-                    work_directory=work_directory,
-                    input_path=file,
-                    process_identifier=process_identifier,
-                    **metadata
-                ),
-                "variables": self.fields,
+        input_output_mapping: typing.Mapping[pathlib.Path, pathlib.Path] = {
+            file: self.get_output_path(
+                work_directory=work_directory,
+                input_path=file,
+                process_identifier=process_identifier,
+                **metadata
+            )
+            for file in data
+        }
+
+        arguments: typing.List[typing.Dict[str, typing.Any]] = [
+            {
+                "input_file": input_path,
+                "output_file": output_path,
+                "variables": self.fields
             }
-
-            arguments.append(arguments_for_file)
+            for input_path, output_path in input_output_mapping.items()
+        ]
 
         starmap(
             function=drop_function,
             args=arguments
         )
 
-        return data
+        return list(input_output_mapping.values())
 
     fields: typing.List[str] = dataclasses.field()
     exclude: bool = dataclasses.field(default=False)
 
-@dataclasses.dataclass(unsafe_hash=True)
+@dataclasses.dataclass
 class RenameOperation(NCOOperation, InPlaceOperationMixin):
     """
     Tells how to rename variables or dimensions
@@ -665,29 +708,30 @@ class RenameOperation(NCOOperation, InPlaceOperationMixin):
         :param metadata: Metadata provided from previous operations that may be used as helpful hints
         :returns: The Paths for each created object
         """
-        # TODO: Check if this is iterating right and efficiently
-        #  - can we rename multiple times in one call?
-        #  - Should we starmap all files at once?
-        for file in data:
-            args: typing.List[typing.Dict[str, typing.Union[str, pathlib.Path]]] = [
-                {
-                    "input_file": file,
-                    "old_name": original_name,
-                    "new_name": new_name,
-                    "output_file": self.get_output_path(
-                        work_directory=work_directory,
-                        input_path=file,
-                        process_identifier=process_identifier,
-                        **metadata
-                    )
-                }
-                for original_name, new_name in self.mapping.items()
-            ]
-            starmap(
-                function=nco.rename_variable,
-                args=args
-            )
-        return data
+        arguments: typing.List[typing.Dict[str, typing.Any]] = [
+            {
+                "input_path": file,
+                "output_path": self.get_output_path(
+                    work_directory=work_directory,
+                    input_path=file,
+                    process_identifier=process_identifier,
+                    **metadata
+                ),
+                "mapping": self.mapping
+            }
+            for file in data
+        ]
+
+        from post_processing.transform.rename import rename_variable
+        new_files: typing.Sequence[pathlib.Path] = starmap(
+            function=rename_variable,
+            args=arguments
+        )
+
+        return new_files
+
+    def __hash__(self) -> int:
+        return hash((self.operation(), *[pair for pair in self.mapping.items()]))
 
     mapping: typing.Dict[str, str] = dataclasses.field()
 
@@ -752,13 +796,13 @@ class AttributeOperation(NCOOperation, InPlaceOperationMixin):
             for file in data
         ]
 
-        starmap(
+        new_paths: typing.Sequence[pathlib.Path] = starmap(
             function=nco.add_or_modify_attribute,
             args=arguments,
             thread_count=True
         )
 
-        return data
+        return new_paths
 
     def __post_init__(self):
         if not isinstance(self.attribute_type, nco.NetcdfType):
@@ -1472,6 +1516,8 @@ class Profile(BaseModel):
         :param additional_metadata: Additional values that may be passed to use as metadata for value replacement
         :returns: The list of resultant files
         """
+        from post_processing.utilities.netcdf import load_metadata
+        input_metadata: typing.Mapping[str, typing.Any] = load_metadata(path=files)
         metadata: typing.Dict[str, typing.Any] = {
             **additional_metadata,
             self.output_type.__class__.__name__: str(self.output_type.value),
@@ -1481,6 +1527,8 @@ class Profile(BaseModel):
             "cycle": str(cycle).zfill(2),
             "date": date.strftime(self.date_format),
         }
+
+        input_metadata.update(metadata)
         process_identifier: str = str(hash((
             date,
             cycle,
@@ -1503,7 +1551,7 @@ class Profile(BaseModel):
                 work_directory=work_directory,
                 data=files,
                 previous_operations=previous_operations,
-                metadata=metadata
+                metadata=input_metadata
             )
 
             if isinstance(output, xarray.Dataset):
@@ -1516,7 +1564,7 @@ class Profile(BaseModel):
                         f"there is no where configured and accessible to write to"
                     )
 
-                filename: str = self.get_output_filename(**metadata)
+                filename: str = self.get_output_filename(**input_metadata)
 
                 if has_configured_output:
                     output_directory: pathlib.Path = self.output_directory

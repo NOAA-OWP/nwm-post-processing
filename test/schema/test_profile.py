@@ -534,14 +534,7 @@ class ProfileTest(DataTest):
         full_profile_path: pathlib.Path = self.profile_directory / "test_profile.json"
         full_profile: profile.Profile = profile.Profile.from_json(path_or_buffer=full_profile_path)
 
-        # Ensure output is saved to the correct testing location
-        def is_save(profile_operation: profile.ProfileOperation) -> bool:
-            return profile_operation.operation() == profile.OperationType.SAVE
-
         output_directory: pathlib.Path = self.get_output_directory() / logger.name
-        for operation in filter(is_save, full_profile.operations):  # type: profile.SaveOperation
-            output_directory.mkdir(parents=True, exist_ok=True)
-            operation.directory = output_directory
 
         try:
             results: typing.Sequence[pathlib.Path] = full_profile.run(
