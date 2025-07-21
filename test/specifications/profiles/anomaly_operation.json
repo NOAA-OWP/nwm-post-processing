@@ -1,0 +1,53 @@
+{
+    "configuration": "short_range",
+    "output_type": "channel_rt",
+    "region": "conus",
+    "operations": [
+        {
+            "operation": "anomaly",
+            "variable_name": "streamflow",
+            "default_score": 3,
+            "output_pattern": "anomaly.nwm.t{cycle}z.{Configuration}.{ModelOutputType}.{frame}.{region}.nc",
+            "time_variable": "time",
+            "dimension_names": "feature_id",
+            "output_variable_name": "streamflow_anomaly",
+            "thresholds": [
+                {
+                    "data_path": "/apd_common/christopher.tubbs/nwm-post-processing/test/data/thresholds/short_range.channel_rt.conus/p05.nc",
+                    "level": -5.0,
+                    "variable": "streamflow_p05"
+                },
+                {
+                    "data_path": "/apd_common/christopher.tubbs/nwm-post-processing/test/data/thresholds/short_range.channel_rt.conus/p10.nc",
+                    "level": -3.0,
+                    "variable": "streamflow_p10"
+                },
+                {
+                    "data_path": "/apd_common/christopher.tubbs/nwm-post-processing/test/data/thresholds/short_range.channel_rt.conus/p25.nc",
+                    "level": -1.25,
+                    "variable": "streamflow_p25"
+                },
+                {
+                    "data_path": "/apd_common/christopher.tubbs/nwm-post-processing/test/data/thresholds/short_range.channel_rt.conus/p75.nc",
+                    "level": 0.0,
+                    "variable": "streamflow_p75"
+                },
+                {
+                    "data_path": "/apd_common/christopher.tubbs/nwm-post-processing/test/data/thresholds/short_range.channel_rt.conus/p90.nc",
+                    "level": 0.5,
+                    "variable": "streamflow_p90"
+                },
+                {
+                    "data_path": "/apd_common/christopher.tubbs/nwm-post-processing/test/data/thresholds/short_range.channel_rt.conus/p95.nc",
+                    "level": 1.5,
+                    "variable": "streamflow_p95"
+                }
+            ]
+        },
+        {
+            "operation": "save",
+            "filename_pattern": "{file_name}",
+            "directory": "{output_path}/nwm.{reference_time__date}"
+        }
+    ]
+}

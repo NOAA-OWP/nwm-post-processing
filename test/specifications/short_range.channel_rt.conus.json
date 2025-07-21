@@ -283,6 +283,13 @@
         "wgrfc.nc"
     ],
     "mask_coordinate": "feature_id",
+    "thresholds": {
+        "variable_to_threshold": "streamflow",
+        "percentiles": [0.05, 0.1, 0.25, 0.75, 0.9, 0.95],
+        "feature": "feature_id",
+        "time": "time",
+        "seed": 12345
+    },
     "configuration": "short_range",
     "model_output_type": "channel_rt",
     "region": "conus"

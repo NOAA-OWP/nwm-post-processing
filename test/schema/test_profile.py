@@ -387,6 +387,28 @@ class ProfileTest(DataTest):
         # TODO: Ensure that the postcondition for each branch is true
         self.assertFalse(True, "Implement the test for profile.BranchOperation")
         logger.info("Test Complete")
+
+    def test_anomaly_operation(self):
+        logger: logging.Logger = logging.getLogger("test_anomaly_operation")
+        profile_path: pathlib.Path = self.profile_directory / "anomaly_operation.json"
+        anomaly_profile: profile.Profile = profile.Profile.from_json(path_or_buffer=profile_path)
+
+        output_directory: pathlib.Path = self.get_output_directory() / logger.name
+
+        try:
+            results: typing.Sequence[pathlib.Path] = anomaly_profile.run(
+                date=self.get_date(),
+                cycle=self.get_test_forecast_cycle(),
+                files=self.get_input_files(),
+                output_path=output_directory
+            )
+        except:
+            logger.error(f"Failed to run the profile defined at '{profile_path}'")
+            raise
+
+        # TODO: Ensure that all products were generated in the expected fashion
+
+        logger.info("Test Complete")
         
     def test_load_operation(self):
         logger: logging.Logger = logging.getLogger("test_load_operation")

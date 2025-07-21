@@ -36,6 +36,10 @@ from post_processing.utilities.common import get_template_variables
 from post_processing.utilities.common import to_json
 from post_processing.configuration import settings
 
+if typing.TYPE_CHECKING:
+    import numpy
+    from post_processing.transform import anomaly
+
 LOGGER: logging.Logger = logging.getLogger(pathlib.Path(__file__).stem)
 InputType = typing.TypeVar("InputType")
 OutputType = typing.TypeVar("OutputType")
@@ -112,6 +116,8 @@ class OperationType(enum.StrEnum):
     """Raise an exception"""
     ON_EACH = "on_each"
     """Run each contained operation on each input separately"""
+    ANOMALY = "anomaly"
+    """Bin values by threshold"""
 
 
 class InPlaceOperationMixin:
@@ -180,7 +186,6 @@ class InPlaceOperationMixin:
 
         formatted_name: str = self.output_pattern.format(**template_arguments)
         return formatted_name
-
 
 @dataclasses.dataclass
 class ProfileOperation(BaseModel, OperationHandler[InputType, OutputType], abc.ABC):
@@ -1107,6 +1112,106 @@ class OnEachOperation(
 
 
 @dataclasses.dataclass
+class AnomalyOperation(NCOOperation):
+    """
+    Attaches anomaly variables to netcdf files based on thresholds
+    """
+    variable_name: str
+    thresholds: typing.List["anomaly.ThresholdDefinition"]
+    default_score: int
+    output_pattern: str
+    time_variable: str = dataclasses.field(default="time")
+    dimension_names: typing.Union[str, typing.Sequence[str]] = dataclasses.field(default='feature_id')
+    output_variable_name: str = dataclasses.field(default="streamflow_anomaly")
+    anomaly_metadata: typing.Dict[str, typing.Any] = dataclasses.field(default_factory=dict)
+    encoding: typing.Dict[str, typing.Any] = dataclasses.field(default_factory=dict)
+
+    def __hash__(self):
+        return hash((
+            self.variable_name,
+            *self.thresholds,
+            self.default_score,
+            self.output_pattern,
+            self.time_variable,
+            self.dimension_names,
+            self.output_variable_name,
+            *[pair for pair in self.anomaly_metadata.items()],
+            *[pair for pair in self.encoding.items()],
+        ))
+
+    @classmethod
+    def operation(cls) -> OperationType:
+        return OperationType.ANOMALY
+
+    def __post_init__(self):
+        if len(self.thresholds) == 0:
+            raise ValueError(
+                f"At least one threshold must be specified for an {self.__class__.__qualname__}"
+            )
+        from post_processing.transform.anomaly import ThresholdDefinition
+        for threshold_index, threshold in enumerate(self.thresholds):
+            if isinstance(threshold, typing.Mapping):
+                threshold = ThresholdDefinition(**threshold)
+                self.thresholds[threshold_index] = threshold
+            elif not isinstance(threshold, ThresholdDefinition):
+                raise TypeError(
+                    f"'{threshold}' (type={type(threshold)}) is not a valid value in "
+                    f"{self.__class__.__qualname__}.thresholds. It must be indicated via a Mapping or a "
+                    f"ThresholdDefinition"
+                )
+
+
+    def __call__(
+        self,
+        profile: "Profile",
+        process_identifier: str,
+        work_directory: pathlib.Path,
+        data: typing.Sequence[pathlib.Path],
+        previous_operations: typing.List["ProfileOperation"],
+        metadata: typing.Dict[str, typing.Any]
+    ) -> typing.Sequence[pathlib.Path]:
+        """
+
+        """
+        from post_processing.transform import anomaly
+        output_paths: typing.List[pathlib.Path] = []
+        frame_pattern: re.Pattern = re.compile(
+            r"(?P<model>[a-zA-Z]+)\."
+            r"(?P<configuration>\w+)\."
+            r"(?P<model_output_type>\w+)(_(?P<member>\d+))?\."
+            r"(?P<frame>f\d+|tm\d+)\."
+            r"(?P<region>[a-zA-Z]+)\."
+            r"nc"
+        )
+        for input_path in data:
+            file_specific_metadata: typing.Dict[str, typing.Any] = {
+                **metadata
+            }
+            identification_match: typing.Optional[re.Match] = frame_pattern.search(input_path.name)
+            if identification_match:
+                identifiers: typing.Mapping[str, typing.Any] = identification_match.groupdict()
+                file_specific_metadata.update(identifiers)
+
+            desired_path: pathlib.Path = work_directory / self.output_pattern.format(**file_specific_metadata)
+            anomaly.calculate_anomaly(
+                input_path=input_path,
+                output_path=desired_path,
+                variable_to_bin=self.variable_name,
+                thresholds=self.thresholds,
+                default_score=self.default_score,
+                time_variable=self.time_variable,
+                dimension_names=self.dimension_names,
+                output_variable_name=self.output_variable_name,
+                field_metadata=self.anomaly_metadata,
+                encoding=self.encoding,
+            )
+            if not desired_path.exists():
+                raise OSError(f"There is no generated anomaly data at {desired_path}")
+            output_paths.append(desired_path)
+        return output_paths
+
+
+@dataclasses.dataclass
 class FunctionOperation(ProfileOperation[InputType, OutputType]):
     """
     Pass input through python code by passing preconfigured keyword arguments and mapped variables
@@ -1348,7 +1453,7 @@ class Profile(BaseModel):
         if not first_operation_type_is_entry or first_operation.operation() == OperationType.INTO_PYTHON:
             raise ValueError(
                 f"The first operation in {self} must operate on files, but the first operation was instead "
-                f"{type(first_operation)}({first_operation})"
+                f"{type(first_operation).__qualname__}({first_operation})"
             )
 
     def run(

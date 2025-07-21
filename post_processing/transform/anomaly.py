@@ -1,0 +1,353 @@
+#!/usr/bin/env python3
+"""
+Objects and functions used to bin values by percentile
+"""
+import typing
+import logging
+import pathlib
+import dataclasses
+
+from post_processing.configuration import settings
+
+if typing.TYPE_CHECKING:
+    import xarray
+    import numpy
+
+LOGGER: logging.Logger = logging.getLogger(pathlib.Path(__file__).stem)
+
+
+@dataclasses.dataclass
+class ThresholdDefinition:
+    """
+    Information about how to derive a threshold from a netcdf file
+    """
+    data_path: pathlib.Path
+    level: typing.Union[int, float, "numpy.float32"]
+    variable: str
+    time_coordinate: str = dataclasses.field(default='time')
+
+    def __post_init__(self):
+        import numpy
+        if not isinstance(self.level, numpy.float32):
+            self.level = numpy.float32(self.level)
+        if isinstance(self.data_path, str):
+            self.data_path = pathlib.Path(self.data_path)
+
+    def __eq__(self, other: typing.Any) -> bool:
+        if not isinstance(other, ThresholdDefinition):
+            raise TypeError(
+                f"Cannot compare '{self}' against '{other}' (type={type(other)})"
+            )
+        return self.level == other.level
+
+    def __hash__(self):
+        return hash((self.level,))
+
+    def __lt__(self, other: typing.Any) -> bool:
+        if not isinstance(other, ThresholdDefinition):
+            raise TypeError(
+                f"Cannot compare '{self}' against '{other}' (type={type(other)})"
+            )
+        return self.level < other.level
+
+    def __le__(self, other: typing.Any) -> bool:
+        return self == other or self < other
+
+    def __gt__(self, other):
+        return not (self <= other)
+
+    def __ge__(self, other):
+        return not (self < other)
+
+    def __str__(self):
+        return f"{self.data_path.name}::{self.variable}({self.time_coordinate}) => {self.level}"
+
+    def __repr__(self):
+        return str(self)
+
+    def get_stats(self, day_of_year: int) -> "xarray.DataArray":
+        """
+        Get statistical value from a netcdf file based on the day of the year
+        """
+        import xarray
+        from post_processing.utilities.netcdf import load_netcdf
+
+        dataset: xarray.Dataset = load_netcdf(path=self.data_path, engine='netcdf4', mode='r')
+        if self.variable not in dataset.variables:
+            raise KeyError(
+                f"The file at '{self.data_path}' does not contain variable '{self.variable}'"
+            )
+        variable: xarray.DataArray = dataset[self.variable]
+        specific_statistics: xarray.DataArray = variable.sel(
+            **{self.time_coordinate: day_of_year}
+        )
+        return specific_statistics
+
+
+def make_apply_thresholds(
+    scores: typing.Sequence["numpy.floating"],
+    default_score: float
+) -> typing.Callable[..., "numpy.ndarray"]:
+    """
+    Make the universal function used by numpy to use thresholds to establish binning. This is a function
+    factory due to array mismatches that occur when using the scores and default_score variables.
+
+    :param scores: The ranking of each threshold in descending order
+    :param default_score: The score to give the bins if they exceed the highest percentile
+    :returns: A numpy ufunc compatible function
+    """
+    import numpy
+    import xarray
+
+    if len(set(scores)) != len(scores):
+        raise ValueError(f"Cannot apply thresholds - there cannot be duplicate scores: {scores}")
+
+    if not isinstance(scores, numpy.ndarray):
+        scores: numpy.ndarray = numpy.array(scores)
+
+    def _apply_thresholds(variable: xarray.DataArray, *thresholds: numpy.ndarray) -> numpy.ndarray:
+        """
+        The ufunc passed to xarray and dask to vectorize the bin comparisons.
+
+        Anomaly definitions cannot be passed in since this will be called as a ufunc
+
+        :param variable: The variable to score
+        :param args: a tuple containing a series of raw threshold values,
+            scores within a list or array in the order of the threshold arrays, and the default value
+        :returns: An array of scores within each threshold
+        """
+        if len(thresholds) != len(scores):
+            raise ValueError(
+                f"Cannot apply thresholds - the number of thresholds differs from the number of scores. {len(thresholds)} vs {scores}"
+            )
+
+        if numpy.sort(scores)[::-1].tolist() != scores.tolist():
+            raise ValueError(f"Cannot apply thresholds - scores are not in ascending order: {scores}")
+
+        output_array: numpy.ndarray = numpy.full(variable.shape, default_score, dtype=numpy.result_type(*scores))
+        incorrect_lengths: typing.List[int] = []
+        LOGGER.info("Now applying bins")
+        for score_index, threshold in enumerate(thresholds):
+            if variable.size != threshold.size:
+                incorrect_lengths.append(scores[score_index].item())
+                continue
+            mask = variable < threshold
+            output_array[mask] = scores[score_index]
+
+        if incorrect_lengths:
+            raise ValueError(
+                f"Could not apply all thresholds - The following scores were of the wrong length: {incorrect_lengths}"
+            )
+
+        return output_array
+    return _apply_thresholds
+
+
+def get_day_of_year(dataset: "xarray.Dataset", variable: str) -> int:
+    """
+    Get the day of the year from a time variable
+    """
+    assert variable in dataset, f"There is not '{variable}' variable in the given dataset"
+    assert dataset[variable].shape == (1,), f"Cannot find the day of year in the '{variable}' variable - there is more than one value"
+    day_of_year: numpy.ndarray = dataset[variable].dt.dayofyear.values
+    if isinstance(day_of_year, typing.Sequence):
+        day_of_year = day_of_year[0]
+    day: int = day_of_year.item()
+    return day
+
+
+def calculate_anomaly(
+    input_path: pathlib.Path,
+    output_path: pathlib.Path,
+    variable_to_bin: str,
+    thresholds: typing.Sequence[ThresholdDefinition],
+    default_score: float,
+    time_variable: str = 'time',
+    dimension_names: typing.Union[str, typing.Iterable[str]] = 'feature_id',
+    output_variable_name: str = "streamflow_anomaly",
+    field_metadata: typing.Dict[str, typing.Any] = None,
+    encoding: typing.Dict[str, typing.Any] = None
+) -> "pathlib.Path":
+    import xarray
+    import numpy
+    from post_processing.utilities.netcdf import load_netcdf
+
+    try:
+        dataset = load_netcdf(path=input_path)
+    except:
+        LOGGER.error(f"Could not load the netcdf data at '{input_path.absolute()}'")
+        raise
+
+    if variable_to_bin not in dataset:
+        raise KeyError(
+            f"There is no variable name '{variable_to_bin}' within the '{input_path}'. Available variables: {dataset.variables}"
+        )
+    variable: xarray.DataArray = dataset[variable_to_bin]
+
+    if len(variable.shape) > 1:
+        raise NotImplementedError(
+            f"Cannot bin on more than one dimension at this time. "
+            f"Reorganize operations so that anomaly binning occurs prior to file consolidation."
+        )
+
+    if field_metadata is None:
+        field_metadata = {}
+
+    if encoding is None:
+        encoding: typing.Dict[str, typing.Any] = dict(variable.encoding)
+
+    minimum_id = variable[dimension_names].min()
+    variable_size: int = variable.size
+    threshold_arrays: typing.List[numpy.ndarray] = []
+    scores: typing.List[numpy.floating] = []
+
+    # TODO: Initial threshold processing can probably be multithreaded
+    thresholds = sorted(thresholds, key=lambda threshold: threshold.level, reverse=True)
+    day_of_year: int = get_day_of_year(dataset=dataset, variable=time_variable)
+
+    for threshold in thresholds:
+        LOGGER.info(f"Processing {threshold} for binning")
+        daily_values: xarray.DataArray = threshold.get_stats(day_of_year=day_of_year)
+        daily_values = daily_values.where(daily_values[dimension_names] >= minimum_id, drop=True)
+
+        if daily_values.size < variable_size:
+            LOGGER.info(f"The size of '{threshold}' is too small - reindexing to align ids")
+            try:
+                daily_values = daily_values.reindex(
+                    **{
+                        daily_values.dims[0]: variable[variable.dims[0]]
+                    }
+                )
+            except Exception as e:
+                if "index has duplicate values" in str(e):
+                    unique_variable_index_values, count = numpy.unique(variable[variable.dims[0]].values.ravel(), return_counts=True)
+                    duplicate_variable_indices = unique_variable_index_values[count > 1]
+                    if duplicate_variable_indices.size > 0:
+                        LOGGER.error(
+                            f"Could not reindex the daily statistics - the variable had duplicate ids:\n{duplicate_variable_indices}"
+                        )
+                    unique_threshold_index_values, count = numpy.unique(daily_values[daily_values.dims[0]].values.ravel(), return_counts=True)
+                    duplicate_threshold_indices = unique_threshold_index_values[count > 1]
+                    if duplicate_threshold_indices.size > 0:
+                        LOGGER.error(
+                            f"Could not reindex the daily statistics - the statistics had duplicate ids:\n{duplicate_threshold_indices}"
+                        )
+                raise
+        threshold_arrays.append(daily_values.values)
+        scores.append(threshold.level)
+
+    apply_thresholds: typing.Callable[[xarray.DataArray, *numpy.ndarray], numpy.ndarray] = make_apply_thresholds(
+        scores=scores,
+        default_score=default_score,
+    )
+
+    input_dimensions: typing.Sequence[typing.Sequence] = [
+        [],     # for the initial variable
+        *[
+            []  # For each threshold array
+            for _ in thresholds
+        ]
+    ]
+
+    LOGGER.info(f"Now binning {input_path.name}({variable_to_bin}) based off of: {thresholds}")
+    anomaly_scores: numpy.ndarray = xarray.apply_ufunc(
+        apply_thresholds,
+        variable,
+        *threshold_arrays,
+        input_core_dims=input_dimensions,
+        output_dtypes=[numpy.result_type(*scores)],
+        dask="parallelized"
+    )
+
+    output_array: xarray.DataArray = xarray.DataArray(
+        data=anomaly_scores,
+        name=output_variable_name,
+        dims=dimension_names,
+        attrs=field_metadata,
+    )
+    output_array.encoding.update(encoding)
+
+
+    try:
+        updated_dataset: xarray.Dataset = dataset.assign(**{output_array.name: output_array})
+    except:
+        LOGGER.error(
+            f"Could not attach the new anomaly values to the data in '{input_path.absolute()}'"
+        )
+        raise
+
+    try:
+        from post_processing.utilities.netcdf import save_netcdf
+        save_netcdf(path=output_path, dataset=updated_dataset)
+    except:
+        LOGGER.error(f"Could not save the dataset with the newly calculated anomaly data to '{output_path.absolute()}'")
+        raise
+
+
+def assign_anomaly(
+    input_path: pathlib.Path,
+    output_path: pathlib.Path,
+    variable_to_bin: str,
+    thresholds: typing.Sequence[ThresholdDefinition],
+    default_score: float,
+    time_variable: str = 'time',
+    dimension_names: typing.Union[str, typing.Iterable[str]] = 'feature_id',
+    output_variable_name: str = "streamflow_anomaly",
+    field_metadata: typing.Dict[str, typing.Any] = None,
+    encoding: typing.Dict[str, typing.Any] = None
+) -> pathlib.Path:
+    """
+    Open a netcdf file, use data from other netcdf files to flag anomalies,
+    and save the resultant values to the same dataset
+
+    :param input_path: path to netcdf file
+    :param output_path: Where to save the new data
+    :param variable_to_bin: name of the variable to calculate the anomaly off of
+    :param thresholds: list of definitions used to identify threshold limits and catagorical values
+    :param default_score: The value to assign to a location within the output variable if it exceeded all given
+    thresholds
+    :param time_variable: The name of the variable containing the valid time of each value
+    :param dimension_names: The list of the names of dimensions that should be on the output variable
+    :param output_variable_name: The name of the variable in the output that contains the results
+    :param field_metadata: Metadata to put on the output variable that defines context
+    :param encoding: Specific directions on how to save the netcdf variable when written to disk
+    :returns: The path to the saved data
+    """
+
+    try:
+        written_path: pathlib.Path = calculate_anomaly(
+            input_path=input_path,
+            output_path=output_path,
+            variable_to_bin=variable_to_bin,
+            thresholds=thresholds,
+            default_score=default_score,
+            time_variable=time_variable,
+            dimension_names=dimension_names,
+            output_variable_name=output_variable_name,
+            field_metadata=field_metadata,
+            encoding=encoding,
+        )
+    except:
+        LOGGER.error(
+            f"Could not calculate the anomaly of '{input_path.name}::{variable_to_bin}({dimension_names})' "
+            f"in regards to {thresholds}"
+        )
+        raise
+
+    return output_path
+
+
+def main() -> int:
+    import argparse
+    parser: argparse.ArgumentParser = argparse.ArgumentParser(
+        description="Assign values within a variable to a bin"
+    )
+    return 0
+
+if __name__ == "__main__":
+    logging.basicConfig(
+        format=settings.log_format,
+        datefmt=settings.date_format
+    )
+    import sys
+    sys.exit(main())
