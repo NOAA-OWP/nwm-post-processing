@@ -14,7 +14,7 @@
                 {
                     "operation": "save",
                     "filename_pattern": "{file_name}",
-                    "directory": "<fill in at runtime>"
+                    "directory": "{output_path}/nwm.{reference_time__date}"
                 }
             ]
         }
