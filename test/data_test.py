@@ -44,6 +44,12 @@ NPP_ROUTELINK_DIRECTORY: pathlib.Path = pathlib.Path(
         settings.application_path / "test" / "data" / "routelink"
     )
 )
+NPP_THRESHOLD_DIRECTORY: pathlib.Path = pathlib.Path(
+    os.environ.get(
+        "NPP_TEST_THRESHOLD_DIRECTORY",
+        settings.application_path / "test" / "data" / "thresholds"
+    )
+)
 OVERWRITE_PREEXISTING_TEST_DATA: bool = False
 """Whether to write new test data if preexisting test data was found"""
 
@@ -62,6 +68,8 @@ class DataTest(unittest.TestCase, abc.ABC):
     """Where masks for input data should be stored"""
     _routelink_directory: typing.Optional[pathlib.Path] = None
     """The directory that the routelink will be saved in"""
+    _threshold_directory: typing.Optional[pathlib.Path] = None
+    """The directory that the thresholds will be saved in"""
     _created_data_directory: bool = False
     """Whether this test created a temporary data directory"""
     _output_directory: typing.Optional[pathlib.Path] = None
@@ -74,6 +82,8 @@ class DataTest(unittest.TestCase, abc.ABC):
     """The masks to use for subsetting in tests"""
     _routelink_path: typing.Optional[pathlib.Path] = None
     """The path to the routelink for this dataset"""
+    _thresholds: typing.Optional[typing.Sequence[pathlib.Path]] = None
+    """The paths to all the thresholds available for use"""
     _date: typing.Optional[datetime] = None
     """The date to use on tests"""
     _region: typing.Optional[Region] = None
@@ -266,12 +276,28 @@ class DataTest(unittest.TestCase, abc.ABC):
             return cls._routelink_directory
 
     @classmethod
+    def get_threshold_directory(cls) -> pathlib.Path:
+        """
+        Get the directory where thresholds will be saved
+        """
+        with cls._resource_lock:
+            if cls._threshold_directory is None:
+                if isinstance(NPP_THRESHOLD_DIRECTORY, pathlib.Path):
+                    threshold_directory = NPP_THRESHOLD_DIRECTORY
+                    threshold_directory.mkdir(parents=True, exist_ok=True)
+                    cls._threshold_directory = threshold_directory
+                else:
+                    cls._threshold_directory = cls.make_temporary_directory()
+            return cls._threshold_directory
+
+    @classmethod
     def setUpClass(cls):
         """Build up everything that this testing class needs"""
         cls.get_input_files()
         cls.get_masks()
         cls.get_output_directory()
         cls.get_routelink_path()
+        cls.get_thresholds()
 
     @classmethod
     def get_input_files(cls) -> typing.Sequence[pathlib.Path]:
@@ -305,6 +331,27 @@ class DataTest(unittest.TestCase, abc.ABC):
                     step=cls.get_model_forecast_interval(),
                 )
             return cls._masks
+
+    @classmethod
+    def get_thresholds(cls) -> typing.Sequence[pathlib.Path]:
+        """
+        Get the thresholds that are available for use
+        """
+        with cls._resource_lock:
+            if cls._thresholds is None or len(cls._thresholds) == 0:
+                cls._thresholds = cls.get_input_dataset().generate_thresholds(
+                    data_path=cls.get_data_directory(),
+                    threshold_directory=cls.get_threshold_directory() / f"{cls.dataset_identifier()}",
+                    variable_to_threshold=cls.get_input_dataset().thresholds.variable_to_threshold,
+                    percentiles=cls.get_input_dataset().thresholds.percentiles,
+                    feature_dimension=cls.get_input_dataset().thresholds.feature,
+                    time_dimension=cls.get_input_dataset().thresholds.time,
+                    cycle=cls.get_test_forecast_cycle(),
+                    step=cls.get_model_forecast_interval(),
+                    length=cls.get_model_forecast_length(),
+                    seed=cls.get_input_dataset().thresholds.seed,
+                )
+            return cls._thresholds
 
     @classmethod
     def get_routelink_path(cls) -> pathlib.Path:

@@ -318,6 +318,17 @@ class RouteLink:
     none_value: int = dataclasses.field(default=-1)
 
 @dataclasses.dataclass
+class Threshold:
+    """
+
+    """
+    variable_to_threshold: str = dataclasses.field(default="streamflow")
+    percentiles: typing.List[float] = dataclasses.field(default_factory=lambda: [0.1, 0.25, 0.5, 0.75, 0.9, 0.95])
+    feature: str = dataclasses.field(default="feature_id")
+    time: str = dataclasses.field(default="time")
+    seed: int = dataclasses.field(default=12345)
+
+@dataclasses.dataclass
 class Dataset:
     """
     Represents a Post Processing Output Netcdf
@@ -340,6 +351,8 @@ class Dataset:
     """Names for mask files to use for testing"""
     mask_coordinate: str
     """The name of the coordinate to mask off of"""
+    thresholds: Threshold
+    """Information on how to use thresholds to determine anomaly levels"""
     member: typing.Optional[int] = dataclasses.field(default=None)
     """The ensemble member that this dataset reflects"""
     mask_seed: int = dataclasses.field(default=123456)
@@ -405,11 +418,26 @@ class Dataset:
             model_output_type=file_data.model_output_type,
             region=file_data.region,
             member=file_data.member,
-            mask_names=[],
+            mask_names=[
+                "abrfc.nc",
+                "aprfc.nc",
+                "cbrfc.nc",
+                "cnrfc.nc",
+                "lmrfc.nc",
+                "marfc.nc",
+                "mbrfc.nc",
+                "ncrfc.nc",
+                "nerfc.nc",
+                "nwrfc.nc",
+                "ohrfc.nc",
+                "serfc.nc",
+                "wgrfc.nc"
+            ],
             mask_coordinate=next(
                 (dimension.name for dimension in dimensions if dimension.unlimited),
                 coordinates[0].name
             ),
+            thresholds=Threshold()
         )
 
     def get_filenames(
@@ -497,6 +525,134 @@ class Dataset:
         )
         routelink.to_netcdf(output_path)
         return output_path
+
+
+    def generate_thresholds(
+        self,
+        data_path: pathlib.Path,
+        threshold_directory: pathlib.Path,
+        variable_to_threshold: str,
+        percentiles: typing.List[float] = None,
+        time_dimension: str = 'time',
+        feature_dimension: str = 'feature_id',
+        cycle: int = 0,
+        length: int = 18,
+        step: int = 1,
+        seed: int = 12345
+    ) -> typing.Sequence[pathlib.Path]:
+        """
+        Generate a threshold file for each passed in percentile
+
+        :param data_path: The path to where all generated data lies
+        :param threshold_directory: The directory to write thresholds to
+        :param variable_to_threshold: The variable to base thresholds off of
+        :param percentiles: The list of percentiles to use
+        :param time_dimension: The time dimension to use
+        :param feature_dimension: The feature dimension to use
+        :param cycle: The cycle of simulated data being mocked
+        :param length: The number of files in the cycle
+        :param step: The amount of hours between each data file
+        :param seed: The seed for the random number generator
+        :returns: The paths to all generated threshold files
+        """
+        paths_to_data: typing.Sequence[pathlib.Path] = self.get_filenames(
+            data_path=data_path,
+            cycle=cycle,
+            length=length,
+            step=step,
+        )
+
+        percentiles = {
+            percentile if percentile < 1 else percentile / 100.0
+            for percentile in percentiles
+        }
+
+        import xarray
+        import numpy
+        from post_processing.utilities import netcdf
+
+        if any(percentile > 1 or percentile < 0 for percentile in percentiles):
+            raise ValueError(f"percentiles must be between 0 and 1, received: {percentiles}")
+
+        percentile_paths: typing.Dict[float, pathlib.Path] = {
+            percentile: threshold_directory / f"p{int(percentile * 100)}.nc"
+            for percentile in percentiles
+        }
+
+        overall_data: xarray.Dataset = netcdf.load_netcdf(path=paths_to_data)
+        variable: xarray.DataArray = overall_data[variable_to_threshold]
+        minimum: numpy.float64 = variable.min().values.min()
+        maximum: numpy.float64 = variable.max().values.max()
+        range_of_values: numpy.float64 = maximum - minimum
+        noise_scale: numpy.float64 = range_of_values * 0.005
+        random_number_generator: numpy.random.Generator = numpy.random.default_rng(seed)
+        days_in_year: int = 366
+
+        output_paths: typing.List[pathlib.Path] = []
+        for percentile in percentiles:
+            path = percentile_paths[percentile]
+            if path.is_file():
+                LOGGER.info(f"The threshold file for the {int(percentile * 100)}th percentile already exists at {path}")
+                output_paths.append(path)
+                continue
+            LOGGER.info(f"Generating thresholds for the {int(percentile * 100)}th percentile for {self}")
+            threshold_name: str = f"p{str(int(percentile * 100)).zfill(2)}"
+            threshold_variable_name: str = f"{variable_to_threshold}_{threshold_name}"
+            quantile: numpy.ndarray = variable.quantile(percentile, dim=time_dimension).values
+            length: int = variable[feature_dimension].size
+            full_year: numpy.ndarray = random_number_generator.normal(
+                loc=quantile,
+                scale=noise_scale,
+                size=(days_in_year, length)
+            )
+
+            # Transpose so that it's locations first, time last
+            full_year = full_year.transpose()
+
+            percentile_dataset: xarray.Dataset = xarray.Dataset(
+                data_vars={
+                    threshold_variable_name: xarray.DataArray(
+                        data=full_year,
+                        dims=[feature_dimension, time_dimension],
+                        name=threshold_variable_name
+                    ),
+                },
+                coords={
+                    feature_dimension: overall_data[feature_dimension].compute().copy(),
+                    time_dimension: numpy.arange(1, days_in_year + 1)
+                },
+                attrs={
+                    "TITLE": f"Test thresholds for {threshold_name}",
+                    "seed": seed,
+                    "cycle": cycle,
+                    "length": length,
+                    "step": step,
+                    "script": str(pathlib.Path(__file__).name),
+                    "created_by": os.environ.get("USER", "Unknown"),
+                    "created_on": datetime.now().astimezone().strftime(settings.date_format),
+                }
+            )
+            output_path: pathlib.Path = threshold_directory / f"{threshold_name}.nc"
+
+            threshold_directory.mkdir(parents=True, exist_ok=True)
+
+            netcdf.save_netcdf(path=output_path, dataset=percentile_dataset)
+            LOGGER.info(f"Saved the threshold dataset for the {int(percentile * 100)}th percentile to {output_path}")
+            output_paths.append(output_path)
+
+        missing_locations = list(filter(lambda pth: not pth.exists(), output_paths))
+        if missing_locations:
+            raise FileNotFoundError(
+                f"For some reason, the following files are no longer available: {missing_locations}"
+            )
+        if len(output_paths) != len(percentiles):
+            raise RuntimeError(
+                f"Files for percentiles are missing. {len(output_paths)} files generated vs "
+                f"{len(percentiles)} files requested."
+            )
+
+        return output_paths
+
 
 
     def generate_masks(

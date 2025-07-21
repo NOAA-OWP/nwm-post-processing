@@ -64,7 +64,7 @@ def load_netcdf(
         dataset: xarray.Dataset = xarray.open_mfdataset(
             paths=path,
             chunks=chunks,
-            concat_dim="by_coords",
+            combine="by_coords",
             engine=engine,
             **kwargs
         )
