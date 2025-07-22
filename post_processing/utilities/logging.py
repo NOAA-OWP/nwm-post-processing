@@ -67,7 +67,7 @@ def get_level(level: typing.Union[int, float, str, bytes]) -> int:
     elif isinstance(level, str):
         level = level.strip()
         parsed_level = logging.getLevelName(level=level.upper())
-        if parsed_level.startswith("Level "):
+        if isinstance(parsed_level, str) and parsed_level.startswith("Level "):
             raise ValueError(f"Could not get an appropriate log level for: {level}")
         return parsed_level
     else:

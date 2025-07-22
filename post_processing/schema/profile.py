@@ -299,6 +299,9 @@ class EchoOperation(ProfileOperation[InputType, InputType]):
         if not isinstance(self.level, int):
             self.level = logging.getLevelName(self.level.upper())
 
+    def __str__(self):
+        return f"{logging.getLevelName(self.level) if isinstance(self.level, int) else self.level}: {self.message}"
+
     message: str
     level: typing.Union[int, str] = dataclasses.field(default=logging.INFO)
     logger_name: typing.Optional[str] = dataclasses.field(default=None)
@@ -394,6 +397,7 @@ class ExtractOperation(NCOOperation):
                 return match.group(0)
             return ""
 
+        from post_processing.enums import RFC
         subset_arguments: typing.List[typing.Dict[str, typing.Any]] = [
             {
                 "input_file": input_file,
@@ -406,6 +410,7 @@ class ExtractOperation(NCOOperation):
                     "mask_name": mask.stem,
                     "input_name": input_file.stem,
                     "frame": get_frame_identifier(input_file.name),
+                    "RFC": RFC.from_string(mask.stem, strict=False),
                     **identifiers
                 },
                 "output_pattern": self.output_pattern,
@@ -428,7 +433,12 @@ class ExtractOperation(NCOOperation):
                 "work_directory": work_directory,
                 "data": [subset_path],
                 "previous_operations": list(previous_operations),
-                "metadata": metadata.copy()
+                "metadata": {
+                    **metadata,
+                    "file_name": subset_path.stem,
+                    "frame": get_frame_identifier(subset_path.name),
+                    "RFC": RFC.from_string(subset_path.stem, strict=False)
+                }
             }
             for subset_path in subset_paths
         ]
@@ -511,6 +521,12 @@ class ExtractOperation(NCOOperation):
             self.dimension
         ))
 
+    def __str__(self):
+        return (
+            f"Extract data by location based on the {self.dimension} variable in the input and the "
+            f"{self.mask_coordinate} within: {', '.join(map(lambda file: file.name, self.masks))}"
+        )
+
     masks: typing.List[pathlib.Path] = dataclasses.field()
     identifier_pattern: str = dataclasses.field()
     """A pattern used to extract metadata from the mask filename"""
@@ -568,6 +584,21 @@ class Peek(NCOOperation):
     """
 
     """
+    show_summary: bool = dataclasses.field(default=True)
+    show_state: bool = dataclasses.field(default=True)
+    show_metadata: bool = dataclasses.field(default=True)
+
+    def __str__(self):
+        if self.show_state and self.show_summary and self.show_metadata:
+            return "Log a summary, the current state of all processed data, and all available metadata"
+        elif self.show_state and self.show_summary:
+            return "Log a summary and the current state of all processed data"
+        elif self.show_state and self.show_metadata:
+            return "Log the current state of all processed data and all available metadata"
+        elif self.show_summary and self.show_metadata:
+            return "Log a summary and all available metadata"
+        return "Log all available metadata"
+
     @classmethod
     def operation(cls) -> OperationType:
         return OperationType.PEEK
@@ -584,10 +615,26 @@ class Peek(NCOOperation):
         from post_processing.utilities.netcdf import load_netcdf
         LOGGER.warning(f"Peeking into operations. Do not do this in production!")
 
-        for path in data:
-            with load_netcdf(path) as netcdf_file:
-                LOGGER.info(f"{os.linesep * 2}{path}:{os.linesep * 2}{netcdf_file}")
+        if self.show_summary:
+            parameter_information: str = f"""
+Profile:             {profile}
+Process identifier:  {process_identifier}
+Work directory:      {work_directory}
+Previous Operations: 
+    - {(os.linesep + '    - ').join(list(map(str, previous_operations)))}
+"""
+            LOGGER.info(parameter_information)
 
+        if self.show_state:
+            for path in data:
+                with load_netcdf(path) as netcdf_file:
+                    LOGGER.info(f"{os.linesep * 2}{path}:{os.linesep * 2}{netcdf_file}")
+
+        if self.show_metadata:
+            metadata_information: str = f"""
+    - {(os.linesep + '    - ').join(list(map(lambda pair: str(pair[0]) + ': ' + str(pair[1]), metadata.items())))}
+"""
+            LOGGER.info(metadata_information)
         return data
 
 @dataclasses.dataclass
@@ -907,6 +954,12 @@ class SaveOperation(NCOOperation):
                         f"No identifiers were found in '{file.name}' with the pattern: '{self.identifier_pattern}'"
                     )
 
+            if 'rfc' in file_specific_metadata and not file_specific_metadata.get("RFC", None):
+                from post_processing.enums import RFC
+                rfc_abbreviation: typing.Optional[RFC] = RFC.from_string(file_specific_metadata['rfc'], strict=False)
+                if rfc_abbreviation:
+                    file_specific_metadata["RFC"] = rfc_abbreviation
+
             try:
                 filename: str = self.filename_pattern.format(**file_specific_metadata)
             except KeyError as e:
@@ -918,7 +971,14 @@ class SaveOperation(NCOOperation):
                 )
                 raise
 
-            output_directory: pathlib.Path = pathlib.Path(str(self.directory).format(**file_specific_metadata))
+            try:
+                output_directory: pathlib.Path = pathlib.Path(str(self.directory).format(**file_specific_metadata))
+            except KeyError as e:
+                LOGGER.error(
+                    f"Key for file path template ('{str(self.directory)}') not found. Available variables:{os.linesep}"
+                    f"    - {(os.linesep + '    - ').join(list(map(lambda pair: str(pair[0]) + ': ' + str(pair[1]), file_specific_metadata.items())))}"
+                )
+                raise
 
             output_directory.mkdir(parents=True, exist_ok=True)
             path: pathlib.Path = output_directory / filename
@@ -928,7 +988,7 @@ class SaveOperation(NCOOperation):
                 LOGGER.error(f"Could not copy '{file}' ({'exists' if file.is_file() else 'does not exist'}) to '{path}'")
                 raise
             saved_files.append(path)
-            LOGGER.info(f"Wrote {file} to {path}")
+            LOGGER.debug(f"Wrote {file} to {path}")
         return saved_files
 
     directory: pathlib.Path = dataclasses.field()
@@ -936,12 +996,27 @@ class SaveOperation(NCOOperation):
     identifier_pattern: typing.Optional[str] = dataclasses.field(default=None)
     _compiled_pattern: typing.Optional[re.Pattern] = member(default=None)
 
-@dataclasses.dataclass(unsafe_hash=True)
+@dataclasses.dataclass
 class BranchOperation(ProfileOperation[InputType, typing.Sequence[pathlib.Path]]):
     """
     An operation that lets you feed input data through multiple mutually exclusive operations
     """
     branches: typing.Dict[str, typing.List[ProfileOperation]] = dataclasses.field()
+
+    def __hash__(self):
+        try:
+            parent_hash: int = super().__hash__()
+        except:
+            parent_hash = 0
+
+        hash_values: typing.List[typing.Hashable] = [parent_hash]
+
+        for branch_name, branch_logic in self.branches.items():
+            for logic_entry in branch_logic:
+                hash_values.append(hash((branch_name, logic_entry)))
+
+        hash_value: int = hash(tuple(hash_values))
+        return hash_value
 
     def __str__(self):
         return f"{self.operation().replace('_', ' ').title()} -> [{', '.join(self.branches.keys())}]"
@@ -1010,7 +1085,7 @@ class BranchOperation(ProfileOperation[InputType, typing.Sequence[pathlib.Path]]
                     process_identifier=process_identifier,
                     work_directory=work_directory,
                     data=data,
-                    previous_operations=previous_operations,
+                    previous_operations=previous_operations.copy(),
                     metadata=metadata.copy()
                 )
                 future_results[branch_name] = future_result
@@ -1248,6 +1323,7 @@ class AnomalyOperation(NCOOperation):
                 output_variable_name=self.output_variable_name,
                 field_metadata=self.anomaly_metadata,
                 encoding=self.encoding,
+                operational_metadata=file_specific_metadata,
             )
             if not desired_path.exists():
                 raise OSError(f"There is no generated anomaly data at {desired_path}")
@@ -1517,8 +1593,9 @@ class Profile(BaseModel):
         :returns: The list of resultant files
         """
         from post_processing.utilities.netcdf import load_metadata
-        input_metadata: typing.Mapping[str, typing.Any] = load_metadata(path=files)
+        input_metadata: typing.Dict[str, typing.Any] = load_metadata(path=files)
         metadata: typing.Dict[str, typing.Any] = {
+            **settings.paths,
             **additional_metadata,
             self.output_type.__class__.__name__: str(self.output_type.value),
             self.region.__class__.__name__: self.region.value,
@@ -1661,7 +1738,14 @@ def load_profiles(profile_path: typing.Union[str, pathlib.Path] = settings.profi
             LOGGER.debug(f"Not loading {directory_member} since it is not a JSON file")
             continue
 
-        profile: Profile = Profile.from_json(directory_member)
+        try:
+            profile: Profile = Profile.from_json(directory_member)
+        except Exception as e:
+            if 'return lists of paths' in str(e):
+                LOGGER.error(e)
+                continue
+            raise
+
         profile.source_file = directory_member
         profiles.append(profile)
 

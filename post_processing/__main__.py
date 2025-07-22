@@ -23,7 +23,7 @@ from post_processing.schema import InputManifest
 from post_processing.schema.profile import Profile
 from post_processing.schema.profile import get_profile
 
-if __name__ == "__main__":
+if __name__.endswith("__main__"):
     setup_logging()
 
 LOGGER: logging.Logger = logging.getLogger(pathlib.Path(__file__).stem)
@@ -130,7 +130,8 @@ def main() -> int:
                 outputs: typing.Sequence[pathlib.Path] = profile.run(
                     date=manifest.reference_time,
                     cycle=manifest.cycle,
-                    files=manifest.files
+                    files=manifest.files,
+                    output_path=arguments.destination
                 )
                 LOGGER.info(
                     f"The results for {profile} were written to:{os.linesep}"

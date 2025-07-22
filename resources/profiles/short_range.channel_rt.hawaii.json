@@ -5,6 +5,12 @@
             "message": "An output for 'nwm.t<date><cycle>z.short_range.channel_rt.hawaii.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/WMS/short_range/channel_rt/nwm.t2025060800z.short_range.channel_rt.hawaii.nc"
+        },
+        {
+            "operation": "echo",
+            "message": "An output for 'nwm.t<date><cycle>z.short_range.channel_rt.aprfc.nc' should be generated, as defined in {source_file}.",
+            "level": "INFO",
+            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AP/channel_rt/nwm.t2025060800z.short_range.channel_rt.aprfc.nc"
         }
     ],
     "configuration": "short_range",

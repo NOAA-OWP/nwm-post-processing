@@ -65,17 +65,19 @@ class ThresholdDefinition:
     def __repr__(self):
         return str(self)
 
-    def get_stats(self, day_of_year: int) -> "xarray.DataArray":
+    def get_stats(self, day_of_year: int, **path_metadata) -> "xarray.DataArray":
         """
         Get statistical value from a netcdf file based on the day of the year
         """
         import xarray
         from post_processing.utilities.netcdf import load_netcdf
 
-        dataset: xarray.Dataset = load_netcdf(path=self.data_path, engine='netcdf4', mode='r')
+        file_path: pathlib.Path = pathlib.Path(str(self.data_path).format(**path_metadata))
+
+        dataset: xarray.Dataset = load_netcdf(path=file_path, engine='netcdf4', mode='r')
         if self.variable not in dataset.variables:
             raise KeyError(
-                f"The file at '{self.data_path}' does not contain variable '{self.variable}'"
+                f"The file at '{file_path}' does not contain variable '{self.variable}'"
             )
         variable: xarray.DataArray = dataset[self.variable]
         specific_statistics: xarray.DataArray = variable.sel(
@@ -126,7 +128,7 @@ def make_apply_thresholds(
 
         output_array: numpy.ndarray = numpy.full(variable.shape, default_score, dtype=numpy.result_type(*scores))
         incorrect_lengths: typing.List[int] = []
-        LOGGER.info("Now applying bins")
+        LOGGER.debug("Now applying bins")
         for score_index, threshold in enumerate(thresholds):
             if variable.size != threshold.size:
                 incorrect_lengths.append(scores[score_index].item())
@@ -166,11 +168,15 @@ def calculate_anomaly(
     dimension_names: typing.Union[str, typing.Iterable[str]] = 'feature_id',
     output_variable_name: str = "streamflow_anomaly",
     field_metadata: typing.Dict[str, typing.Any] = None,
-    encoding: typing.Dict[str, typing.Any] = None
+    encoding: typing.Dict[str, typing.Any] = None,
+    operational_metadata: typing.Dict[str, typing.Any] = None,
 ) -> "pathlib.Path":
     import xarray
     import numpy
     from post_processing.utilities.netcdf import load_netcdf
+
+    if operational_metadata is None:
+        operational_metadata = {}
 
     try:
         dataset = load_netcdf(path=input_path)
@@ -206,12 +212,12 @@ def calculate_anomaly(
     day_of_year: int = get_day_of_year(dataset=dataset, variable=time_variable)
 
     for threshold in thresholds:
-        LOGGER.info(f"Processing {threshold} for binning")
-        daily_values: xarray.DataArray = threshold.get_stats(day_of_year=day_of_year)
+        LOGGER.debug(f"Processing {threshold} for binning")
+        daily_values: xarray.DataArray = threshold.get_stats(day_of_year=day_of_year, **operational_metadata)
         daily_values = daily_values.where(daily_values[dimension_names] >= minimum_id, drop=True)
 
         if daily_values.size < variable_size:
-            LOGGER.info(f"The size of '{threshold}' is too small - reindexing to align ids")
+            LOGGER.warning(f"The size of '{threshold}' is too small - reindexing to align ids")
             try:
                 daily_values = daily_values.reindex(
                     **{
@@ -249,7 +255,7 @@ def calculate_anomaly(
         ]
     ]
 
-    LOGGER.info(f"Now binning {input_path.name}({variable_to_bin}) based off of: {thresholds}")
+    LOGGER.debug(f"Now binning {input_path.name}({variable_to_bin}) based off of: {thresholds}")
     anomaly_scores: numpy.ndarray = xarray.apply_ufunc(
         apply_thresholds,
         variable,
@@ -282,6 +288,8 @@ def calculate_anomaly(
     except:
         LOGGER.error(f"Could not save the dataset with the newly calculated anomaly data to '{output_path.absolute()}'")
         raise
+
+    return output_path
 
 
 def assign_anomaly(
