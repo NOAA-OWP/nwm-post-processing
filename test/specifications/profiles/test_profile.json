@@ -45,7 +45,7 @@
             "masks": [
                 "test/data/masks/short_range.channel_rt.conus/*"
             ],
-            "identifier_pattern": "^(?P<region>\\w+)",
+            "identifier_pattern": "^(?P<region>\\w+(\\.(?P<rfc>[MmAaLlCcNnPpWwOoSsHh][BbPpNnMmAaCcEeWwHhRrGg]([Rr][Ff][Cc]|[Vv][Ii])))?)",
             "output_pattern": "nwm.t{reference_time__date}{cycle}z.{Configuration}.{ModelOutputType}.{region}.nc",
             "each": [
                 {
