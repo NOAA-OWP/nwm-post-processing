@@ -419,6 +419,45 @@ class _Settings(UserDict):
             raise FileNotFoundError("Could not find a resources directory at '{path}'".format(path=path))
         
         return path
+
+    @property
+    def threshold_path(self) -> pathlib.Path:
+        """
+        The path to thresholds used for anomaly calculation
+        """
+        proposed_key: str = "{prefix}_threshold_path".format(prefix=self.prefix).lower()
+        key: str = self._find_key(key=proposed_key)
+
+        if key not in self.keys() or not self.__getitem__(key=key) or not isinstance(self.__getitem__(key=key), (pathlib.Path, str)):
+            path: pathlib.Path = self.resource_path / "thresholds"
+
+            self.__setitem__(key=key, item=path)
+
+        elif isinstance(self.__getitem__(key=key), str):
+            self.__setitem__(key=key, item=pathlib.Path(self.__getitem__(key=key)))
+        elif not isinstance(self.__getitem__(key=key), (str, pathlib.Path)):
+            raise TypeError(
+                "The '{key}' setting is invalid - it must be a path but was instead '{value}' (type={value_type})".format(
+                    key=key.upper(),
+                    value=self.__getitem__(key=key),
+                    value_type=type(self.__getitem__(key=key))
+                )
+            )
+
+        path = self.__getitem__(key=key)
+
+        if not isinstance(path, pathlib.Path):
+            raise TypeError(
+                "Could not retrieve the threshold path - its value is not a path: {path} (type={path_type})".format(
+                    path=path,
+                    path_type=type(path)
+                )
+            )
+
+        if not path.is_dir():
+            raise FileNotFoundError("Could not find a threshold directory at '{path}'".format(path=path))
+
+        return path
     
     @property
     def logging_config_path(self) -> pathlib.Path:
@@ -608,6 +647,30 @@ class _Settings(UserDict):
         value = int(value)
 
         self.__setitem__(key=key, item=value)
+
+    @property
+    def paths(self) -> typing.Dict[str, pathlib.Path]:
+        """
+        Get all paths pertinent to application settings
+        """
+        import inspect
+        paths: typing.Dict[str, pathlib.Path] = {}
+
+        properties: typing.List[typing.Tuple[str, property]] = inspect.getmembers(
+            self.__class__,
+            predicate=lambda member: isinstance(member, property)
+        )
+
+        for name, prop in properties:
+            if name == "paths":
+                continue
+
+            property_value: typing.Any = prop.fget(self)
+
+            if isinstance(property_value, pathlib.Path):
+                paths[name] = property_value
+
+        return paths
 
 
 settings = _Settings()

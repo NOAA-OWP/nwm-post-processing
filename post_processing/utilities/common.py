@@ -49,6 +49,7 @@ MEMBER_PATTERN_VARIABLE: str = "member"
 FRAME_PATTERN_VARIABLE: str = "frame"
 TMINUS_PATTERN_VARIABLE: str = "tminus"
 REGION_PATTERN_VARIABLE: str = "region"
+RFC_PATTERN_VARIABLE: str = "rfc"
 
 NWM_FILENAME_PATTERN: re.Pattern = re.compile(
     r"nwm\."

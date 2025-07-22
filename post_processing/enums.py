@@ -1,6 +1,7 @@
 """
 Enumerations used to describe data
 """
+import typing
 import enum
 
 
@@ -103,7 +104,7 @@ class Region(PostProcessingEnumeration):
 
 class RFC(enum.Enum):
     """
-    Enumerates the ways that River Forecast Centers may be declared with their 2 character abbreviation
+    Enumerates the ways that River Forecast Centers may be declared with their 2-character abbreviation
     """
     ABRFC = "AB"
     """Arkansas Red-Basin River Forecast Center"""
@@ -131,6 +132,29 @@ class RFC(enum.Enum):
     """Southeast River Forecast Center"""
     WGRFC = "WG"
     """West Gulf River Forecast Center"""
+
+    @classmethod
+    def from_string(cls, string: str, strict: bool = True) -> typing.Optional["RFC"]:
+        """
+        Try to match on a value given a case-insensitive string
+
+        :param string: The string to attempt to match on
+        :param strict: Raise an exception if a match is not found
+        :returns: A member of the enum if it is found
+        """
+        for member in cls:
+            if member.value.lower() == string.lower():
+                return member
+            elif member.name.lower() == string.lower():
+                return member
+
+        if strict:
+            raise KeyError(f"There is no {cls.__qualname__} with the name '{string}'")
+
+        return None
+
+    def __str__(self):
+        return self.value
 
 class Verbosity(enum.IntEnum):
     """
