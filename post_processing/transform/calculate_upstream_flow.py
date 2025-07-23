@@ -72,6 +72,8 @@ def calculate_upstream_flow(
     import pandas
     import numpy
     import geopandas
+    import tempfile
+    import shutil
 
     try:
         from post_processing.utilities.netcdf import load_netcdf
@@ -92,88 +94,92 @@ def calculate_upstream_flow(
     if encoding is None:
         encoding = {}
 
-    data_to_transform: xarray.Dataset = load_netcdf(input_path)
-    raw_data = data_to_transform[variable].values
+    with tempfile.TemporaryDirectory(dir=settings.intermediate_directory) as temporary_directory:
+        temporary_path: pathlib.Path = pathlib.Path(temporary_directory)
+        temporary_output_path: pathlib.Path = temporary_path / output_path.name
+        with load_netcdf(input_path) as data_to_transform:
+            raw_data = data_to_transform[variable].values
 
-    if routelink_format == RoutelinkFormat.GEOPACKAGE:
-        routelink = geopandas.read_file(routelink_path, driver="GPKG")
-        from_values = routelink[routelink_from_variable]
-        to_values = routelink[routelink_to_variable]
-    elif routelink_format == RoutelinkFormat.CSV:
-        routelink = pandas.read_csv(input_path)
-        from_values = routelink[routelink_from_variable]
-        to_values = routelink[routelink_to_variable]
-    elif routelink_format == RoutelinkFormat.NETCDF:
-        routelink = load_netcdf(routelink_path)
-        from_values = routelink[routelink_from_variable].values
-        to_values = routelink[routelink_to_variable].values
-    else:
-        raise ValueError(
-            f"Cannot load the routelink needed to calculate upstream flow - "
-            f"'{routelink_format}' is not a supported format"
-        )
+            if routelink_format == RoutelinkFormat.GEOPACKAGE:
+                routelink = geopandas.read_file(routelink_path, driver="GPKG")
+                from_values = routelink[routelink_from_variable]
+                to_values = routelink[routelink_to_variable]
+            elif routelink_format == RoutelinkFormat.CSV:
+                routelink = pandas.read_csv(input_path)
+                from_values = routelink[routelink_from_variable]
+                to_values = routelink[routelink_to_variable]
+            elif routelink_format == RoutelinkFormat.NETCDF:
+                routelink = load_netcdf(routelink_path)
+                from_values = routelink[routelink_from_variable].values
+                to_values = routelink[routelink_to_variable].values
+            else:
+                raise ValueError(
+                    f"Cannot load the routelink needed to calculate upstream flow - "
+                    f"'{routelink_format}' is not a supported format"
+                )
 
-    # TODO: This may lead to issues if the length of the arrays aren't the same - it's linking on array index,
-    #  not index value
+            # TODO: This may lead to issues if the length of the arrays aren't the same - it's linking on array index,
+            #  not index value
 
-    # Create a series containing the raw data, then group it by where the values lead
-    #   * Based on the routelink structure, a single feature may have multiple features pointing at it,
-    #       but will only ever point to, at most, one feature
-    series: pandas.Series = pandas.Series(raw_data)
-    upstream_values: pandas.Series = series.groupby(to_values).sum()
+            # Create a series containing the raw data, then group it by where the values lead
+            #   * Based on the routelink structure, a single feature may have multiple features pointing at it,
+            #       but will only ever point to, at most, one feature
+            series: pandas.Series = pandas.Series(raw_data)
+            upstream_values: pandas.Series = series.groupby(to_values).sum()
 
-    # Create a mapping of feature ids to their upstream flow values
-    #   * Provides an easier access pattern to the values based off of feature_id - going by Series isn't worth it
-    organized_values: typing.Dict[int, float] = upstream_values.to_dict()
+            # Create a mapping of feature ids to their upstream flow values
+            #   * Provides an easier access pattern to the values based off of feature_id - going by Series isn't worth it
+            organized_values: typing.Dict[int, float] = upstream_values.to_dict()
 
-    # Create a new array of values, in the order of the 'from' values matching the organized_values.
-    # The 'to' values won't be in the order of the 'from' values and there won't be matches for all 'from' values
-    #   * numpy.vectorize is used here for a large performance improvement based on the relatively simple operation
-    mapped_flow: numpy.ndarray = numpy.vectorize(organized_values.get)(from_values)
+            # Create a new array of values, in the order of the 'from' values matching the organized_values.
+            # The 'to' values won't be in the order of the 'from' values and there won't be matches for all 'from' values
+            #   * numpy.vectorize is used here for a large performance improvement based on the relatively simple operation
+            mapped_flow: numpy.ndarray = numpy.vectorize(organized_values.get)(from_values)
 
-    # Create the upstreamflow variable and add it to the dataset
-    upstreamflow_variable = xarray.Variable(
-        dims=data_to_transform[variable].dims,
-        data=mapped_flow,
-        attrs={**attributes, **data_to_transform[variable].attrs},
-        encoding={**encoding, **data_to_transform[variable].encoding}
-    )
-    data_to_transform[target_variable] = upstreamflow_variable
+            # Create the upstreamflow variable and add it to the dataset
+            upstreamflow_variable = xarray.Variable(
+                dims=data_to_transform[variable].dims,
+                data=mapped_flow,
+                attrs={**attributes, **data_to_transform[variable].attrs},
+                encoding={**encoding, **data_to_transform[variable].encoding}
+            )
 
-    # Make sure that there aren't any 'None' values from the above 'get' operation and instead hold
-    # the missing_value or '_FillValue' encoding value
-    fill_value: typing.Union[int, float] = upstreamflow_variable.encoding.get("missing_value")
+            # Make sure that there aren't any 'None' values from the above 'get' operation and instead hold
+            # the missing_value or '_FillValue' encoding value
+            fill_value: typing.Union[int, float] = upstreamflow_variable.encoding.get("missing_value")
 
-    if fill_value is None:
-        fill_value = upstreamflow_variable.encoding.get("_FillValue")
+            if fill_value is None:
+                fill_value = upstreamflow_variable.encoding.get("_FillValue")
 
-    if fill_value is None:
-        raise ValueError(
-            f"A fill value could not be found on '{input_path}::{variable}' - "
-            f"'{target_variable}' cannot be encoded and written to '{output_path}'"
-        )
+            if fill_value is None:
+                raise ValueError(
+                    f"A fill value could not be found on '{input_path}::{variable}' - "
+                    f"'{target_variable}' cannot be encoded and written to '{output_path}'"
+                )
 
-    # Add the 'add_offset' encoding value to the resulting value. This often ensures that the stored data is of the
-    # correct data type
-    add_offset: typing.Optional[float] = upstreamflow_variable.encoding.get('add_offset')
+            # Add the 'add_offset' encoding value to the resulting value. This often ensures that the stored data is of the
+            # correct data type
+            add_offset: typing.Optional[float] = upstreamflow_variable.encoding.get('add_offset')
 
-    if add_offset is None:
-        LOGGER.warning(
-            f"No 'add_offset' encoding was found on '{target_variable}' - it may not be encoded as the right type"
-        )
-    else:
-        fill_value += add_offset
+            if add_offset is None:
+                LOGGER.warning(
+                    f"No 'add_offset' encoding was found on '{target_variable}' - it may not be encoded as the right type"
+                )
+            else:
+                fill_value += add_offset
 
-    data_to_transform[target_variable] = upstreamflow_variable.fillna(fill_value)
+            upstreamflow_variable = upstreamflow_variable.fillna(fill_value)
+            data_to_transform[target_variable] = upstreamflow_variable
 
-    try:
-        save_netcdf(path=output_path, dataset=data_to_transform)
-        LOGGER.info(f"Saved the updated version of '{input_path}' to '{output_path}'")
-    except OSError:
-        LOGGER.error(
-            f"Could not write the modified version of '{input_path}' with the new '{target_variable}' variable to '{output_path}'"
-        )
-        raise
+            try:
+                save_netcdf(path=temporary_output_path, dataset=data_to_transform)
+            except OSError:
+                LOGGER.error(
+                    f"Could not write the modified version of '{input_path}' with the new '{target_variable}' variable to '{output_path}'"
+                )
+                raise
+        shutil.move(temporary_output_path, output_path)
+        LOGGER.debug(f"Saved the updated version of '{input_path}' to '{output_path}'")
 
     return output_path
 

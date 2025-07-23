@@ -15,7 +15,7 @@ from datetime import timedelta
 
 from html.parser import HTMLParser
 
-from post_processing.utilities import networking
+import requests
 
 from post_processing.configuration import settings
 from post_processing.enums import Configuration
@@ -94,6 +94,35 @@ _VALID_OUTPUT_TYPE: typing.List[str] = [
 ]
 """Model Output Types that may be downloaded - excludes types not used in post processing"""
 
+NUMERIC_PATTERN_PATTERN: re.Pattern = re.compile(r"^(?:(?:\\d|\[(?:\d-\d|\d+)]|\d)(?:\?|[*+]|\{\d+(?:,\d*)?})?)+$")
+"""
+A pattern that indicates that a given string indicates a regular expression for identifying a series of digits.
+
+Broken out, it translates to:
+ - from beginning to end,
+ - at least one:
+    - '\d' pattern or [#-#], like [0-9], or [###], like [1356] to isolate what specific digits to accept, or just a literal number
+    - followed by at most one of:
+        - *
+        - +
+        - ?
+        - {#}, like {3}, meaning 'match on exactly 3 of the previous'
+        - {#,}, like {5,}, meaning 'match on at least 5 of the previous'
+        - {#,#}, like {2,6}, meaning 'match on 2 to six of the previous'
+    
+Grouping is not supported - patterns like: '\d{4}0(4|[0-2][679])+' won't work
+
+Covers inputs like:
+    - '\d+'
+    - '\d'
+    - '\d\d+'
+    - '5'
+    - '6+'
+    - '[0-9]'
+    - '005?'
+    - '[13579]{2,}'
+"""
+
 
 class Arguments:
     """
@@ -114,12 +143,14 @@ class Arguments:
         """The location for the data to retrieve"""
         self.member: typing.Optional[int] = None
         """The ensemble member to download"""
-        self.destination: pathlib.Path = settings.resource_path
+        self.destination: pathlib.Path = settings.resource_path / "sample"
         """Where to store the downloaded data"""
         self.overwrite: bool = False
         """Whether to overwrite preexisting data"""
         self.log_level: typing.Literal['INFO', 'DEBUG', 'ERROR'] = 'INFO'
         """The level of messages that may be logged"""
+        self.frame: str = r"\d+"
+        """The pattern to use to indicate what frame or frames to retrieve ('\d+' for all or '00' for just 00)"""
 
         self.__parse(args=args)
         self.__validate()
@@ -157,6 +188,12 @@ class Arguments:
         
         if self.configuration in (Configuration.ExtendedAnalysisAssimilation, Configuration.ExtendedAnalysisAssimilationNoDA):
             raise ValueError(f"The downloading of {str(self.configuration).replace('_', ' ').title()} data is not yet supported")
+
+        if not NUMERIC_PATTERN_PATTERN.match(self.frame):
+            raise argparse.ArgumentTypeError(
+                f"The frame string '{self.frame}' is not valid - "
+                f"it MUST be a regex pattern that ONLY matches on numbers, like '\d' or '\d\d' or '0+' or '00'"
+            )
 
     def __parse(self, args: typing.Sequence[str]):
         """
@@ -233,8 +270,18 @@ class Arguments:
             "-l",
             "--log-level",
             type=str,
+            default=self.log_level,
             choices=["INFO", "ERROR", "DEBUG"],
             help="What level messages can be logged"
+        )
+
+        parser.add_argument(
+            "-F",
+            "--frame",
+            dest="frame",
+            type=str,
+            default=self.frame,
+            help="A pattern used to constrain what frames to include"
         )
 
         parameters: argparse.Namespace = parser.parse_args(args=args) if args else parser.parse_args()
@@ -285,7 +332,7 @@ def get_directory_links(url: str) -> typing.Dict[str, str]:
     :param url: The URL of the apache directory listing
     :returns: A mapping of file names to their address
     """
-    raw_markup: bytes = networking.get(url=url)
+    raw_markup: bytes = requests.get(url=url).content
     markup: str = raw_markup.decode()
 
     parser: ApacheDirectoryListingParser = ApacheDirectoryListingParser()
@@ -340,16 +387,18 @@ def download_file(
     :param overwrite: Whether to overwrite a preexisting file
     :returns: The path to the downloaded file
     """
+    directory.mkdir(parents=True, exist_ok=True)
     path: pathlib.Path = directory / filename
 
     if path.exists() and not overwrite:
         LOGGER.info(f"Not downloading '{filename}' - it is already present")
         return None
+
     if path.is_dir():
         raise ValueError(f"Cannot save '{filename}' to '{path}' - it is already a directory")
     
     LOGGER.info(f"Downloading '{filename}'")
-    raw_data: bytes = networking.get(url=url)
+    raw_data: bytes = requests.get(url=url).content
     path.write_bytes(data=raw_data)
     return path
 
@@ -364,6 +413,7 @@ def download_input(
     region: str,
     member: typing.Optional[int],
     destination: pathlib.Path,
+    frame_pattern: str = r"\d+",
     overwrite: bool = False
 ) -> typing.Sequence[pathlib.Path]:
     """
@@ -377,6 +427,8 @@ def download_input(
     :param region: Where the output was configured to model
     :param member: The ensemble member to download
     :param destination: Where to put the data
+    :param frame_pattern: A regex pattern to inject into the regex that matches on file name.
+        Must be some variation of '\d' or '000*'. This will match on terms like 'tm00' or 'f018'
     :param overwrite: Whether to overwrite preexisting data
 
     :returns: A list of the paths to the files that were downloaded
@@ -400,7 +452,7 @@ def download_input(
         model_output_type = f"{model_output_type}_{member}"
 
     desired_link_pattern: re.Pattern = re.compile(
-        rf"nwm\.t{cycle}z\.{configuration.value}\.{model_output_type}\.(:tm|f)\d+\.{region}\.nc"
+        rf"nwm\.t{cycle}z\.{configuration.value}\.{model_output_type}\.(?:tm|f){frame_pattern}\.{region}\.nc"
     )
 
     pertinent_links: typing.Dict[str, str] = {
@@ -447,7 +499,8 @@ def main() -> int:
             region=arguments.region,
             member=arguments.member,
             destination=arguments.destination,
-            overwrite=arguments.overwrite
+            overwrite=arguments.overwrite,
+            frame_pattern=arguments.frame,
         )
 
         if downloaded_files:

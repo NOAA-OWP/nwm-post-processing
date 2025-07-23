@@ -122,15 +122,16 @@ class OperationType(enum.StrEnum):
     """Print information about the current set of data to the logs"""
 
 
+@dataclasses.dataclass
 class InPlaceOperationMixin:
     """
     A mixin for data classes adding a field determining whether the files should be operated on in place or into a new file
     """
-    in_place: bool = False
+    in_place: bool = dataclasses.field(default=False, kw_only=True)
     """
     Dictates whether the changes made to the data should be applied in place or if the changes should go into a new file
     """
-    output_pattern: typing.Optional[str] = None
+    output_pattern: typing.Optional[str] = dataclasses.field(default=None, kw_only=True)
     """
     The file name pattern to use when not making a change in place
     """
@@ -622,6 +623,9 @@ Process identifier:  {process_identifier}
 Work directory:      {work_directory}
 Previous Operations: 
     - {(os.linesep + '    - ').join(list(map(str, previous_operations)))}
+Files:
+    - {(os.linesep + '    - ').join(list(map(str, data)))}
+
 """
             LOGGER.info(parameter_information)
 
@@ -770,8 +774,10 @@ class RenameOperation(NCOOperation, InPlaceOperationMixin):
         ]
 
         from post_processing.transform.rename import rename_variable
+        from post_processing.transform.rename import rename_dimension
+
         new_files: typing.Sequence[pathlib.Path] = starmap(
-            function=rename_variable,
+            function=rename_variable if self.rename_variable else rename_dimension,
             args=arguments
         )
 
@@ -781,6 +787,7 @@ class RenameOperation(NCOOperation, InPlaceOperationMixin):
         return hash((self.operation(), *[pair for pair in self.mapping.items()]))
 
     mapping: typing.Dict[str, str] = dataclasses.field()
+    rename_variable: bool = dataclasses.field(default=True)
 
 @dataclasses.dataclass(unsafe_hash=True)
 class AttributeOperation(NCOOperation, InPlaceOperationMixin):
@@ -982,6 +989,17 @@ class SaveOperation(NCOOperation):
 
             output_directory.mkdir(parents=True, exist_ok=True)
             path: pathlib.Path = output_directory / filename
+
+            if path in saved_files:
+                from pprint import pformat
+                raise FileExistsError(
+                    f"Attempted to save to '{path}', but it was already saved to within this operation. "
+                    f"It is likely that there is a naming error{os.linesep}"
+                    f"Template: {pathlib.Path(self.directory) / self.filename_pattern}{os.linesep}"
+                    f"Available Metadata:{os.linesep}"
+                    f"{pformat(file_specific_metadata, indent=4, sort_dicts=True)}"
+                )
+
             try:
                 shutil.copy(file, path)
             except:
@@ -989,10 +1007,27 @@ class SaveOperation(NCOOperation):
                 raise
             saved_files.append(path)
             LOGGER.debug(f"Wrote {file} to {path}")
-        return saved_files
+
+        missing_files: typing.List[pathlib.Path] = [
+            saved_path
+            for saved_path in saved_files
+            if not saved_path.exists()
+        ]
+        
+        if missing_files:
+            raise FileExistsError(
+                f"Save operation failed. The following files are missing:{os.linesep}"
+                f"    - {(os.linesep + '    - ').join(map(str, missing_files))}"
+            )
+
+        if self.return_new_paths:
+            return saved_files
+
+        return data
 
     directory: pathlib.Path = dataclasses.field()
     filename_pattern: str
+    return_new_paths: bool = dataclasses.field(default=True)
     identifier_pattern: typing.Optional[str] = dataclasses.field(default=None)
     _compiled_pattern: typing.Optional[re.Pattern] = member(default=None)
 
@@ -1091,12 +1126,12 @@ class BranchOperation(ProfileOperation[InputType, typing.Sequence[pathlib.Path]]
                 future_results[branch_name] = future_result
 
             def process_error(error: Exception) -> Exception:
-                new_error: Exception = RuntimeError(
+                from post_processing.utilities.common import condense_exceptions
+                new_error_message: str = (
                     f"Could not perform the branching operation named '{branch_name}' "
                     f"from the '{profile}' profile: {error}"
                 )
-                new_error.with_traceback(error.__traceback__)
-                return new_error
+                return condense_exceptions(new_error_message, [error])
 
             from post_processing.utilities.common import cycle_futures
 
@@ -1122,7 +1157,8 @@ class BranchOperation(ProfileOperation[InputType, typing.Sequence[pathlib.Path]]
             )
 
             if exceptions:
-                raise ExceptionGroup(
+                from post_processing.utilities.common import condense_exceptions
+                raise condense_exceptions(
                     f"One or more branches failed to process for {profile} on cycle {metadata['cycle']}z on "
                     f"{metadata['date']}",
                     exceptions
@@ -1920,14 +1956,22 @@ def call_operations(
     current_data: typing.Union[typing.Sequence[pathlib.Path], xarray.Dataset] = list(data)
 
     for operation in operations:
-        current_data = operation(
-            profile=profile,
-            process_identifier=process_identifier,
-            work_directory=work_directory,
-            data=current_data,
-            previous_operations=previous_operations,
-            metadata=metadata
-        )
+        try:
+            current_data = operation(
+                profile=profile,
+                process_identifier=process_identifier,
+                work_directory=work_directory,
+                data=current_data,
+                previous_operations=previous_operations,
+                metadata=metadata
+            )
+        except:
+            message: str = (
+                f"Failed to perform operations after:{os.linesep}"
+                f"    - {(os.linesep + '    - ').join([str(op) for op in [*previous_operations, operation]])}"
+            )
+            LOGGER.error(message)
+            raise
 
         previous_operations.append(operation)
 
