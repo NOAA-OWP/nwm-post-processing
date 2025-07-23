@@ -65,72 +65,86 @@ def subset_file_into_file_by_mask(
     if this_is_verbose:
         LOGGER.debug(f"Loading the '{input_file}' and '{mask}'")
 
-    input_data: xarray.Dataset = netcdf.load_netcdf(path=input_file)
+    import tempfile
+    import shutil
 
-    if this_is_verbose:
-        LOGGER.debug(f"Loaded '{input_file}' to be masked by '{mask}'")
+    with tempfile.TemporaryDirectory(dir=settings.intermediate_directory) as temporary_directory:
+        temporary_path: pathlib.Path = pathlib.Path(temporary_directory)
+        temporary_output_path: pathlib.Path = temporary_path / output_path.name
 
-    mask_data: xarray.Dataset = netcdf.load_netcdf(path=mask)
+        with netcdf.load_netcdf(path=input_file) as input_data:
+            if this_is_verbose:
+                LOGGER.debug(f"Loaded '{input_file}' to be masked by '{mask}'")
 
-    if this_is_verbose:
-        LOGGER.debug(f"Loaded the mask at '{mask}'")
+            mask_data: xarray.Dataset = netcdf.load_netcdf(path=mask)
 
-    if this_is_verbose:
-        LOGGER.debug(f"Loading '{mask_coordinate}' values from the mask ({mask})")
+            if this_is_verbose:
+                LOGGER.debug(f"Loaded the mask at '{mask}'")
 
-    allowable_ids: numpy.ndarray = mask_data[mask_coordinate].values
+            if this_is_verbose:
+                LOGGER.debug(f"Loading '{mask_coordinate}' values from the mask ({mask})")
 
-    if this_is_verbose:
-        LOGGER.debug(f"Loading '{coordinate}' values from the input ({input_file})")
+            allowable_ids: numpy.ndarray = mask_data[mask_coordinate].values
 
-    available_ids: numpy.ndarray = input_data[coordinate].values
+            if this_is_verbose:
+                LOGGER.debug(f"Loading '{coordinate}' values from the input ({input_file})")
 
-    if this_is_verbose:
-        LOGGER.debug("Finding missing ids")
+            available_ids: numpy.ndarray = input_data[coordinate].values
 
-    missing_ids: numpy.ndarray = numpy.setdiff1d(allowable_ids, available_ids)
+            if this_is_verbose:
+                LOGGER.debug("Finding missing ids")
 
-    if len(missing_ids) > 0:
-        missing_id_line_joiner: str = f"{os.linesep}[{coordinate} missing from '{input_file.name}']    "
-        LOGGER.warning(
-            f"There are {len(missing_ids)} missing '{coordinate}' values within {input_file}({coordinate}) "
-            f"from the mask at {mask}. An evaluation of the mask might be required as requested data will not "
-            f"be in the output. Missing IDs:"
-            f"{missing_id_line_joiner}{missing_id_line_joiner.join(map(str, missing_ids))}"
-        )
-        allowable_ids = allowable_ids[numpy.isin(allowable_ids, input_data[coordinate].values)]
-    elif this_is_very_verbose:
-        LOGGER.debug("All mask IDs are available")
+            missing_ids: numpy.ndarray = numpy.setdiff1d(allowable_ids, available_ids)
 
-    try:
+            if len(missing_ids) > 0:
+                missing_id_line_joiner: str = f"{os.linesep}[{coordinate} missing from '{input_file.name}']    "
+                LOGGER.warning(
+                    f"There are {len(missing_ids)} missing '{coordinate}' values within {input_file}({coordinate}) "
+                    f"from the mask at {mask}. An evaluation of the mask might be required as requested data will not "
+                    f"be in the output. Missing IDs:"
+                    f"{missing_id_line_joiner}{missing_id_line_joiner.join(map(str, missing_ids))}"
+                )
+                allowable_ids = allowable_ids[numpy.isin(allowable_ids, input_data[coordinate].values)]
+            elif this_is_very_verbose:
+                LOGGER.debug("All mask IDs are available")
+
+            try:
+                if this_is_verbose:
+                    LOGGER.debug(f"Extracting data from '{input_file}' that matches the allowable ids")
+                if coordinate in input_data.indexes:
+                    subset_data: xarray.Dataset = input_data.sel(**{coordinate: allowable_ids})
+                else:
+                    LOGGER.error(f"'{coordinate}' is not an index in '{input_file.name}' - this might result in a slowdown.")
+                    subset_data: xarray.Dataset = input_data.where(input_data[coordinate].compute().isin(allowable_ids), drop=True)
+            except Exception as e:
+                if "not all values found in index" in str(e):
+                    expected_ids: typing.Set = set(allowable_ids)
+                    available_ids: typing.Set = set(input_data[coordinate].values)
+                    missing_ids: typing.Set = expected_ids - available_ids
+                    LOGGER.error(
+                        f"Cannot subset the input data - missing the following IDs:{os.linesep}"
+                        f"    - {(os.linesep + '    - ').join(list(map(str, missing_ids)))}"
+                    )
+                raise
+
+            if len(subset_data[coordinate].values) == 0:
+                raise Exception(
+                    f"The mask at '{mask}' is invalid for the data at '{input_file}' - "
+                    f"none of the IDs within '{coordinate}' are available"
+                )
+
+            if this_is_verbose:
+                LOGGER.debug(f"Saving extracted data that matches '{mask}' to '{output_path}'")
+
+            successfully_saved: bool = netcdf.save_netcdf(path=temporary_output_path, dataset=subset_data)
+
+            if not successfully_saved:
+                raise Exception(
+                    f"Something kept masked data from being saved to '{temporary_output_path}' without a suitable error"
+                )
+        shutil.move(temporary_output_path, output_path)
+
         if this_is_verbose:
-            LOGGER.debug(f"Extracting data from '{input_file}' that matches the allowable ids")
-        subset_data: xarray.Dataset = input_data.sel(**{coordinate: allowable_ids})
-    except Exception as e:
-        if "not all values found in index" in str(e):
-            expected_ids: typing.Set = set(allowable_ids)
-            available_ids: typing.Set = set(input_data[coordinate].values)
-            missing_ids: typing.Set = expected_ids - available_ids
-            LOGGER.error(
-                f"Cannot subset the input data - missing the following IDs:{os.linesep}"
-                f"    - {(os.linesep + '    - ').join(list(map(str, missing_ids)))}"
-            )
-        raise
-
-    if len(subset_data[coordinate].values) == 0:
-        raise Exception(
-            f"The mask at '{mask}' is invalid for the data at '{input_file}' - "
-            f"none of the IDs within '{coordinate}' are available"
-        )
-
-    if this_is_verbose:
-        LOGGER.debug(f"Saving extracted data that matches '{mask}' to '{output_path}'")
-
-    successfully_saved: bool = netcdf.save_netcdf(path=output_path, dataset=subset_data)
-
-    if successfully_saved and this_is_verbose:
-        LOGGER.debug(f"Masked data saved to '{output_path}'")
-    elif not successfully_saved:
-        raise Exception(f"Something kept masked data from being saved to '{output_path}' without a suitable error")
+            LOGGER.debug(f"Masked data saved to '{output_path}'")
 
     return output_path

@@ -2,6 +2,7 @@
 Common functions
 """
 import logging
+import os
 import typing
 import pathlib
 import re
@@ -255,7 +256,7 @@ def starmap_threaded(
 
         if exceptions:
             raise condense_exceptions(
-                f"Could not perform {function.__name__} across {len(args)} set of arguments",
+                f"Could not perform {function.__name__} across {len(args)} sets of arguments",
                 exceptions
             )
 
@@ -798,12 +799,18 @@ def condense_exceptions(
     message: str,
     exceptions: typing.Iterable[Exception],
     *additional_exceptions: Exception
-) -> ExceptionGroup:
+) -> typing.Union[Exception, ExceptionGroup]:
     """
     Condenses multiple exceptions into a single exception group containing unique errors or just a single error if it becomes one
     """
     import traceback
     all_exceptions: typing.List[Exception] = [*exceptions, *additional_exceptions]
+
+    if len(all_exceptions) == 0:
+        exception: Exception = all_exceptions[0]
+        exception.args = (f"{message}: {exception.args[0]}", *exception.args[1:])
+        return exception
+
     exception_hashes: typing.Dict[int, Exception] = {}
 
     for exception in all_exceptions:
@@ -815,6 +822,11 @@ def condense_exceptions(
         exception_hash: int = hash(stack_hashes)
 
         exception_hashes[exception_hash] = exception
+
+    if len(exception_hashes) == 1:
+        hash_value, exception = exception_hashes.popitem()
+        exception.args = (f"{message}: {exception.args[0]}", *exception.args[1:])
+        return exception
 
     unique_exceptions: typing.List[Exception] = list(exception_hashes.values())
     return ExceptionGroup(message, unique_exceptions)

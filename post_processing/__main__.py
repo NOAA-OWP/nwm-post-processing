@@ -140,7 +140,8 @@ def main() -> int:
         else:
             LOGGER.warning(f"No profiles were found for '{manifest}'. Nothing will be processed")
     except BaseException as exception:
-        LOGGER.critical(f"{__file__} failed: {exception}", exc_info=exception)
+        from post_processing.utilities.common import log_all_exceptions
+        log_all_exceptions(logger=LOGGER, group=exception, log_function=LOGGER.critical)
         return 1
     return 0
 

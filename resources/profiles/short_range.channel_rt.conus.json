@@ -81,22 +81,6 @@
             "file_name_pattern": "nwm.t{reference_time__date}{cycle}z.{ModelOutputType}.{Configuration}.{Region}.nc"
         },
         {
-            "operation": "echo",
-            "message": "Merged data, now renaming variables and dimensions",
-            "level": "INFO"
-        },
-        {
-            "operation": "rename",
-            "mapping": {
-                "feature_id": "station_id"
-            }
-        },
-        {
-            "operation": "echo",
-            "message": "renamed 'feature_id' to 'station_id', now splitting locations based on RFC",
-            "level": "INFO"
-        },
-        {
             "operation": "branch",
             "branches": {
                 "WMS": [
@@ -115,6 +99,23 @@
                     }
                 ],
                 "RFC": [
+                    {
+                        "operation": "echo",
+                        "message": "Renaminging 'feature_id' to 'station_id'"
+                    },
+                    {
+                        "operation": "rename",
+                        "mapping": {
+                            "feature_id": "station"
+                        }
+                    },
+                    {
+                        "operation": "rename",
+                        "rename_variable": false,
+                        "mapping": {
+                            "feature_id": "station_id"
+                        }
+                    },
                     {
                         "operation": "echo",
                         "message": "Dropping streamflow_anomaly. Operations need to be rearranged to allow anomaly to only be calculated on the WMS branch"
