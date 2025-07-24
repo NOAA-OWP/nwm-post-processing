@@ -200,6 +200,56 @@ class ProfileOperation(BaseModel, OperationHandler[InputType, OutputType], abc.A
     """
     comment: typing.Optional[str] = dataclasses.field(default=None, kw_only=True)
     """A comment from the writer explaining what this operation does"""
+    operation_id: typing.Optional[str] = member(default=None, kw_only=True)
+    """A specialized identifier for this operation"""
+
+    def assign_id(self, parent_id: str):
+        if parent_id == "":
+            self.operation_id = "1"
+        elif parent_id.isdigit():
+            parent_id: int = int(float(parent_id))
+            self.operation_id = f"{parent_id + 1}"
+        elif parent_id.endswith("."):
+            self.operation_id = f"{parent_id}1"
+        elif '.' in parent_id:
+            split_ids: typing.List[str] = parent_id.split(".")
+            final_id: int = int(float(split_ids[-1]))
+            split_ids[-1] = str(final_id + 1)
+            self.operation_id = ".".join(split_ids)
+
+        sub_index: int = 0
+        for attribute_name, attribute in self.__dict__.items():
+            if not isinstance(attribute, typing.Iterable):
+                continue
+
+            values_are_operations: bool = isinstance(attribute, typing.Mapping) and all(
+                isinstance(entry, ProfileOperation) for entry in attribute.values()
+            )
+            values_are_lists_of_operations: bool = isinstance(attribute, typing.Mapping) and all(
+                isinstance(entry, typing.Sequence) and all(
+                    isinstance(inner_entry, ProfileOperation)
+                    for inner_entry in entry
+                )
+                for entry in attribute.values()
+            )
+            if values_are_lists_of_operations:
+                for collection in attribute.values():
+                    sub_index += 1
+                    operation_id = f"{self.operation_id}.{sub_index}"
+                    sub_sub_index: int = 0
+                    for entry in collection:
+                        entry.assign_id(parent_id=f"{operation_id}.{sub_sub_index}")
+                        sub_sub_index += 1
+
+            elif values_are_operations:
+                for entry in attribute.values():
+                    entry.assign_id(parent_id=f"{self.operation_id}.{sub_index}")
+                    sub_index += 1
+
+            if all(isinstance(entry, OperationHandler) for entry in attribute):
+                for entry in attribute:
+                    entry.assign_id(parent_id=f"{self.operation_id}.{sub_index}")
+                    sub_index += 1
 
     @classmethod
     @abc.abstractmethod
@@ -207,7 +257,7 @@ class ProfileOperation(BaseModel, OperationHandler[InputType, OutputType], abc.A
         """Get the type of operation the ProfileOperation fulfills"""
 
     def __str__(self):
-        return self.operation().replace('_', ' ').title()
+        return f"{self.operation_id + ': ' if self.operation_id else ''}{self.operation().replace('_', ' ').title()}"
 
     def __hash__(self):
         values_to_hash: typing.Tuple[str, ...] = (self.__class__.__name__, to_json(self))
@@ -233,6 +283,9 @@ class ProfileOperation(BaseModel, OperationHandler[InputType, OutputType], abc.A
         for attribute_name, attribute in self.__dict__.items():
             if not isinstance(attribute, typing.Iterable):
                 continue
+            if isinstance(attribute, typing.Mapping) and all(isinstance(entry, OperationHandler) for entry in attribute):
+                for entry in attribute.values():
+                    entry.visit(operator=operator, condition=condition)
             if all(isinstance(entry, OperationHandler) for entry in attribute):
                 for entry in attribute:
                     entry.visit(operator=operator, condition=condition)
@@ -301,7 +354,11 @@ class EchoOperation(ProfileOperation[InputType, InputType]):
             self.level = logging.getLevelName(self.level.upper())
 
     def __str__(self):
-        return f"{logging.getLevelName(self.level) if isinstance(self.level, int) else self.level}: {self.message}"
+        return (
+            f"{self.operation_id + ': ' if self.operation_id else ''}"
+            f"Print \"{logging.getLevelName(self.level) if isinstance(self.level, int) else self.level} => "
+            f"{self.message}\""
+        )
 
     message: str
     level: typing.Union[int, str] = dataclasses.field(default=logging.INFO)
@@ -391,64 +448,69 @@ class ExtractOperation(NCOOperation):
         :param metadata: Metadata provided from previous operations that may be used as helpful hints
         :returns: The given paths
         """
-        frame_pattern: re.Pattern = re.compile(r"(?<=\.)(tm|f)\d+(?=\.)")
-        def get_frame_identifier(filename: str) -> str:
-            match: typing.Optional[re.Match] = frame_pattern.search(filename)
-            if match:
-                return match.group(0)
-            return ""
+        try:
+            frame_pattern: re.Pattern = re.compile(r"(?<=\.)(tm|f)\d+(?=\.)")
+            def get_frame_identifier(filename: str) -> str:
+                match: typing.Optional[re.Match] = frame_pattern.search(filename)
+                if match:
+                    return match.group(0)
+                return ""
 
-        from post_processing.enums import RFC
-        subset_arguments: typing.List[typing.Dict[str, typing.Any]] = [
-            {
-                "input_file": input_file,
-                "mask": mask,
-                "coordinate": self.dimension,
-                "work_directory": work_directory,
-                "mask_coordinate": self.mask_coordinate,
-                "identifiers": {
-                    **metadata,
-                    "mask_name": mask.stem,
-                    "input_name": input_file.stem,
-                    "frame": get_frame_identifier(input_file.name),
-                    "RFC": RFC.from_string(mask.stem, strict=False),
-                    **identifiers
-                },
-                "output_pattern": self.output_pattern,
-            }
-            for input_file, (mask, identifiers) in itertools.product(data, self._identifier_mapping.items())
-        ]
-
-        from post_processing.transform import subset_file_into_file_by_mask
-        subset_paths: typing.Sequence[pathlib.Path] = starmap(
-            function=subset_file_into_file_by_mask,
-            args=subset_arguments,
-            thread_count=settings.maximum_additional_threads
-        )
-
-        arguments_for_each: typing.List[typing.Dict[str, typing.Any]] = [
-            {
-                "operations": self.each,
-                "profile": profile,
-                "process_identifier": process_identifier,
-                "work_directory": work_directory,
-                "data": [subset_path],
-                "previous_operations": list(previous_operations),
-                "metadata": {
-                    **metadata,
-                    "file_name": subset_path.stem,
-                    "frame": get_frame_identifier(subset_path.name),
-                    "RFC": RFC.from_string(subset_path.stem, strict=False)
+            from post_processing.enums import RFC
+            subset_arguments: typing.List[typing.Dict[str, typing.Any]] = [
+                {
+                    "input_file": input_file,
+                    "mask": mask,
+                    "coordinate": self.dimension,
+                    "work_directory": work_directory,
+                    "mask_coordinate": self.mask_coordinate,
+                    "identifiers": {
+                        **metadata,
+                        "mask_name": mask.stem,
+                        "input_name": input_file.stem,
+                        "frame": get_frame_identifier(input_file.name),
+                        "RFC": RFC.from_string(mask.stem, strict=False),
+                        **identifiers
+                    },
+                    "output_pattern": self.output_pattern,
                 }
-            }
-            for subset_path in subset_paths
-        ]
+                for input_file, (mask, identifiers) in itertools.product(data, self._identifier_mapping.items())
+            ]
 
-        results: typing.Sequence[typing.Sequence[typing.Union[pathlib.Path]]] = starmap(
-            function=call_operations,
-            args=arguments_for_each,
-            thread_count=settings.maximum_additional_threads
-        )
+            from post_processing.transform import subset_file_into_file_by_mask
+            subset_paths: typing.Sequence[pathlib.Path] = starmap(
+                function=subset_file_into_file_by_mask,
+                args=subset_arguments,
+                thread_count=settings.maximum_additional_threads
+            )
+
+            arguments_for_each: typing.List[typing.Dict[str, typing.Any]] = [
+                {
+                    "operations": self.each,
+                    "profile": profile,
+                    "process_identifier": process_identifier,
+                    "work_directory": work_directory,
+                    "data": [subset_path],
+                    "previous_operations": list(previous_operations),
+                    "metadata": {
+                        **metadata,
+                        "file_name": subset_path.stem,
+                        "frame": get_frame_identifier(subset_path.name),
+                        "RFC": RFC.from_string(subset_path.stem, strict=False)
+                    }
+                }
+                for subset_path in subset_paths
+            ]
+
+            results: typing.Sequence[typing.Sequence[typing.Union[pathlib.Path]]] = starmap(
+                function=call_operations,
+                args=arguments_for_each,
+                thread_count=settings.maximum_additional_threads
+            )
+        except Exception as exception:
+            if 'failure in' not in str(exception).lower():
+                exception.args = (f"Failure in:{os.linesep}{self}{os.linesep}{exception.args[0]}", *exception.args[1:])
+            raise exception
 
         return [path for inner_results in results for path in inner_results]
 
@@ -524,8 +586,11 @@ class ExtractOperation(NCOOperation):
 
     def __str__(self):
         return (
-            f"Extract data by location based on the {self.dimension} variable in the input and the "
-            f"{self.mask_coordinate} within: {', '.join(map(lambda file: file.name, self.masks))}"
+            f"{self.operation_id + ': ' if self.operation_id else ''}"
+            f"Extract data by location based on the '{self.dimension}' dimension in the input and the "
+            f"'{self.mask_coordinate}' dimension within:{os.linesep}"
+            f"    - {(os.linesep + '    - ').join(map(str, self.masks))}{os.linesep}"
+            f"And save the results to files named like: {self.output_pattern}"
         )
 
     masks: typing.List[pathlib.Path] = dataclasses.field()
@@ -546,6 +611,10 @@ class MergeOperation(NCOOperation):
     @classmethod
     def operation(cls) -> OperationType:
         return OperationType.MERGE
+
+    def __str__(self):
+        prefix: str = f"{self.operation_id}: " if self.operation_id else ""
+        return f"{prefix}Merge all input files together"
 
     def __call__(
         self,
@@ -568,13 +637,18 @@ class MergeOperation(NCOOperation):
         """
         from post_processing.utilities.netcdf import load_metadata
 
-        operation_metadata: typing.Dict[str, typing.Any] = load_metadata(path=data)
-        operation_metadata.update(metadata)
-        filename: str = self.file_name_pattern.format_map(operation_metadata)
-        output_path: pathlib.Path = work_directory / filename
+        try:
+            operation_metadata: typing.Dict[str, typing.Any] = load_metadata(path=data)
+            operation_metadata.update(metadata)
+            filename: str = self.file_name_pattern.format_map(operation_metadata)
+            output_path: pathlib.Path = work_directory / filename
 
-        from post_processing.transform import merge_files_into_file
-        merge_files_into_file(files=data, output_file=output_path)
+            from post_processing.transform import merge_files_into_file
+            merge_files_into_file(files=data, output_file=output_path)
+        except Exception as e:
+            if 'failure in' not in str(e).lower():
+                e.args = (f"Failure in:{os.linesep}{self}{os.linesep}{e.args[0]}", *e.args[1:])
+            raise e
         return [output_path]
 
     file_name_pattern: str = dataclasses.field()
@@ -590,15 +664,16 @@ class Peek(NCOOperation):
     show_metadata: bool = dataclasses.field(default=True)
 
     def __str__(self):
+        prefix: str = f"{self.operation_id}: " if self.operation_id else ""
         if self.show_state and self.show_summary and self.show_metadata:
-            return "Log a summary, the current state of all processed data, and all available metadata"
+            return f"{prefix}Log a summary, the current state of all processed data, and all available metadata"
         elif self.show_state and self.show_summary:
-            return "Log a summary and the current state of all processed data"
+            return f"{prefix}Log a summary and the current state of all processed data"
         elif self.show_state and self.show_metadata:
-            return "Log the current state of all processed data and all available metadata"
+            return f"{prefix}Log the current state of all processed data and all available metadata"
         elif self.show_summary and self.show_metadata:
-            return "Log a summary and all available metadata"
-        return "Log all available metadata"
+            return f"{prefix}Log a summary and all available metadata"
+        return f"{prefix}Log all available metadata"
 
     @classmethod
     def operation(cls) -> OperationType:
@@ -662,11 +737,11 @@ class DropOperation(NCOOperation, InPlaceOperationMixin):
         ))
 
     def __str__(self):
+        prefix: str = f"{self.operation_id}: " if self.operation_id else ""
         if self.exclude:
-            return f"Drop all data variables except {', '.join(self.fields)}"
+            return f"{prefix}Drop all data variables except {', '.join(self.fields)}"
         return (
-            f"{self.operation().replace('_', ' ').title()}: "
-            f"Drop the following data variables: {', '.join(self.fields)}"
+            f"{prefix}Drop the following data variables: {', '.join(self.fields)}"
         )
 
     def __call__(
@@ -713,10 +788,15 @@ class DropOperation(NCOOperation, InPlaceOperationMixin):
             for input_path, output_path in input_output_mapping.items()
         ]
 
-        starmap(
-            function=drop_function,
-            args=arguments
-        )
+        try:
+            starmap(
+                function=drop_function,
+                args=arguments
+            )
+        except Exception as exception:
+            if "failure in" not in str(exception):
+                exception.args = (f"Failure in:{os.linesep}{self}{os.linesep}{exception.args[0]}", *exception.args[1:])
+            raise exception
 
         return list(input_output_mapping.values())
 
@@ -733,12 +813,13 @@ class RenameOperation(NCOOperation, InPlaceOperationMixin):
         return OperationType.RENAME
 
     def __str__(self):
+        prefix: str = f"{self.operation_id}: " if self.operation_id else ''
         rename_mapping: typing.Sequence[str] = [
-            f"{key} to {value}"
+            f"the {'variable' if self.rename_variable else 'dimension'} '{key}' to '{value}'"
             for key, value in self.mapping.items()
         ]
 
-        return f"{self.operation().replace('_', ' ').title()}: Renaming {', '.join(rename_mapping)}"
+        return f"{prefix}Rename {', '.join(rename_mapping)}"
 
     def __call__(
         self,
@@ -776,10 +857,15 @@ class RenameOperation(NCOOperation, InPlaceOperationMixin):
         from post_processing.transform.rename import rename_variable
         from post_processing.transform.rename import rename_dimension
 
-        new_files: typing.Sequence[pathlib.Path] = starmap(
-            function=rename_variable if self.rename_variable else rename_dimension,
-            args=arguments
-        )
+        try:
+            new_files: typing.Sequence[pathlib.Path] = starmap(
+                function=rename_variable if self.rename_variable else rename_dimension,
+                args=arguments
+            )
+        except Exception as exception:
+            if 'failure in' not in str(exception):
+                exception.args = (f"Failure in:{os.linesep}{self}{os.linesep}{exception.args[0]}", *exception.args[1:])
+            raise exception
 
         return new_files
 
@@ -799,6 +885,7 @@ class AttributeOperation(NCOOperation, InPlaceOperationMixin):
         return OperationType.ATTRIBUTE
 
     def __str__(self):
+        prefix: str = f"{self.operation_id}: " if self.operation_id else ''
         description = (
             f"{self.operation().replace('_', ' ').title()}: "
             f"{self.mode.replace('_', ' ').title()} the {self.attribute_name} attribute value"
@@ -810,7 +897,7 @@ class AttributeOperation(NCOOperation, InPlaceOperationMixin):
             description += f" on {self.field} "
 
         description += f" to be {self.attribute_value} (type={self.attribute_type})"
-        return description
+        return f"{prefix}{description}"
 
 
     def __call__(
@@ -850,11 +937,16 @@ class AttributeOperation(NCOOperation, InPlaceOperationMixin):
             for file in data
         ]
 
-        new_paths: typing.Sequence[pathlib.Path] = starmap(
-            function=nco.add_or_modify_attribute,
-            args=arguments,
-            thread_count=True
-        )
+        try:
+            new_paths: typing.Sequence[pathlib.Path] = starmap(
+                function=nco.add_or_modify_attribute,
+                args=arguments,
+                thread_count=True
+            )
+        except Exception as exception:
+            if 'failure in' not in str(exception):
+                exception.args = (f"Failure in:{os.linesep}{self}{os.linesep}{exception.args[0]}", *exception.args[1:])
+            raise exception
 
         return new_paths
 
@@ -888,8 +980,9 @@ class SaveOperation(NCOOperation):
         return OperationType.SAVE
 
     def __str__(self):
+        prefix: str = f"{self.operation_id}: " if self.operation_id else ''
         return (
-            f"{self.operation().replace('_', ' ').title()}: Save files to {self.directory} with the "
+            f"{prefix}Save files to {self.directory} with the "
             f"following file name pattern: {self.filename_pattern}"
         )
 
@@ -929,84 +1022,89 @@ class SaveOperation(NCOOperation):
         from post_processing.utilities.common import NWM_FILENAME_PATTERN
 
         saved_files: typing.List[pathlib.Path] = []
-        for file in data:
-            file_specific_metadata: typing.Dict[str, typing.Any] = {}
-            file_name_match: typing.Optional[re.Match] = NWM_FILENAME_PATTERN.search(file.name)
+        try:
+            for file in data:
+                file_specific_metadata: typing.Dict[str, typing.Any] = {}
+                file_name_match: typing.Optional[re.Match] = NWM_FILENAME_PATTERN.search(file.name)
 
-            if file_name_match:
-                file_specific_metadata.update(file_name_match.groupdict())
+                if file_name_match:
+                    file_specific_metadata.update(file_name_match.groupdict())
 
-            file_specific_metadata.update({
-                **load_metadata(path=file),
-                **metadata,
-                "file_name": file.name,
-                "file_stem": file.stem
-            })
+                file_specific_metadata.update({
+                    **load_metadata(path=file),
+                    **metadata,
+                    "file_name": file.name,
+                    "file_stem": file.stem
+                })
 
-            if settings.verbosity >= Verbosity.ALL:
-                LOGGER.debug(
-                    f"{os.linesep}"
-                    f"Available Metadata:{os.linesep}"
-                    f"    - {(os.linesep + '    - ').join([str(key) + ': ' + str(value) for key, value in metadata.items()])}"
-                    f"{os.linesep}"
-                )
-
-            if self._compiled_pattern:
-                matching_identifiers: typing.Optional[re.Match] = self._compiled_pattern.search(file.name)
-
-                if matching_identifiers:
-                    file_specific_metadata.update(matching_identifiers.groupdict())
-                else:
-                    LOGGER.warning(
-                        f"No identifiers were found in '{file.name}' with the pattern: '{self.identifier_pattern}'"
+                if settings.verbosity >= Verbosity.ALL:
+                    LOGGER.debug(
+                        f"{os.linesep}"
+                        f"Available Metadata:{os.linesep}"
+                        f"    - {(os.linesep + '    - ').join([str(key) + ': ' + str(value) for key, value in metadata.items()])}"
+                        f"{os.linesep}"
                     )
 
-            if 'rfc' in file_specific_metadata and not file_specific_metadata.get("RFC", None):
-                from post_processing.enums import RFC
-                rfc_abbreviation: typing.Optional[RFC] = RFC.from_string(file_specific_metadata['rfc'], strict=False)
-                if rfc_abbreviation:
-                    file_specific_metadata["RFC"] = rfc_abbreviation
+                if self._compiled_pattern:
+                    matching_identifiers: typing.Optional[re.Match] = self._compiled_pattern.search(file.name)
 
-            try:
-                filename: str = self.filename_pattern.format(**file_specific_metadata)
-            except KeyError as e:
-                from post_processing.utilities.common import to_json
-                LOGGER.error(
-                    f"Could not generate a new file name used to save: {e}{os.linesep}"
-                    f"Output Pattern: '{self.filename_pattern}'{os.linesep}"
-                    f"Available Options: {to_json(file_specific_metadata)}"
-                )
-                raise
+                    if matching_identifiers:
+                        file_specific_metadata.update(matching_identifiers.groupdict())
+                    else:
+                        LOGGER.warning(
+                            f"No identifiers were found in '{file.name}' with the pattern: '{self.identifier_pattern}'"
+                        )
 
-            try:
-                output_directory: pathlib.Path = pathlib.Path(str(self.directory).format(**file_specific_metadata))
-            except KeyError as e:
-                LOGGER.error(
-                    f"Key for file path template ('{str(self.directory)}') not found. Available variables:{os.linesep}"
-                    f"    - {(os.linesep + '    - ').join(list(map(lambda pair: str(pair[0]) + ': ' + str(pair[1]), file_specific_metadata.items())))}"
-                )
-                raise
+                if 'rfc' in file_specific_metadata and not file_specific_metadata.get("RFC", None):
+                    from post_processing.enums import RFC
+                    rfc_abbreviation: typing.Optional[RFC] = RFC.from_string(file_specific_metadata['rfc'], strict=False)
+                    if rfc_abbreviation:
+                        file_specific_metadata["RFC"] = rfc_abbreviation
 
-            output_directory.mkdir(parents=True, exist_ok=True)
-            path: pathlib.Path = output_directory / filename
+                try:
+                    filename: str = self.filename_pattern.format(**file_specific_metadata)
+                except KeyError as e:
+                    from post_processing.utilities.common import to_json
+                    LOGGER.error(
+                        f"Could not generate a new file name used to save: {e}{os.linesep}"
+                        f"Output Pattern: '{self.filename_pattern}'{os.linesep}"
+                        f"Available Options: {to_json(file_specific_metadata)}"
+                    )
+                    raise
 
-            if path in saved_files:
-                from pprint import pformat
-                raise FileExistsError(
-                    f"Attempted to save to '{path}', but it was already saved to within this operation. "
-                    f"It is likely that there is a naming error{os.linesep}"
-                    f"Template: {pathlib.Path(self.directory) / self.filename_pattern}{os.linesep}"
-                    f"Available Metadata:{os.linesep}"
-                    f"{pformat(file_specific_metadata, indent=4, sort_dicts=True)}"
-                )
+                try:
+                    output_directory: pathlib.Path = pathlib.Path(str(self.directory).format(**file_specific_metadata))
+                except KeyError as e:
+                    LOGGER.error(
+                        f"Key for file path template ('{str(self.directory)}') not found. Available variables:{os.linesep}"
+                        f"    - {(os.linesep + '    - ').join(list(map(lambda pair: str(pair[0]) + ': ' + str(pair[1]), file_specific_metadata.items())))}"
+                    )
+                    raise
 
-            try:
-                shutil.copy(file, path)
-            except:
-                LOGGER.error(f"Could not copy '{file}' ({'exists' if file.is_file() else 'does not exist'}) to '{path}'")
-                raise
-            saved_files.append(path)
-            LOGGER.debug(f"Wrote {file} to {path}")
+                output_directory.mkdir(parents=True, exist_ok=True)
+                path: pathlib.Path = output_directory / filename
+
+                if path in saved_files:
+                    from pprint import pformat
+                    raise FileExistsError(
+                        f"Attempted to save to '{path}', but it was already saved to within this operation. "
+                        f"It is likely that there is a naming error{os.linesep}"
+                        f"Template: {pathlib.Path(self.directory) / self.filename_pattern}{os.linesep}"
+                        f"Available Metadata:{os.linesep}"
+                        f"{pformat(file_specific_metadata, indent=4, sort_dicts=True)}"
+                    )
+
+                try:
+                    shutil.copy(file, path)
+                except:
+                    LOGGER.error(f"Could not copy '{file}' ({'exists' if file.is_file() else 'does not exist'}) to '{path}'")
+                    raise
+                saved_files.append(path)
+                LOGGER.debug(f"Wrote {file} to {path}")
+        except Exception as exception:
+            if 'failure in' not in str(exception):
+                exception.args = (f"Failure in:{os.linesep}{self}{os.linesep}{exception.args[0]}", *exception.args[1:])
+            raise exception
 
         missing_files: typing.List[pathlib.Path] = [
             saved_path
@@ -1054,7 +1152,22 @@ class BranchOperation(ProfileOperation[InputType, typing.Sequence[pathlib.Path]]
         return hash_value
 
     def __str__(self):
-        return f"{self.operation().replace('_', ' ').title()} -> [{', '.join(self.branches.keys())}]"
+        prefix: str = f"{self.operation_id}: " if self.operation_id else ""
+        branch_descriptions: typing.Sequence[str] = [
+            (
+                f"{name}:{os.linesep}"
+                f"{'=' * len(name)}{os.linesep}"
+                f"{os.linesep.join(map(str, branch))}{os.linesep}"
+                f"{'-' * len(name)}{os.linesep}"
+            )
+            for name, branch in self.branches.items()
+        ]
+        return (
+            f"{prefix}Perform the following logic separately:{os.linesep}"
+            f"{os.linesep}"
+            f"{os.linesep.join(branch_descriptions)}{os.linesep}"
+            f"{os.linesep}"
+        )
 
     @classmethod
     def operation(cls) -> OperationType:
@@ -1111,64 +1224,69 @@ class BranchOperation(ProfileOperation[InputType, typing.Sequence[pathlib.Path]]
         import concurrent.futures
         future_results: typing.Dict[str, concurrent.futures.Future[typing.Sequence[pathlib.Path]]] = {}
 
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            for branch_name, branch_logic in self.branches.items():
-                future_result = executor.submit(
-                    call_operations,
-                    operations=branch_logic,
-                    profile=profile,
-                    process_identifier=process_identifier,
-                    work_directory=work_directory,
-                    data=data,
-                    previous_operations=previous_operations.copy(),
-                    metadata=metadata.copy()
-                )
-                future_results[branch_name] = future_result
-
-            def process_error(error: Exception) -> Exception:
-                from post_processing.utilities.common import condense_exceptions
-                new_error_message: str = (
-                    f"Could not perform the branching operation named '{branch_name}' "
-                    f"from the '{profile}' profile: {error}"
-                )
-                return condense_exceptions(new_error_message, [error])
-
-            from post_processing.utilities.common import cycle_futures
-
-            def log_duplicates(
-                branch: str,
-                returned_paths: typing.Sequence[pathlib.Path],
-                current_paths: typing.Sequence[typing.Sequence[pathlib.Path]]
-            ) -> typing.Sequence[pathlib.Path]:
-                current_paths = set(path for resultant_paths in current_paths for path in resultant_paths)
-                preexisting_paths, new_paths = partition(lambda path: path in current_paths, returned_paths)
-                if preexisting_paths:
-                    LOGGER.warning(
-                        f"Processing from the '{branch}' branch in '{profile}' for {metadata['cycle']}z on "
-                        f"{metadata['date']} encountered duplicate results at: "
-                        f"{', '.join(map(str, preexisting_paths))}"
+        try:
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                for branch_name, branch_logic in self.branches.items():
+                    future_result = executor.submit(
+                        call_operations,
+                        operations=branch_logic,
+                        profile=profile,
+                        process_identifier=process_identifier,
+                        work_directory=work_directory,
+                        data=data,
+                        previous_operations=previous_operations.copy(),
+                        metadata=metadata.copy()
                     )
-                return returned_paths
+                    future_results[branch_name] = future_result
 
-            results, exceptions = cycle_futures(
-                futures=future_results,
-                transform=log_duplicates,
-                exception_handler=process_error
-            )
+                def process_error(error: Exception) -> Exception:
+                    from post_processing.utilities.common import condense_exceptions
+                    new_error_message: str = (
+                        f"Could not perform the branching operation named '{branch_name}' "
+                        f"from the '{profile}' profile: {error}"
+                    )
+                    return condense_exceptions(new_error_message, [error])
 
-            if exceptions:
-                from post_processing.utilities.common import condense_exceptions
-                raise condense_exceptions(
-                    f"One or more branches failed to process for {profile} on cycle {metadata['cycle']}z on "
-                    f"{metadata['date']}",
-                    exceptions
+                from post_processing.utilities.common import cycle_futures
+
+                def log_duplicates(
+                    branch: str,
+                    returned_paths: typing.Sequence[pathlib.Path],
+                    current_paths: typing.Sequence[typing.Sequence[pathlib.Path]]
+                ) -> typing.Sequence[pathlib.Path]:
+                    current_paths = set(path for resultant_paths in current_paths for path in resultant_paths)
+                    preexisting_paths, new_paths = partition(lambda path: path in current_paths, returned_paths)
+                    if preexisting_paths:
+                        LOGGER.warning(
+                            f"Processing from the '{branch}' branch in '{profile}' for {metadata['cycle']}z on "
+                            f"{metadata['date']} encountered duplicate results at: "
+                            f"{', '.join(map(str, preexisting_paths))}"
+                        )
+                    return returned_paths
+
+                results, exceptions = cycle_futures(
+                    futures=future_results,
+                    transform=log_duplicates,
+                    exception_handler=process_error
                 )
 
-            melted_results: typing.Sequence[pathlib.Path] = list(set([
-                path
-                for branch_results in results
-                for path in branch_results
-            ]))
+                if exceptions:
+                    from post_processing.utilities.common import condense_exceptions
+                    raise condense_exceptions(
+                        f"One or more branches failed to process for {profile} on cycle {metadata['cycle']}z on "
+                        f"{metadata['date']}",
+                        exceptions
+                    )
+
+                melted_results: typing.Sequence[pathlib.Path] = list(set([
+                    path
+                    for branch_results in results
+                    for path in branch_results
+                ]))
+        except Exception as exception:
+            if 'failure in' not in str(exception):
+                exception.args = (f"Failure in:{os.linesep}{self}{os.linesep}{exception.args[0]}", *exception.args[1:])
+            raise exception
 
         return melted_results
 
@@ -1184,7 +1302,8 @@ class LoadOperation(ProfileOperation[typing.Sequence[pathlib.Path], typing.Itera
         return OperationType.LOAD
 
     def __str__(self):
-        return f"{self.operation().replace('_', ' ').title()}: Load files into python"
+        prefix: str = f"{self.operation_id}: " if self.operation_id else ''
+        return f"{prefix}Load files into python"
 
     def __call__(
         self,
@@ -1200,7 +1319,12 @@ class LoadOperation(ProfileOperation[typing.Sequence[pathlib.Path], typing.Itera
 
         from post_processing.utilities.netcdf import load_netcdf
 
-        data: xarray.Dataset = load_netcdf(data, **self.load_arguments)
+        try:
+            data: xarray.Dataset = load_netcdf(data, **self.load_arguments)
+        except Exception as exception:
+            if 'failure in' not in str(exception):
+                exception.args = (f"Failure in:{os.linesep}{self}{os.linesep}{exception.args[0]}", *exception.args[1:])
+            raise exception
 
         return data
 
@@ -1240,16 +1364,21 @@ class OnEachOperation(
         previous_operations: typing.List["ProfileOperation"],
         metadata: typing.Dict[str, typing.Any]
     ) -> typing.Union[typing.Iterator[OutputType], typing.Iterable[OutputType]]:
-        results: typing.Sequence[OutputType] = fan_out_operations(
-            operations=self.on_each,
-            profile=profile,
-            process_identifier=process_identifier,
-            work_directory=work_directory,
-            data=data,
-            previous_operations=previous_operations,
-            metadata=metadata,
-            thread_count=self.thread_count,
-        )
+        try:
+            results: typing.Sequence[OutputType] = fan_out_operations(
+                operations=self.on_each,
+                profile=profile,
+                process_identifier=process_identifier,
+                work_directory=work_directory,
+                data=data,
+                previous_operations=previous_operations,
+                metadata=metadata,
+                thread_count=self.thread_count,
+            )
+        except Exception as exception:
+            if 'failure in' not in str(exception):
+                exception.args = (f"Failure in:{os.linesep}{self}{os.linesep}{exception.args[0]}", *exception.args[1:])
+            raise exception
         return results
 
     def __hash__(self):
@@ -1260,6 +1389,23 @@ class OnEachOperation(
 
         values_to_hash = tuple([parent_hash, *[hash(operation) for operation in self.on_each]])
         return hash(values_to_hash)
+
+    def __str__(self):
+        prefix: str = f"{self.operation_id}: " if self.operation_id else ''
+        descriptions: typing.Sequence[str] = list(map(str, self.on_each))
+        longest_line: int = max(max(map(len, list(description.splitlines()))) for description in descriptions)
+        operation_descriptions: typing.Sequence[str] = [
+            (
+                f"{'-' * (longest_line + 5)}{os.linesep}"
+                f"{operation}{os.linesep}"
+                f"{'-' * (longest_line + 5)}{os.linesep}"
+            )
+            for operation in self.on_each
+        ]
+        return (
+            f"{prefix}Perform the following on each file and each file alone:{os.linesep * 2}"
+            f"{os.linesep.join(operation_descriptions)}"
+        )
 
 
     on_each: typing.List[ProfileOperation] = dataclasses.field(default_factory=list)
@@ -1280,6 +1426,15 @@ class AnomalyOperation(NCOOperation):
     output_variable_name: str = dataclasses.field(default="streamflow_anomaly")
     anomaly_metadata: typing.Dict[str, typing.Any] = dataclasses.field(default_factory=dict)
     encoding: typing.Dict[str, typing.Any] = dataclasses.field(default_factory=dict)
+
+    def __str__(self):
+        prefix: str = f"{self.operation_id}: " if self.operation_id else ''
+        return (
+            f"{prefix}Create anomaly categories across the following thresholds:{os.linesep*2}"
+            f"    - {(os.linesep + '    - ').join(map(str, self.thresholds))}{os.linesep*2}"
+            f"With a default category of {self.default_score}, matching on {self.dimension_names} across {self.time_variable}{os.linesep}"
+            f"And saving to paths like: {self.output_pattern}"
+        )
 
     def __hash__(self):
         return hash((
@@ -1338,32 +1493,37 @@ class AnomalyOperation(NCOOperation):
             r"(?P<region>[a-zA-Z]+)\."
             r"nc"
         )
-        for input_path in data:
-            file_specific_metadata: typing.Dict[str, typing.Any] = {
-                **metadata
-            }
-            identification_match: typing.Optional[re.Match] = frame_pattern.search(input_path.name)
-            if identification_match:
-                identifiers: typing.Mapping[str, typing.Any] = identification_match.groupdict()
-                file_specific_metadata.update(identifiers)
+        try:
+            for input_path in data:
+                file_specific_metadata: typing.Dict[str, typing.Any] = {
+                    **metadata
+                }
+                identification_match: typing.Optional[re.Match] = frame_pattern.search(input_path.name)
+                if identification_match:
+                    identifiers: typing.Mapping[str, typing.Any] = identification_match.groupdict()
+                    file_specific_metadata.update(identifiers)
 
-            desired_path: pathlib.Path = work_directory / self.output_pattern.format(**file_specific_metadata)
-            anomaly.calculate_anomaly(
-                input_path=input_path,
-                output_path=desired_path,
-                variable_to_bin=self.variable_name,
-                thresholds=self.thresholds,
-                default_score=self.default_score,
-                time_variable=self.time_variable,
-                dimension_names=self.dimension_names,
-                output_variable_name=self.output_variable_name,
-                field_metadata=self.anomaly_metadata,
-                encoding=self.encoding,
-                operational_metadata=file_specific_metadata,
-            )
-            if not desired_path.exists():
-                raise OSError(f"There is no generated anomaly data at {desired_path}")
-            output_paths.append(desired_path)
+                desired_path: pathlib.Path = work_directory / self.output_pattern.format(**file_specific_metadata)
+                anomaly.calculate_anomaly(
+                    input_path=input_path,
+                    output_path=desired_path,
+                    variable_to_bin=self.variable_name,
+                    thresholds=self.thresholds,
+                    default_score=self.default_score,
+                    time_variable=self.time_variable,
+                    dimension_names=self.dimension_names,
+                    output_variable_name=self.output_variable_name,
+                    field_metadata=self.anomaly_metadata,
+                    encoding=self.encoding,
+                    operational_metadata=file_specific_metadata,
+                )
+                if not desired_path.exists():
+                    raise OSError(f"There is no generated anomaly data at {desired_path}")
+                output_paths.append(desired_path)
+        except Exception as exception:
+            if 'failure in' not in str(exception):
+                exception.args = (f"Failure in:{os.linesep}{self}{os.linesep}{exception.args[0]}", *exception.args[1:])
+            raise exception
         return output_paths
 
 
@@ -1395,7 +1555,18 @@ class FunctionOperation(ProfileOperation[InputType, OutputType]):
         return hash(values_to_hash)
 
     def __str__(self):
-        return f"{self.operation().replace('_', ' ').title()}: {self.function_name}"
+        prefix: str = f"{self.operation_id}: " if self.operation_id else ""
+        mapping_description: str = f',{os.linesep}    '.join(
+            map(
+                lambda pair: f"{pair[0]}={pair[1]}",
+                {
+                    **self.kwargs,
+                    **self.argument_mapping
+                }.items()
+            )
+        )
+        function_description: str = f"{self.function_name}({os.linesep}    {mapping_description}{os.linesep})"
+        return f"{prefix}Call {function_description}"
 
     def __post_init__(self):
         self._function = get_function_by_name(function_name=self.function_name)
@@ -1455,7 +1626,12 @@ class FunctionOperation(ProfileOperation[InputType, OutputType]):
                 )
 
         kwargs.update(args)
-        result: OutputType = self._function(**kwargs)
+        try:
+            result: OutputType = self._function(**kwargs)
+        except Exception as exception:
+            if 'failure in' not in str(exception):
+                exception.args = (f"Failure in:{os.linesep}{self}{os.linesep}{exception.args[0]}", *exception.args[1:])
+            raise exception
         return result
 
 
@@ -1469,7 +1645,8 @@ class PythonOperation(ProfileOperation[InputType, OutputType], abc.ABC):
     _function: PythonHandler[InputType, OutputType] = member(default=None)
 
     def __str__(self):
-        return f"{self.operation().replace('_', ' ').title()}: {self.function_name}"
+        prefix: str = f"{self.operation_id}: " if self.operation_id else ""
+        return f"{prefix}{self.operation().replace('_', ' ').title()}: {self.function_name}"
 
     def __post_init__(self):
         self._function = get_function_by_name(function_name=self.function_name)
@@ -1559,9 +1736,32 @@ class Profile(BaseModel):
         description = (
             f"{self.output_type.name} generated for {self.configuration.name}"
             f"{' for ensemble ' + str(self.member) + ' ' if self.member is not None else ''} "
-            f"across {self.region.name}"
+            f"across {self.region.name}:"
         )
-        return description
+        operation_description: str = (os.linesep*2).join(map(str, self.operations))
+
+        if self.comment:
+            comment: str = (
+                f"{os.linesep}{'-' * (max(max(map(len, desc.splitlines())) for desc in operation_description.splitlines()) + 5)}{os.linesep}"
+                f"{self.comment}"
+            )
+        else:
+            comment = ''
+
+        return (
+            f"{description}{os.linesep}"
+            f"{'=' * (len(description) + 5)}{os.linesep}"
+            f"{operation_description}{os.linesep}"
+            f"{os.linesep}"
+            f"{comment}"
+        )
+
+    def assign_ids(self):
+        initial_id: int = 0
+        for operation in self.operations:
+            operation.assign_id(parent_id=str(initial_id))
+            initial_id += 1
+
 
     def __post_init__(self):
         if not len(self.operations):
@@ -1611,6 +1811,7 @@ class Profile(BaseModel):
                 f"The first operation in {self} must operate on files, but the first operation was instead "
                 f"{type(first_operation).__qualname__}({first_operation})"
             )
+        self.assign_ids()
 
     def run(
         self,

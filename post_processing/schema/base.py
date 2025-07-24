@@ -90,7 +90,8 @@ def member(
     *,
     default: T = dataclasses.MISSING,
     default_factory: typing.Callable[[], T] = dataclasses.MISSING,
-    metadata: typing.Dict = None
+    metadata: typing.Dict = None,
+    kw_only: bool = False,
 ) -> dataclasses.Field:
     """
     Create a member specific field
@@ -116,7 +117,8 @@ def member(
             metadata=metadata,
             init=False,
             compare=False,
-            repr=False
+            repr=False,
+            kw_only=kw_only
         )
     else:
         field = dataclasses.field(
@@ -124,7 +126,8 @@ def member(
             metadata=metadata,
             init=False,
             compare=False,
-            repr=False
+            repr=False,
+            kw_only=kw_only
         )
 
     return field

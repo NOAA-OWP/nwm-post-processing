@@ -688,6 +688,30 @@ def get_cycle_files(filepath: pathlib.Path, expected_count: int = None) -> typin
 
     return cycle_files
 
+def format_identifier_to_title(raw_string: str) -> str:
+    """
+    Converts strings like 'myExampleTest', 'This_has_a_number1234',
+    or 'ThisHasAnAbbreviationOWP' into 'My Example Test',
+    'This Has A Number 1234', and 'This Has An Abbreviation OWP' respectively.
+
+    :param raw_string: The input string to format
+    :return: A cleaned-up, human-readable title-cased string
+    """
+    # Step 1: Replace underscores with spaces
+    cleaned = raw_string.replace("_", " ")
+
+    # Step 2: Insert space between lowercase and uppercase transitions (e.g., "myExample" -> "my Example")
+    cleaned = re.sub(r'(?<=[a-z])(?=[A-Z])', ' ', cleaned)
+
+    # Step 3: Insert space between letter and digit (e.g., "number123" -> "number 123")
+    cleaned = re.sub(r'(?<=[a-zA-Z])(?=\d)', ' ', cleaned)
+
+    # Step 4: Insert space between digit and letter (e.g., "123abc" -> "123 abc")
+    cleaned = re.sub(r'(?<=\d)(?=[a-zA-Z])', ' ', cleaned)
+
+    return cleaned
+
+
 def datetime64_to_datetime(numpy_date: "numpy.datetime64") -> datetime:
     """
     Convert a numpy datetime to the vanilla python datetime object
