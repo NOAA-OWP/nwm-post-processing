@@ -140,14 +140,13 @@ def main() -> int:
                     continue
                     
                 outputs: typing.Sequence[pathlib.Path] = profile.run(
-                    date=manifest.reference_time,
                     cycle=manifest.cycle,
                     files=manifest.files,
                     output_path=arguments.destination
                 )
                 LOGGER.info(
-                    f"The results for the profile for {profile.output_type} data run within the "
-                    f"{profile.configuration} configuration across {profile.region} were written to:{os.linesep}"
+                    f"The results for the profile for {profile.output_type.describe()} data run within the "
+                    f"{profile.configuration.describe()} configuration across {profile.region.describe()} were written to:{os.linesep}"
                     f"    - {(os.linesep + '    - ').join(map(str, outputs))}"
                 )
         else:

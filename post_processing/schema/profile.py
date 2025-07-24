@@ -1815,7 +1815,6 @@ class Profile(BaseModel):
 
     def run(
         self,
-        date: datetime,
         cycle: typing.Union[str, int],
         files: typing.Sequence[pathlib.Path],
         **additional_metadata
@@ -1838,13 +1837,11 @@ class Profile(BaseModel):
             self.region.__class__.__name__: self.region.value,
             self.configuration.__class__.__name__: self.configuration.value,
             "member": self.member,
-            "cycle": str(cycle).zfill(2),
-            "date": date.strftime(self.date_format),
+            "cycle": str(cycle).zfill(2)
         }
 
         input_metadata.update(metadata)
         process_identifier: str = str(hash((
-            date,
             cycle,
             self.configuration,
             self.output_type,

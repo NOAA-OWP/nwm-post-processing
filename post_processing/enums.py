@@ -5,6 +5,29 @@ import typing
 import enum
 
 
+_PRINT_REPLACEMENTS: typing.Dict[str, str] = {
+    "no_da": "No Data Assimilation",
+    "analysis_assim": "Analysis and Assimilation",
+    "extend": "Extended",
+    "conus": "CONUS",
+    "rt": "Routing",
+    "abrfc": "Arkansas Red-Basin River Forecast Center",
+    "aprfc": "Alaska Pacific River Forecast Center",
+    "cbrfc": "Colorado Basin River Forecast Center",
+    "cnrfc": "California Nevada River Forecast Center",
+    "lmrfc": "Lower Mississippi River Forecast Center",
+    "marfc": "Mid-Atlantic River Forecast Center",
+    "mbrfc": "Missouri Basin River Forecast Center",
+    "ncrfc": "North Central River Forecast Center",
+    "nerfc": "Northeast River Forecast Center",
+    "nwrfc": "Northwest River Forecast Center",
+    "ohrfc": "Ohio River Valley River Forecast Center",
+    "serfc": "Southeast River Forecast Center",
+    "wgrfc": "West Gulf River Forecast Center",
+}
+"""A mapping of keys and replacements that will make text easier to understand for humans"""
+
+
 class PostProcessingEnumeration(enum.Enum):
     """
     Abstract class defining common methods and behavior for application specific enums
@@ -26,9 +49,15 @@ class PostProcessingEnumeration(enum.Enum):
         """
         return rf"(?P<{cls.__name__}>{'|'.join([member.value for member in cls])})"
 
-    def __str__(self):
+    def describe(self) -> str:
         from post_processing.utilities.common import format_identifier_to_title
-        return format_identifier_to_title(self.value).title()
+        raw_value: str = self.value
+        for key, replacement in _PRINT_REPLACEMENTS.items():
+            raw_value = raw_value.replace(key, replacement)
+        return format_identifier_to_title(raw_value)
+
+    def __str__(self):
+        return self.value
 
 
 class ModelOutputType(PostProcessingEnumeration):
@@ -78,9 +107,9 @@ class Region(PostProcessingEnumeration):
     NCRFC = "ncrfc"
     """North Central River Forecast Center"""
     NERFC = "nerfc"
-    """Norteast River Forecast Center"""
+    """Northeast River Forecast Center"""
     NWRFC = "nwrfc"
-    """Nortwest River Forecast Center"""
+    """Northwest River Forecast Center"""
     OHRFC = "ohrfc"
     """Ohio River Valley River Forecast Center"""
     SERFC = "serfc"
