@@ -208,6 +208,7 @@ def calculate_anomaly(
     scores: typing.List[numpy.floating] = []
 
     # TODO: Initial threshold processing can probably be multithreaded
+    #   NOTE: Multithreading will likely lead to segfaults based on how data is loaded. Expect this refactor to be complicated
     thresholds = sorted(thresholds, key=lambda threshold: threshold.level, reverse=True)
     day_of_year: int = get_day_of_year(dataset=dataset, variable=time_variable)
 
