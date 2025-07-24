@@ -49,7 +49,7 @@
         },
         {
             "operation": "echo",
-            "message": "Dropped Variables, now calculating upstreamflow",
+            "message": "Calculated Anomaly, now calculating upstreamflow",
             "level": "INFO"
         },
         {
@@ -85,41 +85,21 @@
             "branches": {
                 "WMS": [
                     {
-                        "operation": "echo",
-                        "message": "Dropping upstreamflow. Operations need to be rearranged to allow upstreamflow to only be calculated on the RFC branch"
-                    },
-                    {
                         "operation": "drop",
-                        "fields": ["upstreamflow"]
+                        "fields": ["upstreamflow"],
+                        "output_pattern": "no_upstream.nwm.t{reference_time__date}{cycle}z.{Configuration}.{ModelOutputType}.{Region}.nc"
                     },
                     {
                         "operation": "save",
                         "filename_pattern": "nwm.t{reference_time__date}{cycle}z.{Configuration}.{ModelOutputType}.{Region}.nc",
                         "directory": "{output_path}/WMS/"
+                    },
+                    {
+                        "operation": "echo",
+                        "message": "Finished Processing WMS"
                     }
                 ],
                 "RFC": [
-                    {
-                        "operation": "echo",
-                        "message": "Renaminging 'feature_id' to 'station_id'"
-                    },
-                    {
-                        "operation": "rename",
-                        "mapping": {
-                            "feature_id": "station"
-                        }
-                    },
-                    {
-                        "operation": "rename",
-                        "rename_variable": false,
-                        "mapping": {
-                            "feature_id": "station_id"
-                        }
-                    },
-                    {
-                        "operation": "echo",
-                        "message": "Dropping streamflow_anomaly. Operations need to be rearranged to allow anomaly to only be calculated on the WMS branch"
-                    },
                     {
                         "operation": "drop",
                         "fields": ["streamflow_anomaly"]
@@ -130,7 +110,7 @@
                     },
                     {
                         "operation": "extract",
-                        "dimension": "station_id",
+                        "dimension": "feature_id",
                         "mask_coordinate": "feature_id",
                         "masks": [
                             "resources/masks/abrfc.nc",
@@ -144,6 +124,21 @@
                         "identifier_pattern": "^(?P<region>\\w+(\\.(?P<rfc>[MmAaLlCcNnPpWwOoSsHh][BbPpNnMmAaCcEeWwHhRrGg]([Rr][Ff][Cc]|[Vv][Ii])))?)",
                         "output_pattern": "nwm.t{reference_time__date}{cycle}z.{Configuration}.{ModelOutputType}.{region}.nc",
                         "each": [
+                            {
+                                "operation": "rename",
+                                "mapping": {
+                                    "feature_id": "station"
+                                },
+                                "inplace": true
+                            },
+                            {
+                                "operation": "rename",
+                                "rename_variable": false,
+                                "mapping": {
+                                    "feature_id": "station_id"
+                                },
+                                "inplace": true
+                            },
                             {
                                 "operation": "save",
                                 "filename_pattern": "{file_name}",

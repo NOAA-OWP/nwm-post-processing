@@ -77,6 +77,9 @@ def rename_dimension(
     if not mapping:
         raise ValueError(f"No name mapping was passed when attempting to rename elements within '{input_path}'")
 
+    if not input_path.exists():
+        raise FileNotFoundError(f"Cannot rename dimensions in '{input_path}' - it doesn't exist")
+
     import tempfile
     import shutil
     from post_processing.utilities.netcdf import load_netcdf
@@ -89,9 +92,16 @@ def rename_dimension(
         temporary_path: pathlib.Path = pathlib.Path(temporary_directory)
         temporary_output_path: pathlib.Path = temporary_path / output_path.name
 
-        with load_netcdf(path=input_path) as input_file:
-            input_file = input_file.rename_dims(dims_dict=mapping)
-            save_netcdf(temporary_output_path, input_file)
+        try:
+            with load_netcdf(path=input_path) as input_file:
+                input_file = input_file.rename_dims(dims_dict=mapping)
+                save_netcdf(temporary_output_path, input_file)
+        except:
+            from post_processing.configuration import settings
+            new_path: pathlib.Path = settings.application_path / "failed" / input_path.name
+            shutil.copy(input_path, new_path)
+            LOGGER.error(f"Copied the broken file at '{input_path}' to '{new_path}'")
+            raise
 
         output_path.parent.mkdir(parents=True, exist_ok=True)
         shutil.move(temporary_output_path, output_path)

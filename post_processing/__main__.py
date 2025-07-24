@@ -9,6 +9,8 @@ import logging
 import pathlib
 import sys
 
+from datetime import datetime
+
 from post_processing.configuration import settings
 from post_processing.utilities.logging import setup_logging
 from post_processing.exceptions import ArgumentValidationException
@@ -103,6 +105,7 @@ def main() -> int:
 
     :returns: The status code of the application run
     """
+    start_time = datetime.now()
     try:
         arguments: Arguments = Arguments()
     except ArgumentValidationException as exception:
@@ -154,6 +157,7 @@ def main() -> int:
     except BaseException as exception:
         LOGGER.critical(exception, exc_info=True)
         return 1
+    LOGGER.info(f"Operation complete in {datetime.now() - start_time}")
     return 0
 
 

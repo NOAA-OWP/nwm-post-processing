@@ -97,12 +97,23 @@ def subset_file_into_file_by_mask(
             missing_ids: numpy.ndarray = numpy.setdiff1d(allowable_ids, available_ids)
 
             if len(missing_ids) > 0:
+                if missing_ids.size > 20:
+                    missing_ids = missing_ids[:20]
+                    continue_text = f"{os.linesep}[...]{os.linesep}"
+                else:
+                    continue_text = ""
                 missing_id_line_joiner: str = f"{os.linesep}[{coordinate} missing from '{input_file.name}']    "
                 LOGGER.warning(
                     f"There are {len(missing_ids)} missing '{coordinate}' values within {input_file}({coordinate}) "
                     f"from the mask at {mask}. An evaluation of the mask might be required as requested data will not "
                     f"be in the output. Missing IDs:"
-                    f"{missing_id_line_joiner}{missing_id_line_joiner.join(map(str, missing_ids))}"
+                    f"{missing_id_line_joiner}{missing_id_line_joiner.join(map(str, missing_ids))}{continue_text}{os.linesep}"
+                    f"Samples:{os.linesep}"
+                    f"{mask.name}: {mask_data[mask_coordinate].values[:5]}{os.linesep}"
+                    f"{input_file.name}: {available_ids[:5]}{os.linesep}"
+                    f"Are you using the right variables and/or dimensions?{os.linesep}"
+                    f"Mask Variables: {mask_data.sizes}, {list(mask_data.variables.keys())}{os.linesep}"
+                    f"Input Variables: {input_data.sizes}, {list(input_data.variables.keys())}{os.linesep}"
                 )
                 allowable_ids = allowable_ids[numpy.isin(allowable_ids, input_data[coordinate].values)]
             elif this_is_very_verbose:
@@ -121,16 +132,34 @@ def subset_file_into_file_by_mask(
                     expected_ids: typing.Set = set(allowable_ids)
                     available_ids: typing.Set = set(input_data[coordinate].values)
                     missing_ids: typing.Set = expected_ids - available_ids
+                    if len(missing_ids) > 20:
+                        missing_ids = set(list(missing_ids)[:20])
+                        continue_text = f"{os.linesep}[...]{os.linesep}"
+                    else:
+                        continue_text = ""
+
                     LOGGER.error(
                         f"Cannot subset the input data - missing the following IDs:{os.linesep}"
-                        f"    - {(os.linesep + '    - ').join(list(map(str, missing_ids)))}"
+                        f"    - {(os.linesep + '    - ').join(list(map(str, missing_ids)))}{continue_text}{os.linesep}"
+                        f"Samples:{os.linesep}"
+                        f"{mask.name}: {mask_data[mask_coordinate].values[:5]}{os.linesep}"
+                        f"{input_file.name}: {available_ids[:5]}{os.linesep}"
+                        f"Are you using the right variables and/or dimensions?{os.linesep}"
+                        f"Mask Variables: {mask_data.sizes}, {list(mask_data.variables.keys())}{os.linesep}"
+                        f"Input Variables: {input_data.sizes}, {list(input_data.variables.keys())}{os.linesep}"
                     )
                 raise
 
             if len(subset_data[coordinate].values) == 0:
                 raise Exception(
                     f"The mask at '{mask}' is invalid for the data at '{input_file}' - "
-                    f"none of the IDs within '{coordinate}' are available"
+                    f"none of the IDs within '{mask.name}::{mask_coordinate}' are available within {input_file.name}::{coordinate}. {os.linesep}"
+                    f"Samples:{os.linesep}"
+                    f"{mask.name}: {mask_data[mask_coordinate].values[:5]}{os.linesep}"
+                    f"{input_file.name}: {available_ids[:5]}{os.linesep}"
+                    f"Are you using the right variables and/or dimensions?{os.linesep}"
+                    f"Mask Variables: {mask_data.sizes}, {list(mask_data.variables.keys())}{os.linesep}"
+                    f"Input Variables: {input_data.sizes}, {list(input_data.variables.keys())}{os.linesep}"
                 )
 
             if this_is_verbose:
