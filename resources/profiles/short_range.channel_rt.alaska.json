@@ -1,10 +1,101 @@
 {
     "operations": [
         {
-            "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.short_range.channel_rt.alaska.nc' should be generated, as defined in {source_file}.",
-            "level": "error",
-            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/WMS/short_range/channel_rt/nwm.t2025060718z.short_range.channel_rt.alaska.nc"
+            "operation": "drop",
+            "exclude": true,
+            "fields": ["feature_id", "time", "reference_time", "streamflow", "crs"]
+        },
+        {
+            "operation": "on_each",
+            "comment": "Add upstreamflow to each input file by calling 'post_processing.transform.calculate_upstream_flow.calculate_upstream_flow' on each",
+            "on_each": [
+                {
+                    "operation": "function",
+                    "function_name": "post_processing.transform.calculate_upstream_flow.calculate_upstream_flow",
+                    "comment": "This should end up calling `calculate_upstream_flow(input_path=data, output_path=data, routelink_path='{application_path}/RouteLink_CONUS.nc')`",
+                    "kwargs": {
+                        "routelink_path": "{resource_path}/routelink/RouteLink_AK.nc",
+                        "routelink_from_variable": "from",
+                        "output_path": "{work_directory}/upstream.{input_name}"
+                    },
+                    "argument_mapping": {
+                        "input_path": "data"
+                    }
+                }
+            ]
+        },
+        {
+            "operation": "merge",
+            "file_name_pattern": "nwm.t{reference_time__date}{cycle}z.{ModelOutputType}.{Configuration}.{Region}.nc"
+        },
+        {
+            "operation": "branch",
+            "branches": {
+                "WMS": [
+                    {
+                        "operation": "echo",
+                        "message": "Dropping upstreamflow. Operations need to be rearranged to allow upstreamflow to only be calculated on the RFC branch"
+                    },
+                    {
+                        "operation": "drop",
+                        "fields": ["upstreamflow"]
+                    },
+                    {
+                        "operation": "save",
+                        "filename_pattern": "nwm.t{reference_time__date}{cycle}z.{Configuration}.{ModelOutputType}.{Region}.nc",
+                        "directory": "{output_path}/WMS/"
+                    }
+                ],
+                "RFC": [
+                    {
+                        "operation": "echo",
+                        "message": "Renaming 'feature_id' to 'station_id'"
+                    },
+                    {
+                        "operation": "rename",
+                        "mapping": {
+                            "feature_id": "station"
+                        }
+                    },
+                    {
+                        "operation": "rename",
+                        "rename_variable": false,
+                        "mapping": {
+                            "feature_id": "station_id"
+                        }
+                    },
+                    {
+                        "operation": "echo",
+                        "message": "Dropping streamflow_anomaly. Operations need to be rearranged to allow anomaly to only be calculated on the WMS branch"
+                    },
+                    {
+                        "operation": "drop",
+                        "fields": ["streamflow_anomaly"]
+                    },
+                    {
+                        "operation": "echo",
+                        "message": "Now splitting {Region} data up by RFC"
+                    },
+                    {
+                        "operation": "extract",
+                        "dimension": "station",
+                        "mask_coordinate": "feature_id",
+                        "masks": [
+                            "resources/masks/alaska.aprfc.nc"
+                        ],
+                        "identifier_pattern": "^(?P<region>\\w+(\\.(?P<rfc>[MmAaLlCcNnPpWwOoSsHh][BbPpNnMmAaCcEeWwHhRrGg]([Rr][Ff][Cc]|[Vv][Ii])))?)",
+                        "output_pattern": "nwm.t{reference_time__date}{cycle}z.{Configuration}.{ModelOutputType}.{region}.nc",
+                        "each": [
+                            {
+                                "operation": "save",
+                                "filename_pattern": "{file_name}",
+                                "identifier_pattern": "(?P<rfc>[A-Za-z]{2}[Rr][Ff][Cc])",
+                                "directory": "{output_path}/RFC/{RFC}/"
+                            }
+                        ]
+                    }
+                ]
+            }
         }
     ],
     "configuration": "short_range",

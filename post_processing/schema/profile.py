@@ -202,6 +202,8 @@ class ProfileOperation(BaseModel, OperationHandler[InputType, OutputType], abc.A
     """A comment from the writer explaining what this operation does"""
     operation_id: typing.Optional[str] = member(default=None, kw_only=True)
     """A specialized identifier for this operation"""
+    disable: bool = dataclasses.field(default=False, kw_only=True)
+    """Disable operation of this operation"""
 
     def assign_id(self, parent_id: str):
         if parent_id == "":
@@ -693,7 +695,7 @@ class Peek(NCOOperation):
 
         if self.show_summary:
             parameter_information: str = f"""
-Profile:             {profile}
+Profile:             {profile.output_type} data for the {profile.configuration} configuration over {profile.region}
 Process identifier:  {process_identifier}
 Work directory:      {work_directory}
 Previous Operations: 
@@ -1190,7 +1192,7 @@ class BranchOperation(ProfileOperation[InputType, typing.Sequence[pathlib.Path]]
         for branch_name, branch_logic in self.branches.items():
             if len(branch_logic) == 0:
                 invalid_ends_names.append(branch_name)
-            elif not isinstance(branch_logic[-1], (NCOOperation, OutOfPythonOperation)):
+            elif not isinstance(branch_logic[-1], (NCOOperation, OutOfPythonOperation, EchoOperation)):
                 invalid_ends_names.append(branch_name)
 
         if invalid_ends_names:
@@ -1243,7 +1245,7 @@ class BranchOperation(ProfileOperation[InputType, typing.Sequence[pathlib.Path]]
                     from post_processing.utilities.common import condense_exceptions
                     new_error_message: str = (
                         f"Could not perform the branching operation named '{branch_name}' "
-                        f"from the '{profile}' profile: {error}"
+                        f"from the {profile.output_type} data from the '{profile.configuration}' configuration over {profile.region} profile: {error}"
                     )
                     return condense_exceptions(new_error_message, [error])
 
@@ -1258,7 +1260,7 @@ class BranchOperation(ProfileOperation[InputType, typing.Sequence[pathlib.Path]]
                     preexisting_paths, new_paths = partition(lambda path: path in current_paths, returned_paths)
                     if preexisting_paths:
                         LOGGER.warning(
-                            f"Processing from the '{branch}' branch in '{profile}' for {metadata['cycle']}z on "
+                            f"Processing from the '{branch}' branch in 'profile' for {metadata['cycle']}z on "
                             f"{metadata['date']} encountered duplicate results at: "
                             f"{', '.join(map(str, preexisting_paths))}"
                         )
@@ -1273,8 +1275,7 @@ class BranchOperation(ProfileOperation[InputType, typing.Sequence[pathlib.Path]]
                 if exceptions:
                     from post_processing.utilities.common import condense_exceptions
                     raise condense_exceptions(
-                        f"One or more branches failed to process for {profile} on cycle {metadata['cycle']}z on "
-                        f"{metadata['date']}",
+                        f"One or more branches failed to process for profile on cycle {metadata['cycle']}z",
                         exceptions
                     )
 
@@ -1871,8 +1872,7 @@ class Profile(BaseModel):
                 has_configured_output: bool = self.output_directory is not None and self.output_directory.is_dir()
                 if not (has_global_output or has_configured_output):
                     raise ValueError(
-                        f"Cannot save output for {self} for cycle {cycle} on {date.strftime(self.date_format)} - "
-                        f"there is no where configured and accessible to write to"
+                        f"Cannot save output for {self} for cycle {cycle} - there is no where configured and accessible to write to"
                     )
 
                 filename: str = self.get_output_filename(**input_metadata)
@@ -2127,7 +2127,11 @@ def call_generic_operations(
             previous_operations=previous_operations,
             metadata=metadata
         )
-        previous_operations.append(operation)
+
+        if not any(op.operation_id == operation.operation_id for op in previous_operations):
+            previous_operations.append(operation)
+        else:
+            LOGGER.debug(f"Not adding a record of a call to '{operation.operation_id}) {operation.__class__.__qualname__}' - there is already a record")
 
     return current_data
 
@@ -2154,24 +2158,23 @@ def call_operations(
     current_data: typing.Union[typing.Sequence[pathlib.Path], xarray.Dataset] = list(data)
 
     for operation in operations:
-        try:
-            current_data = operation(
-                profile=profile,
-                process_identifier=process_identifier,
-                work_directory=work_directory,
-                data=current_data,
-                previous_operations=previous_operations,
-                metadata=metadata
-            )
-        except:
-            message: str = (
-                f"Failed to perform operations after:{os.linesep}"
-                f"    - {(os.linesep + '    - ').join([str(op) for op in [*previous_operations, operation]])}"
-            )
-            LOGGER.error(message)
-            raise
+        if operation.disable:
+            LOGGER.warning(f"{operation.__class__.__qualname__} disabled:{os.linesep}{operation}")
+            continue
 
-        previous_operations.append(operation)
+        current_data = operation(
+            profile=profile,
+            process_identifier=process_identifier,
+            work_directory=work_directory,
+            data=current_data,
+            previous_operations=previous_operations,
+            metadata=metadata
+        )
+
+        if not any(op.operation_id == operation.operation_id for op in previous_operations):
+            previous_operations.append(operation)
+        else:
+            LOGGER.warning(f"Not adding a record of a call to '{operation.operation_id}) {operation.__class__.__qualname__}' - there is already a record")
 
     return current_data
 

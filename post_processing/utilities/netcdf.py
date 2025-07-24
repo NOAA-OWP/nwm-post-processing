@@ -4,6 +4,7 @@ Helper functions and objects used to standardize file IO operations
 import typing
 import logging
 import pathlib
+from threading import RLock
 
 from functools import lru_cache
 
@@ -12,7 +13,14 @@ if typing.TYPE_CHECKING:
 
 
 LOGGER: logging.Logger = logging.getLogger(pathlib.Path(__file__).stem)
+SAVED_FILES: typing.List[pathlib.Path] = []
+SAVED_FILE_LOCK: RLock = RLock()
 
+def record_saved_file(path: pathlib.Path):
+    with SAVED_FILE_LOCK:
+        if path in SAVED_FILES:
+            LOGGER.warning(f"File '{path}' has now been saved to {len(list(filter(lambda p: p == path, SAVED_FILES)))} times")
+        SAVED_FILES.append(path)
 
 def load_netcdf(
     path: typing.Union[pathlib.Path, str, typing.Sequence[typing.Union[pathlib.Path, str]]],
@@ -60,7 +68,23 @@ def load_netcdf(
         path = path[0]
 
     if isinstance(path, (pathlib.Path, str)):
-        dataset: xarray.Dataset = xarray.open_dataset(path, engine=engine, chunks=chunks, **kwargs)
+        maximum_retries: int = 5
+        attempts: int = 0
+        dataset: typing.Optional[xarray.Dataset] = None
+        last_exception: typing.Optional[Exception] = None
+        while attempts < maximum_retries and dataset is None:
+            try:
+                dataset: xarray.Dataset = xarray.open_dataset(path, engine=engine, chunks=chunks, **kwargs)
+                break
+            except Exception as e:
+                last_exception = e
+                last_exception.args = (f"Could not load data at '{path}'. {e.args[0]}", *e.args[1:])
+            attempts += 1
+            LOGGER.error(f"Failed to load {path}. Waiting and trying again...")
+            import time
+            time.sleep(1)
+        if dataset is None:
+            raise (last_exception or RuntimeError(f"Could not load '{path}'"))
     else:
         # Your IDE may complain about the `data` parameter - it is a false positive. A sequence of paths is fine
         dataset: xarray.Dataset = xarray.open_mfdataset(
@@ -173,9 +197,10 @@ def save_netcdf(
     else:
         raise TypeError(f"{path} (type={type(path)}) is not a valid path. It must be a str or pathlib.Path")
 
-    if engine not in ("h5netcdf", "scipy"):
-        raise ValueError(f"{engine} is not a supported engine - only 'h5netcdf' and 'scipy' are supported")
+    if engine not in ("h5netcdf", "netcdf4"):
+        raise ValueError(f"{engine} is not a supported engine - only 'h5netcdf' and 'netcdf4' are supported")
 
     dataset.to_netcdf(path=path, engine=engine, **kwargs)
-
+    LOGGER.debug(f"Saved netcdf data to: {path}")
+    record_saved_file(path=path)
     return path.is_file()
