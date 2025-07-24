@@ -217,7 +217,10 @@ def calculate_anomaly(
         daily_values = daily_values.where(daily_values[dimension_names] >= minimum_id, drop=True)
 
         if daily_values.size < variable_size:
-            LOGGER.warning(f"The size of '{threshold}' is too small - reindexing to align ids")
+            LOGGER.warning(
+                f"The size of '{threshold}' (size={daily_values.size}) is too small to match "
+                f"'{input_path.name}::{variable_to_bin}({time_variable}) (size={variable_size})' - reindexing to align ids"
+            )
             try:
                 daily_values = daily_values.reindex(
                     **{

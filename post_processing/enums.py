@@ -27,7 +27,8 @@ class PostProcessingEnumeration(enum.Enum):
         return rf"(?P<{cls.__name__}>{'|'.join([member.value for member in cls])})"
 
     def __str__(self):
-        return str(self.value)
+        from post_processing.utilities.common import format_identifier_to_title
+        return format_identifier_to_title(self.value).title()
 
 
 class ModelOutputType(PostProcessingEnumeration):

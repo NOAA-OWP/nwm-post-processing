@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-The entrypoint for the core post processing application
+The entrypoint for the core post-processing application
 """
 import os
 import typing
@@ -26,7 +26,7 @@ from post_processing.schema.profile import get_profile
 if __name__.endswith("__main__"):
     setup_logging()
 
-LOGGER: logging.Logger = logging.getLogger(pathlib.Path(__file__).stem)
+LOGGER: logging.Logger = logging.getLogger("post-process")
 
 class Arguments:
     """
@@ -37,6 +37,8 @@ class Arguments:
         """Where to get the data to process"""
         self.destination: pathlib.Path = None
         """Where to put the post processed data"""
+        self.summarize: bool = False
+        """Whether to summarize the profile rather than running it"""
 
         self.__parse(args=args)
         self.__validate()
@@ -75,6 +77,12 @@ class Arguments:
             "destination",
             type=pathlib.Path,
             help="Where to put the output"
+        )
+
+        parser.add_argument(
+            "--summarize",
+            action="store_true",
+            help="Describe what will occur rather than running the post processing operations"
         )
 
         parameters: argparse.Namespace = parser.parse_args(args=args) if args else parser.parse_args()
@@ -127,6 +135,10 @@ def main() -> int:
     try:
         if profiles:
             for profile in profiles:
+                if arguments.summarize:
+                    print(str(profile))
+                    continue
+                    
                 outputs: typing.Sequence[pathlib.Path] = profile.run(
                     date=manifest.reference_time,
                     cycle=manifest.cycle,
@@ -134,14 +146,14 @@ def main() -> int:
                     output_path=arguments.destination
                 )
                 LOGGER.info(
-                    f"The results for {profile} were written to:{os.linesep}"
+                    f"The results for the profile for {profile.output_type} data run within the "
+                    f"{profile.configuration} configuration across {profile.region} were written to:{os.linesep}"
                     f"    - {(os.linesep + '    - ').join(map(str, outputs))}"
                 )
         else:
             LOGGER.warning(f"No profiles were found for '{manifest}'. Nothing will be processed")
     except BaseException as exception:
-        from post_processing.utilities.common import log_all_exceptions
-        log_all_exceptions(logger=LOGGER, group=exception, log_function=LOGGER.critical)
+        LOGGER.critical(exception, exc_info=True)
         return 1
     return 0
 
