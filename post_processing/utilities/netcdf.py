@@ -6,11 +6,8 @@ import logging
 import pathlib
 from threading import RLock
 
-from functools import lru_cache
-from functools import cache
-
 from post_processing.configuration import settings
-from post_processing.utilities.simple_cache import SimpleCache
+from post_processing.utilities.simple_cache import simple_cache
 
 if typing.TYPE_CHECKING:
     import xarray
@@ -31,11 +28,11 @@ def record_saved_file(path: pathlib.Path):
             LOGGER.warning(f"File '{path}' has now been saved to {len(list(filter(lambda p: p == path, SAVED_FILES)))} times")
         SAVED_FILES.append(path)
 
-@SimpleCache
+@simple_cache(max_size=settings.netcdf_cache_size)
 def load_netcdf(
     path: typing.Union[pathlib.Path, str, typing.Sequence[typing.Union[pathlib.Path, str]]],
     engine: typing.Union[str, typing.Literal["h5netcdf", "zarr", "netcdf4"]] = settings.default_netcdf_engine,
-    chunks: typing.Union[typing.Mapping[str, typing.Any], typing.Literal['auto']] = 'auto',
+    chunks: typing.Optional[typing.Union[typing.Mapping[str, typing.Any], typing.Literal['auto']]] = None,
     **kwargs
 ) -> "xarray.Dataset":
     """
@@ -46,26 +43,13 @@ def load_netcdf(
     :param chunks: The chunks to load into memory
     :param kwargs: Keyword arguments to pass to xarray.open_dataset. See: https://docs.xarray.dev/en/stable/generated/xarray.open_dataset.html
     """
+    if settings.lazy_load_netcdf and chunks is None:
+        chunks = "auto"
+    elif not settings.lazy_load_netcdf:
+        chunks = None
+
     if engine not in ("h5netcdf", "zarr", "netcdf4"):
         raise ValueError(f"{engine} is not a supported engine - only 'h5netcdf', 'netcdf4', and 'zarr' are supported")
-
-    try:
-        import dask
-        has_dask = True
-    except ImportError:
-        has_dask = False
-
-    if has_dask and chunks is None:
-        LOGGER.warning(
-            f"Attempting to open a netcdf file without chunking - "
-            f"lazy loading will not be supported and you are more at risk of out-of-memory errors"
-        )
-    elif not has_dask and chunks not in (None, 'auto'):
-        LOGGER.warning(
-            "Chunking as requested when loading Netcdf data but Dask is not available. "
-            "Lazy loading via chunking is not supported."
-        )
-        chunks = None
 
     import xarray
 
@@ -102,7 +86,7 @@ def load_netcdf(
 
     return dataset
 
-@SimpleCache
+@simple_cache()
 def load_metadata(
     path: typing.Union[pathlib.Path, str, typing.Sequence[typing.Union[pathlib.Path, str]]],
     engine: typing.Union[str, typing.Literal["h5netcdf", "zarr", "netcdf4"]] = settings.default_netcdf_engine,

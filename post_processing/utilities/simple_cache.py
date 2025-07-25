@@ -45,13 +45,13 @@ class CacheEntry(typing.Generic[VT]):
 
     def __eq__(self, other: typing.Any) -> bool:
         if not isinstance(other, self.__class__):
-            raise TypeError(f"Cannot compare a {self.__class__.__name__} with a {other.__class__.__name__}")
+            return False
 
         return self._key == other._key
 
     def __gt__(self, other: typing.Any) -> bool:
         if not isinstance(other, self.__class__):
-            raise TypeError(f"Cannot compare a {self.__class__.__name__} with a {other.__class__.__name__}")
+            return False
 
         return self._last_access > other._last_access
 
@@ -107,3 +107,8 @@ class SimpleCache(typing.Generic[VT]):
             self.evict()
 
         return result
+
+def simple_cache(*, max_size: int = 0):
+    def decorator(function: typing.Callable[..., VT]) -> typing.Callable[..., VT]:
+        return SimpleCache(function, max_size=max_size)
+    return decorator

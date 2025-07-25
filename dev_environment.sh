@@ -57,13 +57,13 @@ export PP_APP_PATH="$(dirname $(realpath ${BASH_SOURCE[0]}))"
 #export PP_VERBOSITY=0
 
 # An override for what netcdf engine to use by default
-#export PP_default_netcdf_engine=h5netcdf
+export PP_default_netcdf_engine=h5netcdf
 
 # An override for whether or not threads may be used
-#export PP_allow_threading=True
+export PP_allow_threading=True
 
 # An override for how large the netcdf cache may be
 #export PP_netcdf_cache_size=3
 
 # An override for whether to lazy load netcdf data
-#export PP_lazy_load_netcdf=True
+export PP_lazy_load_netcdf=True
