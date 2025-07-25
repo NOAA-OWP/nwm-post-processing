@@ -8,6 +8,7 @@ import pathlib
 import dataclasses
 
 from post_processing.configuration import settings
+from post_processing.schema.base import member
 
 if typing.TYPE_CHECKING:
     import xarray
@@ -25,6 +26,7 @@ class ThresholdDefinition:
     level: typing.Union[int, float, "numpy.float32"]
     variable: str
     time_coordinate: str = dataclasses.field(default='time')
+    _data: typing.Dict[int, "xarray.DataArray"] = member(default_factory=dict)
 
     def __post_init__(self):
         import numpy
@@ -69,20 +71,25 @@ class ThresholdDefinition:
         """
         Get statistical value from a netcdf file based on the day of the year
         """
+        if day_of_year in self._data:
+            return self._data[day_of_year]
+
         import xarray
         from post_processing.utilities.netcdf import load_netcdf
 
         file_path: pathlib.Path = pathlib.Path(str(self.data_path).format(**path_metadata))
 
-        dataset: xarray.Dataset = load_netcdf(path=file_path, engine='netcdf4', mode='r')
-        if self.variable not in dataset.variables:
-            raise KeyError(
-                f"The file at '{file_path}' does not contain variable '{self.variable}'"
-            )
-        variable: xarray.DataArray = dataset[self.variable]
-        specific_statistics: xarray.DataArray = variable.sel(
-            **{self.time_coordinate: day_of_year}
-        )
+        with load_netcdf(path=file_path) as dataset:
+            if self.variable not in dataset.variables:
+                raise KeyError(
+                    f"The file at '{file_path}' does not contain variable '{self.variable}'"
+                )
+            variable: xarray.DataArray = dataset[self.variable]
+            specific_statistics: xarray.DataArray = variable.sel(
+                **{self.time_coordinate: day_of_year}
+            ).compute()
+
+        self._data[day_of_year] = specific_statistics
         return specific_statistics
 
 

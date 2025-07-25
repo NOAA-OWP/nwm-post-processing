@@ -1204,7 +1204,7 @@ class BranchOperation(ProfileOperation[InputType, typing.Sequence[pathlib.Path]]
             raise ValueError(message)
 
 
-    def __call__(
+    def branch_concurrently(
         self,
         profile: "Profile",
         process_identifier: str,
@@ -1212,9 +1212,9 @@ class BranchOperation(ProfileOperation[InputType, typing.Sequence[pathlib.Path]]
         data: InputType,
         previous_operations: typing.List[ProfileOperation],
         metadata: typing.Dict[str, typing.Any]
-    ) -> typing.Sequence[pathlib.Path]:
+    ) -> OutputType:
         """
-        Feed input parameters into different branches of logic
+        Feed input parameters into different branches of logic across multiple threads
 
         :param profile: The profile that called for this operation
         :param process_identifier: An identifier tying together other output for this post processing task
@@ -1290,6 +1290,96 @@ class BranchOperation(ProfileOperation[InputType, typing.Sequence[pathlib.Path]]
             raise exception
 
         return melted_results
+
+
+    def branch_sequentially(
+        self,
+        profile: "Profile",
+        process_identifier: str,
+        work_directory: pathlib.Path,
+        data: InputType,
+        previous_operations: typing.List[ProfileOperation],
+        metadata: typing.Dict[str, typing.Any]
+    ) -> typing.Sequence[pathlib.Path]:
+        """
+        Feed input parameters into different branches of logic without threading
+
+        :param profile: The profile that called for this operation
+        :param process_identifier: An identifier tying together other output for this post processing task
+        :param work_directory: Where intermediate products may be saved
+        :param data: The files to operate on
+        :param metadata: Metadata provided from previous operations that may be used as helpful hints
+        :returns: The Paths for each created object
+        """
+        results: typing.List[pathlib.Path] = []
+
+        try:
+            for branch_name, branch_logic in self.branches.items():
+                branch_results: typing.Sequence[pathlib.Path] = call_operations(
+                    operations=branch_logic,
+                    profile=profile,
+                    process_identifier=process_identifier,
+                    work_directory=work_directory,
+                    data=data,
+                    previous_operations=previous_operations.copy(),
+                    metadata=metadata.copy()
+                )
+
+                recurring_paths: typing.List[pathlib.Path] = list(filter(
+                    lambda path: path in results,
+                    branch_results
+                ))
+
+                if recurring_paths:
+                    LOGGER.warning(
+                        f"Processing from the '{branch_name}' branch in the profile for {profile.output_type} data from the "
+                        f"{profile.configuration} configuration over {profile.region} for t{metadata['cycle']}z on "
+                        f"{metadata['reference_time__date']} encountered duplicate results at: "
+                        f"{', '.join(map(str, recurring_paths))}"
+                    )
+
+                results.extend(
+                    path
+                    for path in branch_results
+                    if path not in results
+                )
+        except Exception as exception:
+            if 'failure in' not in str(exception):
+                exception.args = (f"Failure in:{os.linesep}{self}{os.linesep}{exception.args[0]}", *exception.args[1:])
+            raise exception
+
+        return results
+
+
+    def __call__(
+        self,
+        profile: "Profile",
+        process_identifier: str,
+        work_directory: pathlib.Path,
+        data: InputType,
+        previous_operations: typing.List[ProfileOperation],
+        metadata: typing.Dict[str, typing.Any]
+    ) -> typing.Sequence[pathlib.Path]:
+        """
+        Feed input parameters into different branches of logic
+
+        :param profile: The profile that called for this operation
+        :param process_identifier: An identifier tying together other output for this post processing task
+        :param work_directory: Where intermediate products may be saved
+        :param data: The files to operate on
+        :param metadata: Metadata provided from previous operations that may be used as helpful hints
+        :returns: The Paths for each created object
+        """
+        branch_function = self.branch_concurrently if settings.allow_threading else self.branch_sequentially
+        results = branch_function(
+            profile=profile,
+            process_identifier=process_identifier,
+            work_directory=work_directory,
+            data=data,
+            previous_operations=previous_operations,
+            metadata=metadata
+        )
+        return results
 
 @dataclasses.dataclass(unsafe_hash=True)
 class LoadOperation(ProfileOperation[typing.Sequence[pathlib.Path], typing.Iterator[xarray.Dataset]]):
