@@ -275,6 +275,26 @@ class _Settings(UserDict):
         return self.__getitem__(key=key)
 
     @property
+    def lazy_load_netcdf(self) -> bool:
+        """
+        Whether to default to loading netcdf data lazily
+        """
+        proposed_key: str = "{prefix}_lazy_load_netcdf".format(prefix=self.prefix).lower()
+        key: str = self._find_key(key=proposed_key)
+
+        if key not in self.keys():
+            self.__setitem__(key=key, item=True)
+
+        return str(self.__getitem__(key=key)).lower() in ("true", "1", "t", "y", "yes", "o", "on")
+
+    @lazy_load_netcdf.setter
+    def lazy_load_netcdf(self, value: bool):
+        proposed_key: str = "{prefix}_lazy_load_netcdf".format(prefix=self.prefix).lower()
+        key: str = self._find_key(key=proposed_key)
+        self.__setitem__(key=key, item=value)
+
+
+    @property
     def application_path(self) -> pathlib.Path:
         """
         Get the root of this application

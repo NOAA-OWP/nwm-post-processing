@@ -11,8 +11,12 @@ try:
     from post_processing.configuration import settings
     LOG_FORMAT: str = settings.log_format
     DATE_FORMAT: str = settings.date_format
+    NETCDF_ENGINE: typing.Literal['netcdf4', 'h5netcdf'] = settings.default_netcdf_engine
+    LAZY_LOAD: bool = settings.lazy_load_netcdf
 except ImportError:
     settings = None
+    NETCDF_ENGINE = "netcdf4"
+    LAZY_LOAD: bool = True
     LOG_FORMAT = "[%(asctime)s] %(levelname)s %(name)s: %(message)s"
     DATE_FORMAT = "%Y-%m-%d %H:%M:%S%z"
 
@@ -82,13 +86,13 @@ def calculate_upstream_flow(
         from functools import partial
         load_netcdf = partial(
             xarray.open_dataset,
-            chunks={},
-            engine="h5netcdf",
+            chunks={} if LAZY_LOAD else None,
+            engine=NETCDF_ENGINE,
         )
         def save_netcdf(path: typing.Union[str, pathlib.Path], dataset: xarray.Dataset):
             dataset.to_netcdf(
                 path=path,
-                engine="h5netcdf"
+                engine=NETCDF_ENGINE,
             )
 
     if encoding is None:
@@ -256,7 +260,11 @@ def main() -> int:
 
     # Load and print the generated data
     import xarray
-    output_dataset: xarray.Dataset = xarray.open_dataset(generated_file_path, chunks={})
+    output_dataset: xarray.Dataset = xarray.open_dataset(
+        generated_file_path,
+        chunks={} if LAZY_LOAD else None,
+        engine=NETCDF_ENGINE
+    )
     output_dataset.info()
     return 0
 
