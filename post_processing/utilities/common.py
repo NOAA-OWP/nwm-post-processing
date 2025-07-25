@@ -84,7 +84,7 @@ def starmap(
     if not isinstance(args, typing.Iterable) or isinstance(args, (str, bytes)):
         raise TypeError(f"Arguments for starmap must be an iterable collection. Received '{args}' (type={type(args)})")
 
-    if thread_count is not None and thread_count > 0:
+    if settings.allow_threading and thread_count is not None and thread_count > 0:
         results.extend(
             starmap_threaded(function=function, args=args, thread_count=thread_count)
         )

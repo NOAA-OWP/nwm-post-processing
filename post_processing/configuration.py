@@ -15,8 +15,12 @@ Make sure that this is False when deployed to testing and production.
 """
 _DEFAULT_DATE_FORMAT: str = "%Y-%m-%d %H:%M:%S%z"
 """The default date format for the entire project"""
+
 _DEFAULT_LOG_FORMAT: str = "[%(asctime)s] %(levelname)s %(name)s: %(message)s"
 """The default formatting for log messages when logging is not set up with the logging configuration"""
+
+_DEFAULT_NETCDF_CACHE_SIZE: int = 3
+"""The number of netcdf files to keep loaded"""
 
 SENTINEL = object()
 
@@ -161,6 +165,66 @@ class _Settings(UserDict):
         The prefix of important application environment parameters
         """
         return "PP"
+
+    @property
+    def allow_threading(self) -> bool:
+        """
+        Whether to allow multithreading
+        """
+        proposed_key: str = f"{self.prefix}_allow_threading"
+        key: str = self._find_key(key=proposed_key)
+
+        if key not in self.keys():
+            self.__setitem__(key=key, item=True)
+
+        stored_value: typing.Any = self.__getitem__(key=key)
+
+        return str(stored_value).lower() in ('true', 't', '1', 'yes', 'y', 'on')
+
+    @allow_threading.setter
+    def allow_threading(self, value: bool):
+        proposed_key: str = f"{self.prefix}_allow_threading"
+        key: str = self._find_key(key=proposed_key)
+        self.__setitem__(key=key, item=value)
+
+    @property
+    def default_netcdf_engine(self) -> str:
+        """
+        The netcdf engine to use by default
+        """
+        proposed_key: str = f"{self.prefix}_default_netcdf_engine"
+        key: str = self._find_key(key=proposed_key)
+
+        if key not in self.keys():
+            import importlib.util
+            if importlib.util.find_spec("h5netcdf") is None:
+                self.__setitem__(key=key, item="netcdf4")
+            else:
+                self.__setitem__(key=key, item="h5netcdf")
+
+        return self.__getitem__(key=key)
+
+    @default_netcdf_engine.setter
+    def default_netcdf_engine(self, value: str):
+        proposed_key: str = f"{self.prefix}_default_netcdf_engine"
+        key: str = self._find_key(key=proposed_key)
+        self.__setitem__(key=key, item=value)
+
+    @property
+    def netcdf_cache_size(self) -> int:
+        proposed_key: str = f"{self.prefix}_netcdf_cache_size"
+        key: str = self._find_key(key=proposed_key)
+
+        if key not in self.keys():
+            self.__setitem__(key=key, item=_DEFAULT_NETCDF_CACHE_SIZE)
+
+        return int(float(self.__getitem__(key=key)))
+
+    @netcdf_cache_size.setter
+    def netcdf_cache_size(self, value: int):
+        proposed_key: str = f"{self.prefix}_netcdf_cache_size"
+        key: str = self._find_key(key=proposed_key)
+        self.__setitem__(key=key, item=value)
     
     @property
     def debug(self) -> bool:

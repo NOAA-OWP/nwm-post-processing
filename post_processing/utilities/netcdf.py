@@ -7,6 +7,10 @@ import pathlib
 from threading import RLock
 
 from functools import lru_cache
+from functools import cache
+
+from post_processing.configuration import settings
+from post_processing.utilities.simple_cache import SimpleCache
 
 if typing.TYPE_CHECKING:
     import xarray
@@ -17,14 +21,20 @@ SAVED_FILES: typing.List[pathlib.Path] = []
 SAVED_FILE_LOCK: RLock = RLock()
 
 def record_saved_file(path: pathlib.Path):
+    """
+    Record a saved file in order to issue an alert if a netcdf file is written to multiple times, putting the system at risk of a segfault
+
+    :param path: The path to where a file was saved
+    """
     with SAVED_FILE_LOCK:
         if path in SAVED_FILES:
             LOGGER.warning(f"File '{path}' has now been saved to {len(list(filter(lambda p: p == path, SAVED_FILES)))} times")
         SAVED_FILES.append(path)
 
+@SimpleCache
 def load_netcdf(
     path: typing.Union[pathlib.Path, str, typing.Sequence[typing.Union[pathlib.Path, str]]],
-    engine: typing.Union[str, typing.Literal["h5netcdf", "zarr", "netcdf4"]] = "h5netcdf",
+    engine: typing.Union[str, typing.Literal["h5netcdf", "zarr", "netcdf4"]] = settings.default_netcdf_engine,
     chunks: typing.Union[typing.Mapping[str, typing.Any], typing.Literal['auto']] = 'auto',
     **kwargs
 ) -> "xarray.Dataset":
@@ -36,13 +46,8 @@ def load_netcdf(
     :param chunks: The chunks to load into memory
     :param kwargs: Keyword arguments to pass to xarray.open_dataset. See: https://docs.xarray.dev/en/stable/generated/xarray.open_dataset.html
     """
-    if engine is None:
-        engine = "h5netcdf"
-
-    engine = engine.strip().lower()
-
     if engine not in ("h5netcdf", "zarr", "netcdf4"):
-        raise ValueError(f"{engine} is not a supported engine - only 'h5netcdf' and 'zarr' are supported")
+        raise ValueError(f"{engine} is not a supported engine - only 'h5netcdf', 'netcdf4', and 'zarr' are supported")
 
     try:
         import dask
@@ -97,10 +102,10 @@ def load_netcdf(
 
     return dataset
 
-
+@SimpleCache
 def load_metadata(
     path: typing.Union[pathlib.Path, str, typing.Sequence[typing.Union[pathlib.Path, str]]],
-    engine: typing.Union[str, typing.Literal["h5netcdf", "zarr", "netcdf4"]] = "h5netcdf"
+    engine: typing.Union[str, typing.Literal["h5netcdf", "zarr", "netcdf4"]] = settings.default_netcdf_engine,
 ) -> typing.Dict[str, typing.Any]:
     """
     Get the metadata attached to a netcdf file and its variables
@@ -177,7 +182,7 @@ def format_attribute_value(value: typing.Any) -> typing.Any:
 def save_netcdf(
     path: typing.Union[str, pathlib.Path],
     dataset: "xarray.Dataset",
-    engine: typing.Literal["h5netcdf", "scipy"] = "h5netcdf",
+    engine: typing.Literal["h5netcdf", "scipy"] = settings.default_netcdf_engine,
     **kwargs
 ) -> bool:
     """
@@ -200,7 +205,8 @@ def save_netcdf(
     if engine not in ("h5netcdf", "netcdf4"):
         raise ValueError(f"{engine} is not a supported engine - only 'h5netcdf' and 'netcdf4' are supported")
 
-    dataset.to_netcdf(path=path, engine=engine, **kwargs)
+    compute = str(kwargs.get('compute', True)).lower() in ('true', 'yes', 't', 'y', '1')
+    dataset.to_netcdf(path=path, engine=engine, **kwargs, compute=compute)
     LOGGER.debug(f"Saved netcdf data to: {path}")
     record_saved_file(path=path)
     return path.is_file()

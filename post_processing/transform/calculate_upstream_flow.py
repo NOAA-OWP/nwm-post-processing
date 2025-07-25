@@ -71,7 +71,7 @@ def calculate_upstream_flow(
     import xarray
     import pandas
     import numpy
-    import geopandas
+
     import tempfile
     import shutil
 
@@ -101,6 +101,7 @@ def calculate_upstream_flow(
             raw_data = data_to_transform[variable].values
 
             if routelink_format == RoutelinkFormat.GEOPACKAGE:
+                import geopandas
                 routelink = geopandas.read_file(routelink_path, driver="GPKG")
                 from_values = routelink[routelink_from_variable]
                 to_values = routelink[routelink_to_variable]
