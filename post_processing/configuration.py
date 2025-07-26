@@ -108,7 +108,7 @@ def _parse_env_file(env_path: pathlib.Path) -> typing.Dict[str, typing.Any]:
     configured_variables: typing.Dict[str, typing.Any] = {}
 
     for match in line_pattern.finditer(file_text):
-        configured_variables[match.group("variable_name")] = match.group("variable_value")
+        configured_variables[match.group("variable_name").lower()] = match.group("variable_value")
 
     return configured_variables
 
@@ -121,18 +121,23 @@ class _Settings(UserDict):
         super().__init__()
 
         for key, value in os.environ.items():
-            self.__setitem__(key=key.lower(), item=value)
+            self.__setitem__(key=key, item=value)
 
         for initial_key, initial_value in (initial_values or {}).items():
-            self.__setitem__(key=initial_key.lower(), item=initial_value)
+            matching_key: str = self._find_key(initial_key)
+            self.__setitem__(key=matching_key, item=initial_value)
 
         for keyword, argument in kwargs.items():
-            self.__setitem__(key=keyword, item=argument)
+            matching_key: str = self._find_key(keyword)
+            self.__setitem__(key=matching_key, item=argument)
 
         env_file: pathlib.Path = self.application_path / ".env"
 
         configured_variables: typing.Mapping[str, typing.Any] = _parse_env_file(env_path=env_file)
-        self.update(configured_variables)
+
+        for key, value in configured_variables.items():
+            matching_key: str = self._find_key(key)
+            self.__setitem__(key=matching_key, item=value)
 
 
     def _find_key(self, key: str) -> str:
@@ -152,6 +157,7 @@ class _Settings(UserDict):
             os_key
             for os_key in os.environ.keys()
             if os_key not in matching_keys
+               and os_key.lower() == key.lower()
         ])
 
         if len(matching_keys) == 1:
