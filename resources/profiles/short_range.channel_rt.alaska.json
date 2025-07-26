@@ -52,19 +52,6 @@
                         "message": "Renaming 'feature_id' to 'station_id'"
                     },
                     {
-                        "operation": "rename",
-                        "mapping": {
-                            "feature_id": "station"
-                        }
-                    },
-                    {
-                        "operation": "rename",
-                        "rename_variable": false,
-                        "mapping": {
-                            "feature_id": "station_id"
-                        }
-                    },
-                    {
                         "operation": "echo",
                         "message": "Dropping streamflow_anomaly. Operations need to be rearranged to allow anomaly to only be calculated on the WMS branch"
                     },
@@ -78,7 +65,7 @@
                     },
                     {
                         "operation": "extract",
-                        "dimension": "station",
+                        "dimension": "feature_id",
                         "mask_coordinate": "feature_id",
                         "masks": [
                             "resources/masks/alaska.aprfc.nc"
@@ -86,6 +73,19 @@
                         "identifier_pattern": "^(?P<region>\\w+(\\.(?P<rfc>[MmAaLlCcNnPpWwOoSsHh][BbPpNnMmAaCcEeWwHhRrGg]([Rr][Ff][Cc]|[Vv][Ii])))?)",
                         "output_pattern": "nwm.t{reference_time__date}{cycle}z.{Configuration}.{ModelOutputType}.{region}.nc",
                         "each": [
+                            {
+                                "operation": "rename",
+                                "mapping": {
+                                    "feature_id": "station_id"
+                                }
+                            },
+                            {
+                                "operation": "rename",
+                                "rename_variable": false,
+                                "mapping": {
+                                    "feature_id": "station"
+                                }
+                            },
                             {
                                 "operation": "save",
                                 "filename_pattern": "{file_name}",
