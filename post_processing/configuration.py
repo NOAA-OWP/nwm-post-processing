@@ -181,7 +181,7 @@ class _Settings(UserDict):
         key: str = self._find_key(key=proposed_key)
 
         if key not in self.keys():
-            self.__setitem__(key=key, item=True)
+            self.__setitem__(key=key, item=False)
 
         stored_value: typing.Any = self.__getitem__(key=key)
 
@@ -289,7 +289,7 @@ class _Settings(UserDict):
         key: str = self._find_key(key=proposed_key)
 
         if key not in self.keys():
-            self.__setitem__(key=key, item=True)
+            self.__setitem__(key=key, item=False)
 
         return str(self.__getitem__(key=key)).lower() in ("true", "1", "t", "y", "yes", "o", "on")
 
