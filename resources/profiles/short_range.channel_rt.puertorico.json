@@ -6,11 +6,6 @@
             "fields": ["feature_id", "time", "reference_time", "streamflow", "crs"]
         },
         {
-            "operation": "echo",
-            "message": "Dropped Variables, now calculating upstreamflow",
-            "level": "INFO"
-        },
-        {
             "operation": "on_each",
             "comment": "Add upstreamflow to each input file by calling 'post_processing.transform.calculate_upstream_flow.calculate_upstream_flow' on each",
             "on_each": [
@@ -19,74 +14,68 @@
                     "function_name": "post_processing.transform.calculate_upstream_flow.calculate_upstream_flow",
                     "comment": "This should end up calling `calculate_upstream_flow(input_path=data, output_path=data, routelink_path='{application_path}/RouteLink_CONUS.nc')`",
                     "kwargs": {
-                        "routelink_path": "{application_path}/resources/routelink/RouteLink_PRVI.nc",
+                        "routelink_path": "{resource_path}/routelink/RouteLink_PRVI.nc",
                         "routelink_from_variable": "from",
                         "output_path": "{work_directory}/upstream.{input_name}"
                     },
                     "argument_mapping": {
                         "input_path": "data"
                     }
-                },
-                {
-                    "operation": "echo",
-                    "message": "Upstream flow is only supposed to be on RFC output. Find a way to move it so it does not end up in WMS output",
-                    "level": "ERROR"
                 }
             ]
-        },
-        {
-            "operation": "echo",
-            "message": "Calculated upstream flow, now merging data",
-            "level": "INFO"
         },
         {
             "operation": "merge",
             "file_name_pattern": "nwm.t{reference_time__date}{cycle}z.{ModelOutputType}.{Configuration}.{Region}.nc"
         },
         {
-            "operation": "echo",
-            "message": "Merged data, now renaming variables and dimensions",
-            "level": "INFO"
-        },
-        {
-            "operation": "rename",
-            "mapping": {
-                "feature_id": "station_id"
-            }
-        },
-        {
-            "operation": "echo",
-            "message": "renamed 'feature_id' to 'station_id', now splitting locations based on RFC",
-            "level": "INFO"
-        },
-        {
             "operation": "branch",
             "branches": {
                 "WMS": [
                     {
-                        "operation": "raise",
-                        "message": "Ensure that '{output_path}/WMS/nwm.t{reference_time__date}{cycle}z.{Configuration}.{ModelOutputType}.{Region}.nc' has anomaly. This error may be removed then"
+                        "operation": "drop",
+                        "fields": ["upstreamflow"]
                     },
                     {
                         "operation": "save",
-                        "filename_pattern": "nwm.t{reference_time__date}{cycle}z.{Configuration}.{ModelOutputType}.{Region}.nc",
+                        "filename_pattern": "nwm.t{reference_time__date}{cycle}z.{Configuration}.{ModelOutputType}.{Region}.serfc.nc",
                         "directory": "{output_path}/WMS/"
                     }
                 ],
                 "RFC": [
                     {
                         "operation": "extract",
-                        "dimension": "station_id",
+                        "dimension": "feature_id",
                         "mask_coordinate": "feature_id",
                         "masks": [
                             "resources/masks/prvi.serfc.nc"
                         ],
                         "identifier_pattern": "^(?P<region>\\w+(\\.(?P<rfc>[MmAaLlCcNnPpWwOoSsHh][BbPpNnMmAaCcEeWwHhRrGg]([Rr][Ff][Cc]|[Vv][Ii])))?)",
-                        "output_pattern": "nwm.t{reference_time__date}{cycle}z.{Configuration}.{ModelOutputType}.{region}.nc",
+                        "output_pattern": "split.nwm.t{reference_time__date}{cycle}z.{Configuration}.{ModelOutputType}.puertorico.nc",
                         "each": [
                             {
+                                "operation": "peek",
+                                "show_state": false,
+                                "show_summary": false
+                            },
+                            {
+                                "operation": "rename",
+                                "mapping": {
+                                    "feature_id": "station_id"
+                                },
+                                "output_pattern": "renamed.{file_name}"
+                            },
+                            {
+                                "operation": "rename",
+                                "rename_variable": false,
+                                "mapping": {
+                                    "feature_id": "station"
+                                },
+                                "output_pattern": "renamed.{file_name}"
+                            },
+                            {
                                 "operation": "save",
-                                "filename_pattern": "{file_name}",
+                                "filename_pattern": "nwm.t{reference_time__date}{cycle}z.{Configuration}.{ModelOutputType}.puertorico.serfc.nc",
                                 "identifier_pattern": "(?P<rfc>[A-Za-z]{2}[Rr][Ff][Cc])",
                                 "directory": "{output_path}/RFC/{RFC}/"
                             }
@@ -94,18 +83,6 @@
                     }
                 ]
             }
-        },
-        {
-            "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.short_range.channel_rt.puertorico.nc' should be generated, as defined in {source_file}.",
-            "level": "INFO",
-            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/WMS/short_range/channel_rt/nwm.t2025060718z.short_range.channel_rt.puertorico.nc"
-        },
-        {
-            "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.short_range.channel_rt.puertorico.nc' should be generated, as defined in {source_file}.",
-            "level": "INFO",
-            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/SE/nwm.t2025060718z.short_range.channel_rt.puertorico.serfc.nc"
         }
     ],
     "configuration": "short_range",

@@ -41,6 +41,8 @@ class Arguments:
         """Where to put the post processed data"""
         self.summarize: bool = False
         """Whether to summarize the profile rather than running it"""
+        self.peek: bool = False
+        """Print the headers of each produced file at the end"""
 
         self.__parse(args=args)
         self.__validate()
@@ -85,6 +87,13 @@ class Arguments:
             "--summarize",
             action="store_true",
             help="Describe what will occur rather than running the post processing operations"
+        )
+
+        parser.add_argument(
+            "--peek",
+            "-p",
+            action="store_true",
+            help="Print the headers of each produced file"
         )
 
         parameters: argparse.Namespace = parser.parse_args(args=args) if args else parser.parse_args()
@@ -152,6 +161,12 @@ def main() -> int:
                     f"{profile.configuration.describe()} configuration across {profile.region.describe()} were written to:{os.linesep}"
                     f"    - {(os.linesep + '    - ').join(map(str, outputs))}"
                 )
+
+                if arguments.peek:
+                    for output in outputs:
+                        from post_processing.utilities.netcdf import load_netcdf
+                        data = load_netcdf(output)
+                        LOGGER.info(f"Output: {output}:{os.linesep}{data}")
         else:
             LOGGER.warning(f"No profiles were found for '{manifest}'. Nothing will be processed")
     except BaseException as exception:

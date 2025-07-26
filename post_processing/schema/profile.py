@@ -165,7 +165,7 @@ class InPlaceOperationMixin:
         :returns: The formatted output name
         """
         if self.output_pattern is None:
-            return f"{input_file}.nc"
+            return f"{context.get('stage', '')}{input_file}.nc"
 
         template_arguments: typing.Dict[str, typing.Optional[str]] = {
             variable_name: None
@@ -2209,6 +2209,7 @@ def call_generic_operations(
     current_data = data
 
     for operation in operations:
+        metadata['stage'] = operation.operation_id
         current_data = operation(
             profile=profile,
             process_identifier=process_identifier,
@@ -2248,6 +2249,7 @@ def call_operations(
     current_data: typing.Union[typing.Sequence[pathlib.Path], xarray.Dataset] = list(data)
 
     for operation in operations:
+        metadata['stage'] = operation.operation_id
         if operation.disable:
             LOGGER.warning(f"{operation.__class__.__qualname__} disabled:{os.linesep}{operation}")
             continue
