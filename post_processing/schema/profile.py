@@ -1066,7 +1066,10 @@ class SaveOperation(NCOOperation):
                         file_specific_metadata["RFC"] = rfc_abbreviation
 
                 try:
-                    filename: str = self.filename_pattern.format(**file_specific_metadata)
+                    if self.filename_pattern:
+                        filename: str = self.filename_pattern.format(**file_specific_metadata)
+                    else:
+                        filename: str = file.name
                 except KeyError as e:
                     from post_processing.utilities.common import to_json
                     LOGGER.error(
@@ -1128,10 +1131,11 @@ class SaveOperation(NCOOperation):
         return data
 
     directory: pathlib.Path = dataclasses.field()
-    filename_pattern: str
+    filename_pattern: typing.Optional[str] = dataclasses.field(default=None)
     return_new_paths: bool = dataclasses.field(default=True)
     identifier_pattern: typing.Optional[str] = dataclasses.field(default=None)
     _compiled_pattern: typing.Optional[re.Pattern] = member(default=None)
+
 
 @dataclasses.dataclass
 class BranchOperation(ProfileOperation[InputType, typing.Sequence[pathlib.Path]]):

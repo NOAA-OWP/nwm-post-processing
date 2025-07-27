@@ -139,7 +139,6 @@ class _Settings(UserDict):
             matching_key: str = self._find_key(key)
             self.__setitem__(key=matching_key, item=value)
 
-
     def _find_key(self, key: str) -> str:
         """
         Find a matching case-flexible key in either these settings or in the os environment variables
@@ -298,7 +297,6 @@ class _Settings(UserDict):
         proposed_key: str = "{prefix}_lazy_load_netcdf".format(prefix=self.prefix).lower()
         key: str = self._find_key(key=proposed_key)
         self.__setitem__(key=key, item=value)
-
 
     @property
     def application_path(self) -> pathlib.Path:
@@ -509,6 +507,34 @@ class _Settings(UserDict):
             raise FileNotFoundError("Could not find a resources directory at '{path}'".format(path=path))
         
         return path
+
+    @property
+    def mask_path(self) -> pathlib.Path:
+        """
+        The path to masks bundled with the application
+        """
+        proposed_key: str = f"{self.prefix}_mask_path".lower()
+        key: str = self._find_key(key=proposed_key)
+
+        if key not in self.keys() or not isinstance(self.__getitem__(key=key), (pathlib.Path, str)):
+            path: pathlib.Path = self.resource_path / "masks"
+            self.__setitem__(key=key, item=path)
+
+        return self.__getitem__(key=key)
+
+    @property
+    def routelink_path(self) -> pathlib.Path:
+        """
+        The path to masks bundled with the application
+        """
+        proposed_key: str = f"{self.prefix}_routelink_path".lower()
+        key: str = self._find_key(key=proposed_key)
+
+        if key not in self.keys() or not isinstance(self.__getitem__(key=key), (pathlib.Path, str)):
+            path: pathlib.Path = self.resource_path / "routelink"
+            self.__setitem__(key=key, item=path)
+
+        return self.__getitem__(key=key)
 
     @property
     def threshold_path(self) -> pathlib.Path:

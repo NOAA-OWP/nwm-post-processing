@@ -6,12 +6,6 @@
             "fields": ["feature_id", "time", "reference_time", "streamflow", "crs"]
         },
         {
-            "operation": "save",
-            "filename_pattern": "nwm.t{reference_time__date}{cycle}z.{Configuration}.{ModelOutputType}.tm{tminus}.{Region}.serfc.nc",
-            "directory": "{output_path}/WMS/",
-            "return_new_paths": false
-        },
-        {
             "operation": "on_each",
             "comment": "Add upstreamflow to each input file by calling 'post_processing.transform.calculate_upstream_flow.calculate_upstream_flow' on each",
             "on_each": [
@@ -20,7 +14,7 @@
                     "function_name": "post_processing.transform.calculate_upstream_flow.calculate_upstream_flow",
                     "comment": "This should end up calling `calculate_upstream_flow(input_path=data, output_path=data, routelink_path='{application_path}/RouteLink_CONUS.nc')`",
                     "kwargs": {
-                        "routelink_path": "{routelink_path}/RouteLink_PRVI.nc",
+                        "routelink_path": "{resource_path}/routelink/RouteLink_HI.nc",
                         "routelink_from_variable": "from",
                         "output_path": "{work_directory}/upstream.{input_name}"
                     },
@@ -31,38 +25,43 @@
             ]
         },
         {
-            "operation": "rename",
-            "mapping": {
-                "feature_id": "station_id"
-            }
-        },
-        {
-            "operation": "rename",
-            "rename_variable": false,
-            "mapping": {
-                "feature_id": "station"
-            }
+            "operation": "merge",
+            "file_name_pattern": "nwm.t{reference_time__date}{cycle}z.{ModelOutputType}.{Configuration}.{Region}.nc"
         },
         {
             "operation": "extract",
             "dimension": "feature_id",
             "mask_coordinate": "feature_id",
             "masks": [
-                "resources/masks/prvi.serfc.nc"
+                "resources/masks/aprfc.nc"
             ],
             "identifier_pattern": "^(?P<region>\\w+(\\.(?P<rfc>[MmAaLlCcNnPpWwOoSsHh][BbPpNnMmAaCcEeWwHhRrGg]([Rr][Ff][Cc]|[Vv][Ii])))?)",
-            "output_pattern": "nwm.t{reference_time__date}{cycle}z.{Configuration}.{ModelOutputType}.{frame}.puertorico.serfc.nc",
+            "output_pattern": "split.nwm.t{reference_time__date}{cycle}z.{Configuration}.{ModelOutputType}.{region}.nc",
             "each": [
                 {
+                    "operation": "rename",
+                    "mapping": {
+                        "feature_id": "station_id"
+                    }
+                },
+                {
+                    "operation": "rename",
+                    "rename_variable": false,
+                    "mapping": {
+                        "feature_id": "station"
+                    }
+                },
+                {
                     "operation": "save",
+                    "filename_pattern": "nwm.t{reference_time__date}{cycle}z.{Configuration}.{ModelOutputType}.{rfc}.nc",
                     "identifier_pattern": "(?P<rfc>[A-Za-z]{2}[Rr][Ff][Cc])",
                     "directory": "{output_path}/RFC/{RFC}/"
                 }
             ]
         }
     ],
-    "configuration": "analysis_assim",
+    "configuration": "short_range_no_da",
     "output_type": "channel_rt",
-    "region": "puertorico",
+    "region": "hawaii",
     "member": null
 }

@@ -1,76 +1,68 @@
 {
     "operations": [
         {
-            "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.medium_range_no_da.channel_rt.abrfc.nc' should be generated, as defined in {source_file}.",
-            "level": "error",
-            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AB/channel_rt/nwm.t2025060712z.medium_range_no_da.channel_rt.abrfc.nc"
+            "operation": "drop",
+            "exclude": true,
+            "fields": ["feature_id", "time", "reference_time", "streamflow", "crs"]
         },
         {
-            "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.medium_range_no_da.channel_rt.cbrfc.nc' should be generated, as defined in {source_file}.",
-            "level": "error",
-            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/CB/channel_rt/nwm.t2025060712z.medium_range_no_da.channel_rt.cbrfc.nc"
+            "operation": "on_each",
+            "comment": "Add upstreamflow to each input file by calling 'post_processing.transform.calculate_upstream_flow.calculate_upstream_flow' on each",
+            "on_each": [
+                {
+                    "operation": "function",
+                    "function_name": "post_processing.transform.calculate_upstream_flow.calculate_upstream_flow",
+                    "comment": "This should end up calling `calculate_upstream_flow(input_path=data, output_path=data, routelink_path='{application_path}/RouteLink_CONUS.nc')`",
+                    "kwargs": {
+                        "routelink_path": "{routelink_path}/RouteLink_CONUS.nc",
+                        "routelink_from_variable": "from",
+                        "output_path": "{work_directory}/upstream.{input_name}"
+                    },
+                    "argument_mapping": {
+                        "input_path": "data"
+                    }
+                }
+            ]
         },
         {
-            "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.medium_range_no_da.channel_rt.cnrfc.nc' should be generated, as defined in {source_file}.",
-            "level": "error",
-            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/CN/channel_rt/nwm.t2025060712z.medium_range_no_da.channel_rt.cnrfc.nc"
+            "operation": "merge",
+            "file_name_pattern": "nwm.t{reference_time__date}{cycle}z.{ModelOutputType}.{Configuration}.{Region}.nc"
         },
         {
-            "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.medium_range_no_da.channel_rt.lmrfc.nc' should be generated, as defined in {source_file}.",
-            "level": "error",
-            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/LM/channel_rt/nwm.t2025060712z.medium_range_no_da.channel_rt.lmrfc.nc"
-        },
-        {
-            "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.medium_range_no_da.channel_rt.marfc.nc' should be generated, as defined in {source_file}.",
-            "level": "error",
-            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/MA/channel_rt/nwm.t2025060712z.medium_range_no_da.channel_rt.marfc.nc"
-        },
-        {
-            "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.medium_range_no_da.channel_rt.mbrfc.nc' should be generated, as defined in {source_file}.",
-            "level": "error",
-            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/MB/channel_rt/nwm.t2025060712z.medium_range_no_da.channel_rt.mbrfc.nc"
-        },
-        {
-            "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.medium_range_no_da.channel_rt.ncrfc.nc' should be generated, as defined in {source_file}.",
-            "level": "error",
-            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NC/channel_rt/nwm.t2025060712z.medium_range_no_da.channel_rt.ncrfc.nc"
-        },
-        {
-            "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.medium_range_no_da.channel_rt.nerfc.nc' should be generated, as defined in {source_file}.",
-            "level": "error",
-            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NE/channel_rt/nwm.t2025060712z.medium_range_no_da.channel_rt.nerfc.nc"
-        },
-        {
-            "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.medium_range_no_da.channel_rt.nwrfc.nc' should be generated, as defined in {source_file}.",
-            "level": "error",
-            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NW/channel_rt/nwm.t2025060712z.medium_range_no_da.channel_rt.nwrfc.nc"
-        },
-        {
-            "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.medium_range_no_da.channel_rt.ohrfc.nc' should be generated, as defined in {source_file}.",
-            "level": "error",
-            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/OH/channel_rt/nwm.t2025060712z.medium_range_no_da.channel_rt.ohrfc.nc"
-        },
-        {
-            "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.medium_range_no_da.channel_rt.serfc.nc' should be generated, as defined in {source_file}.",
-            "level": "error",
-            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/SE/channel_rt/nwm.t2025060712z.medium_range_no_da.channel_rt.serfc.nc"
-        },
-        {
-            "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.medium_range_no_da.channel_rt.wgrfc.nc' should be generated, as defined in {source_file}.",
-            "level": "error",
-            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/WG/channel_rt/nwm.t2025060712z.medium_range_no_da.channel_rt.wgrfc.nc"
+            "operation": "extract",
+            "dimension": "feature_id",
+            "mask_coordinate": "feature_id",
+            "masks": [
+                "{mask_path}/abrfc.nc",
+                "{mask_path}/c*rfc.nc",
+                "{mask_path}/m*rfc.nc",
+                "{mask_path}/lmrfc.nc",
+                "{mask_path}/n*rfc.nc",
+                "{mask_path}/serfc.nc",
+                "{mask_path}/wgrfc.nc"
+            ],
+            "identifier_pattern": "^(?P<region>\\w+(\\.(?P<rfc>[MmAaLlCcNnPpWwOoSsHh][BbPpNnMmAaCcEeWwHhRrGg]([Rr][Ff][Cc]|[Vv][Ii])))?)",
+            "output_pattern": "nwm.t{reference_time__date}{cycle}z.{Configuration}.{ModelOutputType}.{region}.nc",
+            "each": [
+                {
+                    "operation": "rename",
+                    "mapping": {
+                        "feature_id": "station"
+                    },
+                },
+                {
+                    "operation": "rename",
+                    "rename_variable": false,
+                    "mapping": {
+                        "feature_id": "station_id"
+                    },
+                },
+                {
+                    "operation": "save",
+                    "identifier_pattern": "(?P<rfc>[A-Za-z]{2}[Rr][Ff][Cc])",
+                    "directory": "{output_path}/RFC/{RFC}/"
+                }
+            ]
         }
     ],
     "configuration": "medium_range_no_da",

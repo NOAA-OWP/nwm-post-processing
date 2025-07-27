@@ -66,7 +66,7 @@
                     "function_name": "post_processing.transform.calculate_upstream_flow.calculate_upstream_flow",
                     "comment": "This should end up calling `calculate_upstream_flow(input_path=data, output_path=data, routelink_path='{application_path}/RouteLink_CONUS.nc')`",
                     "kwargs": {
-                        "routelink_path": "{resource_path}/routelink/RouteLink_CONUS.nc",
+                        "routelink_path": "{routelink_path}/RouteLink_CONUS.nc",
                         "routelink_from_variable": "from",
                         "output_path": "{work_directory}/upstream.{input_name}"
                     },
@@ -81,14 +81,14 @@
             "dimension": "feature_id",
             "mask_coordinate": "feature_id",
             "masks": [
-                "resources/masks/abrfc.nc",
-                "resources/masks/c*rfc.nc",
-                "resources/masks/m*rfc.nc",
-                "resources/masks/lmrfc.nc",
-                "resources/masks/n*rfc.nc",
-                "resources/masks/serfc.nc",
-                "resources/masks/wgrfc.nc",
-                "resources/masks/ohrfc.nc"
+                "{mask_path}/abrfc.nc",
+                "{mask_path}/c*rfc.nc",
+                "{mask_path}/m*rfc.nc",
+                "{mask_path}/lmrfc.nc",
+                "{mask_path}/n*rfc.nc",
+                "{mask_path}/serfc.nc",
+                "{mask_path}/wgrfc.nc",
+                "{mask_path}/ohrfc.nc"
             ],
             "identifier_pattern": "^(?P<region>\\w+(\\.(?P<rfc>[MmAaLlCcNnPpWwOoSsHh][BbPpNnMmAaCcEeWwHhRrGg]([Rr][Ff][Cc]|[Vv][Ii])))?)",
             "output_pattern": "nwm.t{reference_time__date}{cycle}z.{Configuration}.{ModelOutputType}.{frame}.{region}.nc",
