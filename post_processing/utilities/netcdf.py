@@ -8,6 +8,7 @@ from threading import RLock
 
 from post_processing.configuration import settings
 from post_processing.utilities.simple_cache import simple_cache
+from post_processing.utilities.simple_cache import CacheEntry
 
 if typing.TYPE_CHECKING:
     import xarray
@@ -15,7 +16,13 @@ if typing.TYPE_CHECKING:
 
 LOGGER: logging.Logger = logging.getLogger(pathlib.Path(__file__).stem)
 SAVED_FILES: typing.List[pathlib.Path] = []
+"""
+A list of files that have been saved. This will indicate if there are frequent rewrites to a file that may end up
+ invalidating data
+"""
 SAVED_FILE_LOCK: RLock = RLock()
+"""A lock to ensure that SAVED_FILES is only acted upon by one thread at a time"""
+
 
 def record_saved_file(path: pathlib.Path):
     """
@@ -28,7 +35,43 @@ def record_saved_file(path: pathlib.Path):
             LOGGER.warning(f"File '{path}' has now been saved to {len(list(filter(lambda p: p == path, SAVED_FILES)))} times")
         SAVED_FILES.append(path)
 
-@simple_cache(max_size=settings.netcdf_cache_size)
+
+def _invalidate_netcdf_cache(cache_entry: CacheEntry["xarray.Dataset"]) -> bool:
+    """
+    Invalidate the cache entry for this if the object on disk has changed since this was cached
+
+    Args:
+        cache_entry: The cache entry to be invalidated
+
+    Returns:
+        True if the cache entry should be invalidated
+    """
+    if settings.lazy_load_netcdf:
+        return True
+
+    from datetime import datetime
+    path: typing.Union[pathlib.Path, str, typing.Sequence[typing.Union[pathlib.Path, str]]] = cache_entry.key.kwargs.get("path")
+
+    if path is None:
+        path = cache_entry.key.args[0]
+
+    if isinstance(path, str):
+        path = pathlib.Path(path)
+    elif isinstance(path, typing.Sequence):
+        path: typing.Sequence[pathlib.Path] = list(map(pathlib.Path, path))
+
+    if isinstance(path, pathlib.Path):
+        path: typing.Sequence[pathlib.Path] = [path]
+
+    last_modified: datetime = max(
+        datetime.fromtimestamp(referenced_path.stat().st_mtime)
+        for referenced_path in path
+    )
+    last_cache_access: datetime = cache_entry.last_accessed
+    return last_modified <= last_cache_access
+
+
+@simple_cache(invalidator_function=_invalidate_netcdf_cache, max_size=settings.netcdf_cache_size)
 def load_netcdf(
     path: typing.Union[pathlib.Path, str, typing.Sequence[typing.Union[pathlib.Path, str]]],
     engine: typing.Union[str, typing.Literal["h5netcdf", "zarr", "netcdf4"]] = settings.default_netcdf_engine,
@@ -86,7 +129,8 @@ def load_netcdf(
 
     return dataset
 
-@simple_cache()
+
+@simple_cache(invalidator_function=_invalidate_netcdf_cache)
 def load_metadata(
     path: typing.Union[pathlib.Path, str, typing.Sequence[typing.Union[pathlib.Path, str]]],
     engine: typing.Union[str, typing.Literal["h5netcdf", "zarr", "netcdf4"]] = settings.default_netcdf_engine,
@@ -122,6 +166,12 @@ def load_metadata(
 
 
 def _get_variable_metadata(variable: "xarray.DataArray") -> typing.Dict[str, typing.Any]:
+    """
+    Get the metadata for specific netcdf variable
+
+    :param variable: The variable to inspect
+    :returns: The variable's metadata in the form of a dictionary
+    """
     import numpy
     metadata = {
         f"{variable.name}.{attribute_name}": format_attribute_value(attribute_value)
@@ -162,11 +212,10 @@ def format_attribute_value(value: typing.Any) -> typing.Any:
     return value
 
 
-
 def save_netcdf(
     path: typing.Union[str, pathlib.Path],
     dataset: "xarray.Dataset",
-    engine: typing.Literal["h5netcdf", "scipy"] = settings.default_netcdf_engine,
+    engine: typing.Literal["h5netcdf", "netcdf4"] = settings.default_netcdf_engine,
     **kwargs
 ) -> bool:
     """
