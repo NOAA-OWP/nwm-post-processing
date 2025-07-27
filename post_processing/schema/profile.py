@@ -193,6 +193,7 @@ class InPlaceOperationMixin:
         formatted_name: str = self.output_pattern.format(**template_arguments)
         return formatted_name
 
+
 @dataclasses.dataclass
 class ProfileOperation(BaseModel, OperationHandler[InputType, OutputType], abc.ABC):
     """
@@ -315,6 +316,7 @@ class ProfileOperation(BaseModel, OperationHandler[InputType, OutputType], abc.A
         :returns: The Paths for each created object
         """
 
+
 @dataclasses.dataclass(unsafe_hash=True)
 class EchoOperation(ProfileOperation[InputType, InputType]):
     """
@@ -362,7 +364,7 @@ class EchoOperation(ProfileOperation[InputType, InputType]):
             f"{self.message}\""
         )
 
-    message: str
+    message: str = dataclasses.field()
     level: typing.Union[int, str] = dataclasses.field(default=logging.INFO)
     logger_name: typing.Optional[str] = dataclasses.field(default=None)
     _logger: logging.Logger = member(default_factory=lambda: LOGGER)
@@ -1192,7 +1194,7 @@ class BranchOperation(ProfileOperation[InputType, typing.Sequence[pathlib.Path]]
         for branch_name, branch_logic in self.branches.items():
             if len(branch_logic) == 0:
                 invalid_ends_names.append(branch_name)
-            elif not isinstance(branch_logic[-1], (NCOOperation, OutOfPythonOperation, EchoOperation)):
+            elif not isinstance(branch_logic[-1], (NCOOperation, EchoOperation, Peek)):
                 invalid_ends_names.append(branch_name)
 
         if invalid_ends_names:
@@ -1202,7 +1204,6 @@ class BranchOperation(ProfileOperation[InputType, typing.Sequence[pathlib.Path]]
                 f"{', '.join(invalid_ends_names)}"
             )
             raise ValueError(message)
-
 
     def branch_concurrently(
         self,
@@ -1217,10 +1218,11 @@ class BranchOperation(ProfileOperation[InputType, typing.Sequence[pathlib.Path]]
         Feed input parameters into different branches of logic across multiple threads
 
         :param profile: The profile that called for this operation
-        :param process_identifier: An identifier tying together other output for this post processing task
+        :param process_identifier: An identifier tying together other output for this post-processing task
         :param work_directory: Where intermediate products may be saved
         :param data: The files to operate on
         :param metadata: Metadata provided from previous operations that may be used as helpful hints
+        :param previous_operations: Operations that have already been performed
         :returns: The Paths for each created object
         """
         import concurrent.futures
@@ -1291,7 +1293,6 @@ class BranchOperation(ProfileOperation[InputType, typing.Sequence[pathlib.Path]]
 
         return melted_results
 
-
     def branch_sequentially(
         self,
         profile: "Profile",
@@ -1305,10 +1306,11 @@ class BranchOperation(ProfileOperation[InputType, typing.Sequence[pathlib.Path]]
         Feed input parameters into different branches of logic without threading
 
         :param profile: The profile that called for this operation
-        :param process_identifier: An identifier tying together other output for this post processing task
+        :param process_identifier: An identifier tying together other output for this post-processing task
         :param work_directory: Where intermediate products may be saved
         :param data: The files to operate on
         :param metadata: Metadata provided from previous operations that may be used as helpful hints
+        :param previous_operations: Operations that have already been performed
         :returns: The Paths for each created object
         """
         results: typing.List[pathlib.Path] = []
@@ -1350,7 +1352,6 @@ class BranchOperation(ProfileOperation[InputType, typing.Sequence[pathlib.Path]]
 
         return results
 
-
     def __call__(
         self,
         profile: "Profile",
@@ -1380,6 +1381,7 @@ class BranchOperation(ProfileOperation[InputType, typing.Sequence[pathlib.Path]]
             metadata=metadata
         )
         return results
+
 
 @dataclasses.dataclass(unsafe_hash=True)
 class LoadOperation(ProfileOperation[typing.Sequence[pathlib.Path], typing.Iterator[xarray.Dataset]]):
@@ -1419,9 +1421,10 @@ class LoadOperation(ProfileOperation[typing.Sequence[pathlib.Path], typing.Itera
 
         return data
 
+
 @dataclasses.dataclass
 class OnEachOperation(
-    ProfileOperation[typing.Union[typing.Iterator[InputType], typing.Iterable[InputType]], typing.Union[typing.Iterator[OutputType], typing.Iterable[OutputType]]]
+    ProfileOperation[typing.Union[typing.Iterable[InputType]], typing.Union[typing.Iterable[OutputType]]]
 ):
     """
     An operation that applies each function to each input separately and returns the combined results
@@ -1498,7 +1501,6 @@ class OnEachOperation(
             f"{os.linesep.join(operation_descriptions)}"
         )
 
-
     on_each: typing.List[ProfileOperation] = dataclasses.field(default_factory=list)
     thread_count: int = dataclasses.field(default_factory=lambda: settings.maximum_additional_threads)
 
@@ -1560,7 +1562,6 @@ class AnomalyOperation(NCOOperation):
                     f"{self.__class__.__qualname__}.thresholds. It must be indicated via a Mapping or a "
                     f"ThresholdDefinition"
                 )
-
 
     def __call__(
         self,
@@ -1707,7 +1708,7 @@ class FunctionOperation(ProfileOperation[InputType, OutputType]):
                 if callable(target_variable):
                     target_variable = target_variable()
                 if isinstance(target_variable, str):
-                    target_variable = target_variable(**mapping_source)
+                    target_variable = target_variable.format(**mapping_source)
                 args[target_variable_name] = target_variable
             else:
                 raise KeyError(
@@ -1724,86 +1725,6 @@ class FunctionOperation(ProfileOperation[InputType, OutputType]):
                 exception.args = (f"Failure in:{os.linesep}{self}{os.linesep}{exception.args[0]}", *exception.args[1:])
             raise exception
         return result
-
-
-@dataclasses.dataclass(unsafe_hash=True)
-class PythonOperation(ProfileOperation[InputType, OutputType], abc.ABC):
-    """
-    Base class for operations implemented via python. Functions must match the standard Operation signature
-    """
-    function_name: str
-    kwargs: typing.Dict[str, typing.Any] = dataclasses.field(default_factory=dict)
-    _function: PythonHandler[InputType, OutputType] = member(default=None)
-
-    def __str__(self):
-        prefix: str = f"{self.operation_id}: " if self.operation_id else ""
-        return f"{prefix}{self.operation().replace('_', ' ').title()}: {self.function_name}"
-
-    def __post_init__(self):
-        self._function = get_function_by_name(function_name=self.function_name)
-
-    def __call__(
-        self,
-        profile: "Profile",
-        process_identifier: str,
-        work_directory: pathlib.Path,
-        data: InputType,
-        previous_operations: typing.List[ProfileOperation],
-        metadata: typing.Dict[str, typing.Any],
-    ) -> OutputType:
-        result: OutputType = self._function(
-            profile,
-            process_identifier,
-            work_directory,
-            data,
-            previous_operations,
-            metadata,
-            **self.kwargs
-        )
-        return result
-
-
-@dataclasses.dataclass(unsafe_hash=True)
-class IntoPythonOperation(PythonOperation[typing.Sequence[pathlib.Path], typing.Iterator[xarray.Dataset]]):
-    """
-    An operation that transforms raw files into python objects
-    """
-    @classmethod
-    def operation(cls) -> OperationType:
-        return OperationType.INTO_PYTHON
-
-    def __call__(
-        self,
-        profile: "Profile",
-        process_identifier: str,
-        work_directory: pathlib.Path,
-        data: typing.Sequence[pathlib.Path],
-        previous_operations: typing.List[ProfileOperation],
-        metadata: typing.Dict[str, typing.Any],
-    ) -> typing.Iterator[xarray.Dataset]:
-        from post_processing.utilities.netcdf import load_netcdf
-        for path in data:
-            with load_netcdf(path=path, **self.kwargs) as dataset:
-                yield dataset
-
-@dataclasses.dataclass(unsafe_hash=True)
-class ToPythonOperation(PythonOperation[typing.Iterator[xarray.Dataset], typing.Iterator[xarray.Dataset]]):
-    """
-    An operation that transforms python objects and returns python objects
-    """
-    @classmethod
-    def operation(cls) -> OperationType:
-        return OperationType.TO_PYTHON
-
-
-@dataclasses.dataclass(unsafe_hash=True)
-class OutOfPythonOperation(PythonOperation[typing.Iterator[xarray.Dataset], typing.Sequence[pathlib.Path]]):
-    """
-    An operation that transforms python objects and returns paths to objects
-    """
-    @classmethod
-    def operation(cls) -> OperationType:
-        return OperationType.OUT_OF_PYTHON
 
 
 @dataclasses.dataclass
@@ -1852,7 +1773,6 @@ class Profile(BaseModel):
         for operation in self.operations:
             operation.assign_id(parent_id=str(initial_id))
             initial_id += 1
-
 
     def __post_init__(self):
         if not len(self.operations):
@@ -1913,7 +1833,6 @@ class Profile(BaseModel):
         """
         Perform all operations configured for this profile
 
-        :param date: The date that the cycle is for
         :param cycle: The cycle of the data to be evaluated (t00z, t06z, etc)
         :param files: The files to operate on
         :param additional_metadata: Additional values that may be passed to use as metadata for value replacement
@@ -2041,6 +1960,7 @@ class Profile(BaseModel):
             **kwargs
         )
 
+
 def load_profiles(profile_path: typing.Union[str, pathlib.Path] = settings.profile_path) -> typing.Sequence[Profile]:
     """
     Load all available profiles
@@ -2077,6 +1997,7 @@ def load_profiles(profile_path: typing.Union[str, pathlib.Path] = settings.profi
         raise FileNotFoundError(f"No profiles found in {profile_path}")
 
     return profiles
+
 
 def get_function_by_name(
     function_name: str,
@@ -2155,6 +2076,7 @@ def get_function_by_name(
 
     return function
 
+
 def fan_out_operations(
     operations: typing.Iterable[ProfileOperation],
     profile: Profile,
@@ -2226,6 +2148,7 @@ def call_generic_operations(
 
     return current_data
 
+
 def call_operations(
     operations: typing.Iterable[ProfileOperation],
     profile: Profile,
@@ -2270,6 +2193,7 @@ def call_operations(
 
     return current_data
 
+
 def get_profile(
     manifest: schema.InputManifest,
     profile_path: typing.Union[str, pathlib.Path] = settings.profile_path
@@ -2296,6 +2220,7 @@ def get_profile(
     ]
 
     return profiles
+
 
 @functools.cache
 def load_profile(source: typing.Union[pathlib.Path, str, typing.Dict[str, typing.Any]]) -> Profile:
@@ -2347,6 +2272,7 @@ def load_profile(source: typing.Union[pathlib.Path, str, typing.Dict[str, typing
 
     profile = Profile(**constructor_parameters)
     return profile
+
 
 def load_operation(specification: typing.Mapping[str, typing.Any]) -> ProfileOperation:
     """
@@ -2406,6 +2332,7 @@ def load_operation(specification: typing.Mapping[str, typing.Any]) -> ProfileOpe
 
     return operation_class(**constructor_arguments)
 
+
 @functools.cache
 def get_profile_operation_types(
     root: typing.Type[ProfileOperation] = ProfileOperation
@@ -2453,4 +2380,3 @@ def get_profile_operation_types(
            and operation_type != OperationType.NCO
     }
     return subclasses
-

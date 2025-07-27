@@ -5,6 +5,7 @@ import typing
 import threading
 import logging
 import pathlib
+import dataclasses
 
 from datetime import datetime
 
@@ -16,15 +17,28 @@ ParamSpec = typing.ParamSpec("ParamSpec")
 SENTINEL = object()
 
 
+@dataclasses.dataclass
+class KeyTuple:
+    args: typing.Tuple[typing.Any, ...]
+    kwargs: typing.Mapping[str, typing.Any]
+
+    def __eq__(self, other: typing.Any) -> bool:
+        if not isinstance(other, self.__class__):
+            return False
+
+        return self.args == other.args and self.kwargs == other.kwargs
+
+
+
 class CacheEntry(typing.Generic[VT]):
-    def __init__(self, cache_lock: threading.RLock, key: typing.Tuple[typing.Any, ...], value: VT) -> None:
+    def __init__(self, cache_lock: threading.RLock, key: KeyTuple, value: VT) -> None:
         self._cache_lock = cache_lock
-        self._key: typing.Tuple[typing.Any, ...] = key
+        self._key: KeyTuple = key
         self._value: VT = value
         self._last_access: datetime = datetime.now()
 
     @property
-    def key(self) -> typing.Tuple[typing.Any, ...]:
+    def key(self) -> KeyTuple:
         return self._key
 
     @property
@@ -32,6 +46,10 @@ class CacheEntry(typing.Generic[VT]):
         with self._cache_lock:
             self._last_access = datetime.now()
             return self._value
+
+    @property
+    def last_accessed(self) -> datetime:
+        return self.last_accessed
 
     def release(self):
         if self._value is None:
@@ -66,11 +84,22 @@ class CacheEntry(typing.Generic[VT]):
 
 
 class SimpleCache(typing.Generic[VT]):
-    def __init__(self, function: typing.Callable[ParamSpec, VT], *, max_size: int = 0):
+    def __init__(
+            self,
+            function: typing.Callable[ParamSpec, VT],
+            *,
+            invalidator_function: typing.Callable[[CacheEntry[VT]], bool] = None,
+            max_size: int = 0
+    ):
+        if invalidator_function is None:
+            def invalidator_function(entry: CacheEntry[VT]) -> bool:
+                return False
+
         self.__lock: threading.RLock = threading.RLock()
         self.__max_size: int = max_size
         self.__function: typing.Callable[ParamSpec, VT] = function
         self.__values: typing.List[CacheEntry[VT]] = []
+        self.__should_invalidate: typing.Callable[[CacheEntry[VT]], bool] = invalidator_function
 
     def search(self, *args, **kwargs) -> typing.Optional[CacheEntry[VT]]:
         key: typing.Tuple[typing.Tuple[typing.Any, ...], typing.Mapping[str, typing.Any]] = (args, kwargs)
@@ -81,19 +110,22 @@ class SimpleCache(typing.Generic[VT]):
 
         return None
 
-    def evict(self):
+    def evict(self, entry: typing.Optional[CacheEntry[VT]] = None):
         with self.__lock:
-            earliest_entry: CacheEntry[VT] = min(self.__values)
-            self.__values.remove(earliest_entry)
-            earliest_entry.release()
+            if entry is None:
+                entry: CacheEntry[VT] = min(self.__values)
+            self.__values.remove(entry)
+            entry.release()
 
     def __call__(self, *args, **kwargs) -> VT:
         preexisting_entry: typing.Optional[CacheEntry[VT]] = self.search(*args, **kwargs)
 
-        if preexisting_entry is not None:
+        if preexisting_entry is not None and not self.__should_invalidate(preexisting_entry):
             return preexisting_entry.value
+        elif preexisting_entry is not None:
+            self.evict(preexisting_entry)
 
-        key: typing.Tuple[typing.Tuple[typing.Any, ...], typing.Mapping[str, typing.Any]] = (args, kwargs)
+        key: KeyTuple = KeyTuple(args=args, kwargs=kwargs)
 
         result: VT = self.__function(*args, **kwargs)
 
@@ -108,7 +140,13 @@ class SimpleCache(typing.Generic[VT]):
 
         return result
 
-def simple_cache(*, max_size: int = 0):
-    def decorator(function: typing.Callable[..., VT]) -> typing.Callable[..., VT]:
-        return SimpleCache(function, max_size=max_size)
+
+def simple_cache(
+        *,
+        invalidator_function: typing.Callable[[CacheEntry[VT]], bool] = None,
+        max_size: int = 0
+) -> typing.Callable[[typing.Callable[ParamSpec, VT]], typing.Callable[ParamSpec, VT]]:
+    def decorator(function: typing.Callable[ParamSpec, VT]) -> typing.Callable[ParamSpec, VT]:
+        cached_function: SimpleCache[VT] = SimpleCache(function, invalidator_function=invalidator_function, max_size=max_size)
+        return typing.cast(typing.Callable[ParamSpec, VT], cached_function)
     return decorator
