@@ -1,10 +1,63 @@
 {
     "operations": [
         {
-            "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.medium_range_no_da.channel_rt.alaska.nc' should be generated, as defined in {source_file}.",
-            "level": "error",
-            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AP/channel_rt/nwm.t2025060718z.medium_range_no_da.channel_rt.alaska.aprfc.nc"
+            "operation": "drop",
+            "exclude": true,
+            "fields": ["feature_id", "time", "reference_time", "streamflow", "crs"]
+        },
+        {
+            "operation": "on_each",
+            "comment": "Add upstreamflow to each input file by calling 'post_processing.transform.calculate_upstream_flow.calculate_upstream_flow' on each",
+            "on_each": [
+                {
+                    "operation": "function",
+                    "function_name": "post_processing.transform.calculate_upstream_flow.calculate_upstream_flow",
+                    "comment": "This should end up calling `calculate_upstream_flow(input_path=data, output_path=data, routelink_path='{application_path}/RouteLink_CONUS.nc')`",
+                    "kwargs": {
+                        "routelink_path": "{resource_path}/routelink/RouteLink_AK.nc",
+                        "routelink_from_variable": "from",
+                        "output_path": "{work_directory}/upstream.{input_name}"
+                    },
+                    "argument_mapping": {
+                        "input_path": "data"
+                    }
+                }
+            ]
+        },
+        {
+            "operation": "merge",
+            "file_name_pattern": "nwm.t{reference_time__date}{cycle}z.{ModelOutputType}.{Configuration}.{Region}.nc"
+        },
+        {
+            "operation": "extract",
+            "dimension": "feature_id",
+            "mask_coordinate": "feature_id",
+            "masks": [
+                "{mask_path}/alaska.aprfc.nc"
+            ],
+            "identifier_pattern": "^(?P<region>\\w+(\\.(?P<rfc>[MmAaLlCcNnPpWwOoSsHh][BbPpNnMmAaCcEeWwHhRrGg]([Rr][Ff][Cc]|[Vv][Ii])))?)",
+            "output_pattern": "nwm.t{reference_time__date}{cycle}z.{Configuration}.{ModelOutputType}.{region}.nc",
+            "each": [
+                {
+                    "operation": "rename",
+                    "mapping": {
+                        "feature_id": "station_id"
+                    }
+                },
+                {
+                    "operation": "rename",
+                    "rename_variable": false,
+                    "mapping": {
+                        "feature_id": "station"
+                    }
+                },
+                {
+                    "operation": "save",
+                    "filename_pattern": "{file_name}",
+                    "identifier_pattern": "(?P<rfc>[A-Za-z]{2}[Rr][Ff][Cc])",
+                    "directory": "{output_path}/RFC/{RFC}/"
+                }
+            ]
         }
     ],
     "configuration": "medium_range_no_da",
