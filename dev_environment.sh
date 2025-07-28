@@ -38,6 +38,12 @@ export PP_APP_PATH="$(dirname $(realpath ${BASH_SOURCE[0]}))"
 # An override for The path to statistical thresholds
 #export PP_threshold_path="${PP_APP_PATH}/resources/thresholds/"
 
+# An override for where to find masks
+#export PP_mask_path="${PP_APP_PATH}/resources/masks"
+
+# An override for where to find routelinks
+#export PP_routelink_path="${PP_APP_PATH}/resources/routelink"
+
 # An override for The path to the application log configuration
 #export PP_log_config_path="${PP_APP_PATH}/resources/python_log_config.json
 
