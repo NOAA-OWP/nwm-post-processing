@@ -571,6 +571,13 @@ In the context of the National Water Model, that is equivalent to:
 
 `nwm.t<cycle>z.<configuration>.<output type <member>>.<forecast or tminus hour>.<region>.nc`
 
+### Examples
+
+- nwm.t02z.short_range.channel_rt.conus.nc
+- nwm.t06z.medium_range_blend.channel_rt.conus.nc
+- nwm.t12z.long_range.channel_rt_3.conus.nc
+- nwm.t12z.analysis_assim_no_da.channel_rt.tm0145.hawaii.nc
+
 #### Summary Mode
 
 Entering the following command:
@@ -608,13 +615,6 @@ ChannelRouting generated for AnalysisAssimilation across Alaska:
     - /path/to/nwm-post-processing/resources/masks/alaska.aprfc.nc
 And save the results to files named like: nwm.t{reference_time__date}{cycle}z.{Configuration}.{ModelOutputType}.{frame}.{region}.nc
 ```
-
-### Examples
-
-- nwm.t02z.short_range.channel_rt.conus.nc
-- nwm.t06z.medium_range_blend.channel_rt.conus.nc
-- nwm.t12z.long_range.channel_rt_3.conus.nc
-- nwm.t12z.analysis_assim_no_da.channel_rt.tm0145.hawaii.nc
 
 ### Naming Quirks
 
