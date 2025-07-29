@@ -644,40 +644,6 @@ class _Settings(UserDict):
         self.__setitem__(key=key, item=value)
 
     @property
-    def output_directory(self) -> typing.Optional[pathlib.Path]:
-        """
-        A preconfigured location for where to put output files
-        """
-        proposed_key: str = "{prefix}_output_directory".format(prefix=self.prefix).lower()
-        key: str = self._find_key(key=proposed_key)
-
-        if key not in self.keys() or not self.__getitem__(key=key):
-            return None
-        elif isinstance(self.__getitem__(key=key), str):
-            self.__setitem__(key=key, item=pathlib.Path(self.__getitem__(key=key)))
-        elif not isinstance(self.__getitem__(key=key), pathlib.Path):
-            raise TypeError(
-                "The '{key}' setting is invalid it must be a path to a directory but was instead '{value}' (type={value_type})".format(
-                    key=key.upper(),
-                    value=self.__getitem__(key=key),
-                    value_type=type(self.__getitem__(key=key))
-                )
-            )
-        elif self.__getitem__(key=key).is_file():
-            raise FileExistsError(
-                "The '{key}' setting is invalid - it must be a path to a directory but was a path to a file".format(
-                    key=key
-                )
-            )
-
-        output_directory = self.__getitem__(key=key)
-
-        if not output_directory.exists():
-            output_directory.mkdir(parents=True, exist_ok=True)
-
-        return output_directory
-
-    @property
     def profile_path(self) -> pathlib.Path:
         """
         The path where you should expect to find profile confingurations
