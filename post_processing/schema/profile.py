@@ -1989,6 +1989,10 @@ def load_profiles(profile_path: typing.Union[str, pathlib.Path] = settings.profi
             LOGGER.debug(f"Not loading {directory_member} since it is not a file")
             continue
 
+        if directory_member.suffix == ".md":
+            # This is a markdown used for documentation, don't play with it, don't log it
+            continue
+
         if not directory_member.suffix == ".json":
             LOGGER.debug(f"Not loading {directory_member} since it is not a JSON file")
             continue
