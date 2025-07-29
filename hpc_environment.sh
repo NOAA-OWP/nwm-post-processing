@@ -50,9 +50,6 @@ export PP_APP_PATH="$(dirname $(realpath ${BASH_SOURCE[0]}))"
 # An override for Where to store intermediate files
 #export PP_intermediate_directory="{PP_APP_PATH}/intermediate"
 
-# An override for The default location for where to store results
-#export PP_output_directory=
-
 # An override for where to find profiles
 #export PP_profile_path="${PP_APP_PATH}/resources/profiles/"
 

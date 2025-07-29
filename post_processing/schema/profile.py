@@ -1874,6 +1874,8 @@ class Profile(BaseModel):
         work_directory: pathlib.Path = self.intermediate_directory / process_identifier
         work_directory.mkdir(parents=True, exist_ok=True)
 
+        safe_to_remove_intermediate_output: bool = True
+
         try:
             previous_operations: typing.List[ProfileOperation] = []
             output: typing.Union[typing.Sequence[pathlib.Path], xarray.Dataset] = call_operations(
@@ -1887,27 +1889,17 @@ class Profile(BaseModel):
             )
 
             if isinstance(output, xarray.Dataset):
-                global_output_directory: typing.Optional[pathlib.Path] = settings.output_directory
-                has_global_output: bool = global_output_directory is not None and global_output_directory.is_dir()
-                has_configured_output: bool = self.output_directory is not None and self.output_directory.is_dir()
-                if not (has_global_output or has_configured_output):
-                    raise ValueError(
-                        f"Cannot save output for {self} for cycle {cycle} - there is no where configured and accessible to write to"
-                    )
+                safe_to_remove_intermediate_output = False
+                raise FileNotFoundError(
+                    f"Data was not saved to files per the configuration. Intermediate data may be found in "
+                    f"{work_directory} for the time being, but its persistence is not guaranteed. Please correct your "
+                    f"configuration as {self.source_file}"
+                )
 
-                filename: str = self.get_output_filename(**input_metadata)
-
-                if has_configured_output:
-                    output_directory: pathlib.Path = self.output_directory
-                else:
-                    output_directory: pathlib.Path = global_output_directory
-
-                output_path: pathlib.Path = output_directory / filename
-                output.to_netcdf(output_path)
-                return [output_path]
             return output
         finally:
-            shutil.rmtree(work_directory)
+            if safe_to_remove_intermediate_output:
+                shutil.rmtree(work_directory)
 
     def __call__(
         self,

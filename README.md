@@ -3,6 +3,22 @@
 **National Water Model Post Processing** takes [National Water Model](https://water.noaa.gov/about/nwm) data, 
 combines the output, and subsets them based on region in order to make model data easier to work with
 
+---
+
+## Table of Contents
+
+- [Basic Details](#basic-details)
+- [Installation](INSTALL.md)
+- [Usage](#usage)
+- [Testing](#testing)
+- [Configuration](#configuration)
+- [Profiles](#profiles)
+- [Other](#other)
+
+---
+
+## Basic Details
+
 ### Technology stack 
   - `nco`: Netcdf Operators
   - `pandas`
@@ -13,8 +29,7 @@ combines the output, and subsets them based on region in order to make model dat
   - JSON
 
 ### Status
-Pre-Alpha
-
+Alpha
 
 ## Dependencies
 
@@ -33,7 +48,7 @@ third party libraries to an absolute minimum. `httpx` may be 100x more effective
 `requests` or your own networking code, but approval for use within primary deployment environments 
 (not exclusive to, but featuring US federal High Performance Computing environments) may not be worth it.
 
-## Concurrency
+### Concurrency
 
 Concurrency is highly limited. Multiprocessing is not desired since it is generally not acceptable within some 
 deployment environments since each spawned process must be accounted for and threading may cause I/O issues due to 
@@ -41,11 +56,99 @@ the implementation of NetCDF4 and HDF5, both of which are not just not thread-sa
 `PP_allow_threads` may be set to `true` to allow a limited degree of multithreading, but use it wisely. In the future, 
 the use of a `dask` cluster process may alleviate some of these issues.
 
-## Installation
+## Usage
 
-See [INSTALL](INSTALL.md).
+Ensure that the installation instructions are followed. The `post-process` command will not be available otherwise.
+
+Given a desired cycle of `00`, a desired model output type of `channel_rt`, a desired configuration of 
+`short_range`, a directory containing model output at `/path/to/input`, and a directory to put results at 
+`/path/to/output/`, processing may be performed via the following invocations:
+
+```shell
+post-process /path/to/input/nwm.t00z.short_range.channel_rt.f001.conus.nc /path/to/output
+```
+
+```shell
+python3 -m post_processing /path/to/input/nwm.t00z.short_range.channel_rt.f018.conus.nc /path/to/output
+```
+
+> **Warning**
+> 
+> Calling `python post_processing/__main__.py /path/to/input/nwm.t00z.short_range.channel_rt.f018.conus.nc /path/to/output`
+> will not work. This invocation is not compatible with namespaces and nested packages with not know what the `post_processing` 
+> package is.
+
+Notice the fluctuating `f00#` value. `python3 -m post_processing` and 
+`post-process` both execute the code in [`__main__.py`](post_processing/__main__.py), and `__main__.py` will find all 
+common `f001` and `tm00` files so the specific member file given is not as important as just providing _any_ NWM 
+output to be processed. This relies on NCEP naming standards, which matches on:
+
+`<model>.<cycle>.<configuration>.<output type>.<forecast hour>.<location>.nc`
+
+In the context of the National Water Model, that is equivalent to:
+
+`nwm.t<cycle>z.<configuration>.<output type <member>>.<forecast or tminus hour>.<region>.nc`
+
+### Examples
+
+- nwm.t02z.short_range.channel_rt.conus.nc
+- nwm.t06z.medium_range_blend.channel_rt.conus.nc
+- nwm.t12z.long_range.channel_rt_3.conus.nc
+- nwm.t12z.analysis_assim_no_da.channel_rt.tm0145.hawaii.nc
+
+#### Summary Mode
+
+Entering the following command:
+
+```shell
+post-process --summarize /path/to/nwm.t00z.analysis_assim.channel_rt.tm00.alaska.nc /path/to/output
+```
+
+will print a summary of what to expect rather than actually running the profile. Expect to see output like:
+
+```
+ChannelRouting generated for AnalysisAssimilation across Alaska:
+=====================================================================
+1: Drop all data variables except feature_id, time, reference_time, streamflow, crs
+
+2: Save files to {output_path}/WMS/ with the following file name pattern: nwm.t{reference_time__date}{cycle}z.{Configuration}.{ModelOutputType}.tm{tminus}.{Region}.nc
+
+3: Perform the following on each file and each file alone:
+
+-----------------------------------------------------------------------------------------
+3.1: Call post_processing.transform.calculate_upstream_flow.calculate_upstream_flow(
+    routelink_path={resource_path}/routelink/RouteLink_AK.nc,
+    routelink_from_variable=from,
+    output_path={work_directory}/upstream.{input_name},
+    input_path=data
+)
+-----------------------------------------------------------------------------------------
+
+
+4: Rename the variable 'feature_id' to 'station_id'
+
+5: Rename the dimension 'feature_id' to 'station'
+
+6: Extract data by location based on the 'station_id' dimension in the input and the 'feature_id' dimension within:
+    - /path/to/nwm-post-processing/resources/masks/alaska.aprfc.nc
+And save the results to files named like: nwm.t{reference_time__date}{cycle}z.{Configuration}.{ModelOutputType}.{frame}.{region}.nc
+```
+
+## Testing
+
+From the root of the project, type:
+
+```shell
+python -m unittest discover -s test -p "test_*.py"
+```
+
+To run the unit tests on the python code. This command tells the active python version to use the `unittest` testing library
+(as opposed to something like pytest) and discover unit tests under every file matching the glob of "test_*.py" 
+under the `./test` directory
 
 ## Configuration
+
+See [Configuration](Configuration.md) for more thorough information.
 
 ### Python Configuration
 
@@ -62,7 +165,7 @@ setting the `PP_LOG_CONFIG_PATH` environment variable (case-insensitive). Log le
 from bloating output files. As with `PP_LOG_CONFIG_PATH`, the `PP_LOG_LEVEL_OVERRIDE_PATH` environment variable will 
 allow you to change where the override file to use lives.
 
-### Profiles
+## Profiles
 
 Processing is performed based on configured profiles for model configuration, output type, member, and region. 
 In order for processing to be performed, there must be a profile with matching the desired configuration, 
@@ -144,8 +247,13 @@ output type, member, and region. For example:
 
 ### How do I use this Profile?
 
-Calling `post-process /path/to/input/nwm.t06z.analysis_assim.channel_rt.tm01.alaska.nc /path/to/output`
-will cause this application to deconstruct the input file. From this input, the application will pull apart 
+Call the following to launch the application:
+
+```shell
+post-process /path/to/input/nwm.t06z.analysis_assim.channel_rt.tm01.alaska.nc /path/to/output
+```
+
+This will cause the application to start and to deconstruct the input filename. From this input filename, the application will pull apart 
 `/path/to/input/nwm.t06z.analysis_assim.channel_rt.tm01.alaska.nc` to detect `t06z`, `analysis_assim`, `channel_rt`, 
 no ensemble member identifier, and `alaska`. Using those details, the application will look through its 
 [profile directory](./resources/profiles/) for all profiles whose `"configuration"` is `"analysis_assim"`, 
@@ -153,7 +261,7 @@ whose `"output_type"` is `"channel_rt"`, whose `"member"` is `null`, and whose `
 match on anything like `"configuration": "Analysis_Assim"` or `"configuration": "aNaLySiS_AsSiM"`. The application 
 will read this document to determine what to do based on the contents of its `"operations"` value.
 
-> **NOTE**
+> **Note**
 > 
 > The application relies on metadata encoded in the filename, not the file path itself. In this example, giving it the path 
 > `/path/to/input/nwm.t06z.analysis_assim.channel_rt.tm00.alaska.nc` or 
@@ -286,7 +394,7 @@ those within the CONUS files that will have separate **WMS** and **RFC** output.
     within the `"masks"` collection. These can be absolute paths, relative paths, templated strings, or globs. 
     In this case, the one mask in use is at the relative path `"resources/masks/alaska.aprfc.nc"`. 
  
-   > **WARNING**
+   > **Warning**
    > 
    > A safer path would be `"{mask_path}/alaska.aprfc"` since it will allow me to move my masks around without 
    > breaking the reference.
@@ -307,7 +415,7 @@ those within the CONUS files that will have separate **WMS** and **RFC** output.
     Note: despite the name,`"dimension"` here may also refer to a variable, 
     which will be the case here since `"feature_id"` was renamed to`"station_id"`.
 
-    > **WARNING**
+    > **Warning**
     >
     > Since `feature_id(feature_id)` was renamed to `station_id(station)` within the NetCDF, `station_id` is no 
    > longer considered a coordinate. This will end up logging a message warning you that a non-coordinate is in use 
@@ -538,83 +646,7 @@ the available metadata in every operation, only those immediately accessible to 
 assume that any metadata available within the peek operation will be available within a regular operation. 
 The default is `true`.
 
-## Usage
-
-Ensure that the installation instructions are followed. The `post-process` command will not be available otherwise.
-
-Given a desired cycle of `00`, a desired model output type of `channel_rt`, a desired configuration of 
-`short_range`, a directory containing model output at `/path/to/input`, and a directory to put results at 
-`/path/to/output/`, processing may be performed via the following invocations:
-
-```shell
-post-process /path/to/input/nwm.t00z.short_range.channel_rt.f001.conus.nc /path/to/output
-```
-
-```shell
-python3 -m post_processing /path/to/input/nwm.t00z.short_range.channel_rt.f018.conus.nc /path/to/output
-```
-
-> **Warning**
-> 
-> Calling `python post_processing/__main__.py /path/to/input/nwm.t00z.short_range.channel_rt.f018.conus.nc /path/to/output`
-> will not work. This invocation is not compatible with namespaces and nested packages with not know what the `post_processing` 
-> package is.
-
-Notice the fluctuating `f00#` value. `python3 -m post_processing` and 
-`post-process` both execute the code in [`__main__.py`](post_processing/__main__.py), and `__main__.py` will find all 
-common `f001` and `tm00` files so the specific member file given is not as important as just providing _any_ NWM 
-output to be processed. This relies on NCEP naming standards, which matches on:
-
-`<model>.<cycle>.<configuration>.<output type>.<forecast hour>.<location>.nc`
-
-In the context of the National Water Model, that is equivalent to:
-
-`nwm.t<cycle>z.<configuration>.<output type <member>>.<forecast or tminus hour>.<region>.nc`
-
-### Examples
-
-- nwm.t02z.short_range.channel_rt.conus.nc
-- nwm.t06z.medium_range_blend.channel_rt.conus.nc
-- nwm.t12z.long_range.channel_rt_3.conus.nc
-- nwm.t12z.analysis_assim_no_da.channel_rt.tm0145.hawaii.nc
-
-#### Summary Mode
-
-Entering the following command:
-
-```shell
-post-process --summarize /path/to/nwm.t00z.analysis_assim.channel_rt.tm00.alaska.nc /path/to/output
-```
-
-will print a summary of what to expect rather than actually running the profile. Expect to see output like:
-
-```
-ChannelRouting generated for AnalysisAssimilation across Alaska:
-=====================================================================
-1: Drop all data variables except feature_id, time, reference_time, streamflow, crs
-
-2: Save files to {output_path}/WMS/ with the following file name pattern: nwm.t{reference_time__date}{cycle}z.{Configuration}.{ModelOutputType}.tm{tminus}.{Region}.nc
-
-3: Perform the following on each file and each file alone:
-
------------------------------------------------------------------------------------------
-3.1: Call post_processing.transform.calculate_upstream_flow.calculate_upstream_flow(
-    routelink_path={resource_path}/routelink/RouteLink_AK.nc,
-    routelink_from_variable=from,
-    output_path={work_directory}/upstream.{input_name},
-    input_path=data
-)
------------------------------------------------------------------------------------------
-
-
-4: Rename the variable 'feature_id' to 'station_id'
-
-5: Rename the dimension 'feature_id' to 'station'
-
-6: Extract data by location based on the 'station_id' dimension in the input and the 'feature_id' dimension within:
-    - /path/to/nwm-post-processing/resources/masks/alaska.aprfc.nc
-And save the results to files named like: nwm.t{reference_time__date}{cycle}z.{Configuration}.{ModelOutputType}.{frame}.{region}.nc
-```
+## Other
 
 ### Naming Quirks
 
@@ -628,15 +660,3 @@ National Water Model output will include `f##`, indicating a forecast hour for m
 in time, or `tm##`, indicating a duration into the past. These terms are consolidated as the word `frame` within the 
 code base. This name comes from the `frame` terminology in video or animations, where each `frame` is a series of 
 values at a given time.
-
-## How to test the software
-
-From the root of the project, type:
-
-```shell
-python -m unittest discover -s test -p "test_*.py"
-```
-
-To run the unit tests on the python code. This command tells the active python version to use the `unittest` testing library
-(as opposed to something like pytest) and discover unit tests under every file matching the glob of "test_*.py" 
-under the `./test` directory
