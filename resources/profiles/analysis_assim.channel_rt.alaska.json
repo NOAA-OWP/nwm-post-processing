@@ -48,7 +48,7 @@
             "dimension": "station_id",
             "mask_coordinate": "feature_id",
             "masks": [
-                "resources/masks/alaska.aprfc.nc"
+                "{mask_path}/alaska.aprfc.nc"
             ],
             "identifier_pattern": "^(?P<region>\\w+(\\.(?P<rfc>[MmAaLlCcNnPpWwOoSsHh][BbPpNnMmAaCcEeWwHhRrGg]([Rr][Ff][Cc]|[Vv][Ii])))?)",
             "output_pattern": "nwm.t{reference_time__date}{cycle}z.{Configuration}.{ModelOutputType}.{frame}.{region}.nc",
