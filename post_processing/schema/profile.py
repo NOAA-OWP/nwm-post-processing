@@ -520,7 +520,14 @@ class ExtractOperation(NCOOperation):
 
     def __post_init__(self):
         from post_processing.utilities.common import expand_paths
-        self.masks = expand_paths(self.masks, base_path=settings.application_path)
+        expanded_paths: typing.List[pathlib.Path] = expand_paths(self.masks, base_path=settings.application_path)
+
+        if len(expanded_paths) == 0:
+            raise FileNotFoundError(
+                f"Could not find any files based off of '{self.masks}' with a base path of '{settings.application_path}'"
+            )
+
+        self.masks = expanded_paths
 
         missing_masks: typing.List[pathlib.Path] = [path for path in self.masks if not path.is_file()]
 
@@ -597,7 +604,7 @@ class ExtractOperation(NCOOperation):
             f"And save the results to files named like: {self.output_pattern}"
         )
 
-    masks: typing.List[pathlib.Path] = dataclasses.field()
+    masks: typing.List[pathlib.Path]
     identifier_pattern: str = dataclasses.field()
     """A pattern used to extract metadata from the mask filename"""
     output_pattern: str = dataclasses.field()

@@ -179,10 +179,18 @@ def expand_paths(
     :param strict: Whether to only bring back paths if it is confirmed that they are files
     :returns: All globbed paths
     """
+    from post_processing.configuration import settings
+
     if base_path is None:
         base_path = pathlib.Path.cwd()
 
-    paths = list(map(pathlib.Path, paths))
+    additional_paths: typing.Dict[str, str] = {key: str(value) for key, value in settings.paths.items()}
+
+    paths = list(map(
+        lambda given_path: pathlib.Path(str(given_path).format(**additional_paths)),
+        paths
+    ))
+
     expanded_paths: typing.List[pathlib.Path] = []
 
     for path in paths:

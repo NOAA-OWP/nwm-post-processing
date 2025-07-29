@@ -48,14 +48,14 @@
                     "operation": "rename",
                     "mapping": {
                         "feature_id": "station"
-                    },
+                    }
                 },
                 {
                     "operation": "rename",
                     "rename_variable": false,
                     "mapping": {
                         "feature_id": "station_id"
-                    },
+                    }
                 },
                 {
                     "operation": "save",
