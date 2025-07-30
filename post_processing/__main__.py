@@ -43,6 +43,10 @@ class Arguments:
         """Whether to summarize the profile rather than running it"""
         self.peek: bool = False
         """Print the headers of each produced file at the end"""
+        self.version: bool = False
+        """Print the version rather than run a profile"""
+        self.settings: bool = False
+        """Print available settings rather than run a profile"""
 
         self.__parse(args=args)
         self.__validate()
@@ -52,6 +56,9 @@ class Arguments:
         Raise exceptions if arguments are invalid
         """
         messages: typing.List[str] = []
+
+        if self.settings or self.version:
+            return
 
         if not self.source_file.exists():
             messages.append(f"Cannot process data within the '{self.source_file}' file - it does not exist")
@@ -67,8 +74,27 @@ class Arguments:
         """
         Parse passed in command line input
         """
+        subcommand_parser: argparse.ArgumentParser = argparse.ArgumentParser()
+        subparsers = subcommand_parser.add_subparsers(dest="subcommand", required=True)
+        subparsers.add_parser("settings", description="Show available settings")
+        subparsers.add_parser("version", description="Show application version")
+
+        subcommand_usages: str = (
+            f"Subcommands:{os.linesep}"
+            f"    {(os.linesep + '    - ').join([str(action.prog.split()[-1:][0]).ljust(10) + ': ' + (action.description or action.format_help()) for action in subparsers.choices.values()])}"
+        )
+
+        if len(sys.argv) > 1 and sys.argv[1].lower() == 'settings':
+            self.settings = True
+            return
+        elif len(sys.argv) > 1 and sys.argv[1].lower() == 'version':
+            self.version = True
+            return
+
         parser: argparse.ArgumentParser = argparse.ArgumentParser(
-            description="Process National Water Model output for easier use"
+            description="Process National Water Model output for easier use",
+            epilog=subcommand_usages,
+            formatter_class=argparse.RawDescriptionHelpFormatter,
         )
 
         parser.add_argument(
@@ -107,6 +133,51 @@ class Arguments:
                 )
 
 
+def show_version():
+    import subprocess
+
+    try:
+        commit: str = subprocess.check_output(
+            ["git", "rev-parse", "--short", "HEAD"],
+            stderr=subprocess.DEVNULL,
+            text=True,
+        ).strip()
+    except:
+        commit: str = "Unknown"
+
+    version: str = "Unknown"
+    if os.path.exists('__version__.py'):
+        version: str = pathlib.Path('__version__.py').read_text().strip()
+    elif os.path.exists(pathlib.Path(__file__).parent / '__version__.py'):
+        version: str = (pathlib.Path(__file__).parent / '__version__.py').read_text().strip()
+    elif (settings.application_path / "pyproject.toml").is_file():
+        import tomllib
+        pyproject_data: typing.Dict[str, typing.Any] = tomllib.loads((settings.application_path / "pyproject.toml").read_text())
+
+        if 'project' in pyproject_data and 'version' in pyproject_data['project']:
+            version = pyproject_data['project']['version']
+
+        if 'tool' in pyproject_data and 'poetry' in pyproject_data['tool']:
+            version = pyproject_data['tool']['poetry'].get("version", "Unknown")
+    elif (settings.application_path / "setup.cfg").is_file():
+        import configparser
+        parser: configparser.ConfigParser = configparser.ConfigParser()
+        parser.read(settings.application_path / "setup.cfg")
+        if parser.has_section("metadata") and parser.has_option("metadata", "version"):
+            version = parser.get("metadata", "version")
+
+    versions: typing.List[str] = [
+        f"{'Git Commit'.ljust(20)}: {commit}",
+        f"{'Application Version'.ljust(20)}: {version}",
+    ]
+
+    print(os.linesep.join(versions))
+
+
+def show_settings():
+    from pprint import pprint
+    pprint(settings.to_dict())
+
 
 def main() -> int:
     """
@@ -120,6 +191,22 @@ def main() -> int:
     except ArgumentValidationException as exception:
         LOGGER.critical(str(exception))
         return 2
+
+    if arguments.settings:
+        try:
+            show_settings()
+            return 0
+        except Exception as e:
+            LOGGER.critical(str(e))
+            return 1
+
+    if arguments.version:
+        try:
+            show_version()
+            return 0
+        except Exception as e:
+            LOGGER.critical(str(e))
+            return 1
 
     try:
         cycle_files: typing.Sequence[pathlib.Path] = get_cycle_files(arguments.source_file)

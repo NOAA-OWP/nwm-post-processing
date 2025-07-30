@@ -186,18 +186,28 @@ def expand_paths(
 
     additional_paths: typing.Dict[str, str] = {key: str(value) for key, value in settings.paths.items()}
 
-    paths = list(map(
-        lambda given_path: pathlib.Path(str(given_path).format(**additional_paths)),
-        paths
-    ))
+    try:
+        templated_paths: typing.List[pathlib.Path] = list(map(
+            lambda given_path: pathlib.Path(str(given_path).format(**additional_paths)),
+            paths
+        ))
 
-    expanded_paths: typing.List[pathlib.Path] = []
+        expanded_paths: typing.List[pathlib.Path] = []
 
-    for path in paths:
-        if not path.is_absolute():
-            path = base_path / path
-        found_paths: typing.Sequence[pathlib.Path] = expand_path(path=path, strict=strict)
-        expanded_paths.extend(found_paths)
+        for path in templated_paths:
+            if not path.is_absolute():
+                path = base_path / path
+            found_paths: typing.Sequence[pathlib.Path] = expand_path(path=path, strict=strict)
+            expanded_paths.extend(found_paths)
+    except Exception as e:
+        LOGGER.error(
+            f"Could not find paths matching the following specifications:{os.linesep}"
+            f"    - {(os.linesep + '     - ').join(map(str, paths))}{os.linesep}"
+            f"The base path was: {base_path}{os.linesep}"
+            f"The available additional paths used for replacement were:{os.linesep}"
+            f"    - {(os.linesep + '    - ').join([str(key) + ': ' + str(value) for key, value in additional_paths.items()])}"
+        )
+        raise e
 
     return expanded_paths
 
