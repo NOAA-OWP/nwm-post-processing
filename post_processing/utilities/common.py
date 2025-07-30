@@ -182,7 +182,7 @@ def expand_paths(
     from post_processing.configuration import settings
 
     if base_path is None:
-        base_path = pathlib.Path.cwd()
+        base_path = settings.base_path
 
     template_variables: typing.Dict[str, str] = {key: str(value) for key, value in settings.to_dict().items()}
 
@@ -210,6 +210,44 @@ def expand_paths(
         raise e
 
     return expanded_paths
+
+
+def find_candidate_paths(
+    paths: typing.Iterable[pathlib.Path],
+    base_path: pathlib.Path = None
+) -> typing.Sequence[pathlib.Path]:
+    """
+    Finds the paths to all files that seem to be like the ones on off from the paths
+
+    Say a /path/to/directory contains:
+
+    * some_file.txt
+    * other_file.gpkg
+    * serfc.nc
+    * abrfc.nc
+    * prvi.serfc.nc
+
+    and I try to find "{file_path}/priv.serfc.nc", where file_path is "/path/to/directory". This will return a list containing:
+
+    * serfc.nc
+    * abrfc.nc
+    * prvi.serfc.nc
+
+    In order to give insight into why files could not be found
+
+    :param paths: The paths to search
+    :param base_path: Where to start searching for files
+    :returns: A list of all paths that might have been intended by the one given
+    """
+    paths = list(map(pathlib.Path, paths))
+
+    generalized_paths: typing.List[pathlib.Path] = [
+        path.parent / f"*.{path.suffix}"
+        for path in paths
+    ]
+
+    possible_paths: typing.List[pathlib.Path] = expand_paths(paths=generalized_paths, base_path=base_path)
+    return possible_paths
 
 
 def starmap_threaded(

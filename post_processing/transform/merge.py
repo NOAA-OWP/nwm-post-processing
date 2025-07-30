@@ -13,8 +13,9 @@ def merge_files_into_file(
     files: typing.Sequence[typing.Union[str, pathlib.Path]],
     output_file: typing.Union[str, pathlib.Path]
 ) -> None:
-    combined_files: xarray.Dataset = merge_files(files=files)
-    combined_files.to_netcdf(output_file)
+    from post_processing.utilities.netcdf import save_netcdf
+    with merge_files(files=files) as merged_files:
+        save_netcdf(path=output_file, dataset=merged_files)
 
 def merge_files(files: typing.Sequence[typing.Union[str, pathlib.Path]]) -> xarray.Dataset:
     from post_processing.utilities.netcdf import load_netcdf

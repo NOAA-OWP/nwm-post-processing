@@ -55,9 +55,10 @@ class BaseModel:
         except Exception as e:
             import json
             import os
+            from post_processing.utilities.common import to_json
             message: str = (
                 f"Could not construct a {cls.__qualname__} from the following configuration:{os.linesep}"
-                f"{json.dumps(kwargs, indent=4)}{os.linesep*2}"
+                f"{to_json(kwargs)}{os.linesep*2}"
                 f"Due to: {e}"
             )
             raise RuntimeError(message) from e
@@ -174,13 +175,3 @@ def to_dict(obj: typing.Any) -> typing.Union[typing.Dict[str, typing.Any], typin
     }
 
     return dictionary
-
-def to_json(obj: typing.Any) -> str:
-    """
-    Convert an object (preferably a data class) into a JSON string
-
-    :param obj: The object to convert
-    :return: A JSON string
-    """
-    import json
-    return json.dumps(to_dict(obj), indent=4)

@@ -14,7 +14,7 @@
                     "function_name": "post_processing.transform.calculate_upstream_flow.calculate_upstream_flow",
                     "comment": "This should end up calling `calculate_upstream_flow(input_path=data, output_path=data, routelink_path='{application_path}/RouteLink_CONUS.nc')`",
                     "kwargs": {
-                        "routelink_path": "{resource_path}/routelink/RouteLink_HI.nc",
+                        "routelink_path": "{rotuelink_path}/RouteLink_HI.nc",
                         "routelink_from_variable": "from",
                         "output_path": "{work_directory}/upstream.{input_name}"
                     },
@@ -32,10 +32,6 @@
             "operation": "branch",
             "branches": {
                 "WMS": [
-                    {
-                        "operation": "echo",
-                        "message": "Dropping upstreamflow. Operations need to be rearranged to allow upstreamflow to only be calculated on the RFC branch"
-                    },
                     {
                         "operation": "drop",
                         "fields": ["upstreamflow"]
@@ -56,7 +52,7 @@
                         "dimension": "feature_id",
                         "mask_coordinate": "feature_id",
                         "masks": [
-                            "resources/masks/aprfc.nc"
+                            "{mask_path}/aprfc.nc"
                         ],
                         "identifier_pattern": "^(?P<region>\\w+(\\.(?P<rfc>[MmAaLlCcNnPpWwOoSsHh][BbPpNnMmAaCcEeWwHhRrGg]([Rr][Ff][Cc]|[Vv][Ii])))?)",
                         "output_pattern": "split.nwm.t{reference_time__date}{cycle}z.{Configuration}.{ModelOutputType}.{region}.nc",
@@ -76,9 +72,9 @@
                             },
                             {
                                 "operation": "save",
-                                "filename_pattern": "nwm.t{reference_time__date}{cycle}z.{Configuration}.{ModelOutputType}.{rfc}.nc",
+                                "filename_pattern": "nwm.t{reference_time__date}{cycle}z.{Configuration}.{ModelOutputType}.aprfc.nc",
                                 "identifier_pattern": "(?P<rfc>[A-Za-z]{2}[Rr][Ff][Cc])",
-                                "directory": "{output_path}/RFC/{RFC}/"
+                                "directory": "{output_path}/RFC/AP/"
                             }
                         ]
                     }
