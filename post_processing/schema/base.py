@@ -50,7 +50,17 @@ class BaseModel:
             else:
                 raise ValueError(f"Missing a value for '{field.name}' - cannot construct a {cls.__qualname__}")
 
-        instance: ModelType = cls(**initial_values)
+        try:
+            instance: ModelType = cls(**initial_values)
+        except Exception as e:
+            import json
+            import os
+            message: str = (
+                f"Could not construct a {cls.__qualname__} from the following configuration:{os.linesep}"
+                f"{json.dumps(kwargs, indent=4)}{os.linesep*2}"
+                f"Due to: {e}"
+            )
+            raise RuntimeError(message) from e
         return instance
 
     @classmethod
