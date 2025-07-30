@@ -445,6 +445,11 @@ def download_input(
     links_in_listing: typing.Dict[str, str] = get_directory_links(url=listing_address)
     """Links to each file within the listing for the date and configuration"""
 
+    if not links_in_listing:
+        raise FileNotFoundError(
+            f"Could not find any data at '{listing_address}' for date '{date}', {configuration}, {output_type}, {region}, t{cycle}z"
+        )
+
     # Now that we have the links for every item for the given configuration for that day, 
     # use the cycle and output type to find the right links to request
     model_output_type: str = output_type.value
@@ -460,6 +465,13 @@ def download_input(
         for filename, address in links_in_listing.items()
         if desired_link_pattern.match(filename)
     }
+
+    if not pertinent_links:
+        raise FileNotFoundError(
+            f"None of the identified links were identified as NWM data, per the pattern '{desired_link_pattern.pattern}'.{os.linesep}"
+            f"All found links:{os.linesep}"
+            f"    - {(os.linesep + '    - ').join([str(key) + ': ' + str(value) for key, value in links_in_listing.items()])}"
+        )
 
     download_directory: pathlib.Path = destination / f"nwm.{date}"
     download_directory.mkdir(parents=True, exist_ok=True)

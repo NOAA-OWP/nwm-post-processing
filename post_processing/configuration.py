@@ -754,6 +754,24 @@ class _Settings(UserDict):
 
         return paths
 
+    def to_dict(self) -> typing.Dict[str, typing.Any]:
+        """
+        Represent all settings as a dictionary
+        """
+        import inspect
+        values: typing.Dict[str, typing.Any] = {}
+
+        properties: typing.List[typing.Tuple[str, property]] = inspect.getmembers(
+            self.__class__,
+            predicate=lambda member: isinstance(member, property)
+        )
+
+        for name, prop in properties:
+            property_value: typing.Any = prop.fget(self)
+            values[name] = property_value
+
+        return values
+
 
 settings = _Settings()
 """Application wide settings"""
