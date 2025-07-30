@@ -263,11 +263,12 @@ def main() -> int:
                     f"    - {(os.linesep + '    - ').join(map(str, outputs))}"
                 )
 
-                if arguments.peek:
+                if settings.debug or arguments.peek:
                     for output in outputs:
                         from post_processing.utilities.netcdf import load_netcdf
-                        data = load_netcdf(output)
-                        LOGGER.info(f"Output: {output}:{os.linesep}{data}")
+                        from post_processing.utilities.netcdf import peek
+                        representation: str = peek(output)
+                        LOGGER.info(f"Output: {output}:{os.linesep}{representation}")
         else:
             LOGGER.warning(f"No profiles were found for '{manifest}'. Nothing will be processed")
     except BaseException as exception:

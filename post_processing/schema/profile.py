@@ -165,7 +165,7 @@ class InPlaceOperationMixin:
         :returns: The formatted output name
         """
         if self.output_pattern is None:
-            return f"{context.get('stage', '')}{input_file}.nc"
+            return f"{input_file}.nc"
 
         template_arguments: typing.Dict[str, typing.Optional[str]] = {
             variable_name: None
@@ -446,7 +446,7 @@ class ExtractOperation(NCOOperation):
         Split each received NWMFile into other files based on the collection of masks. There should be len(masks) * len(files) returned files
 
         :param profile: The profile that called for this operation
-        :param process_identifier: An identifier tying together other output for this post processing task
+        :param process_identifier: An identifier tying together other output for this post-processing task
         :param work_directory: Where intermediate products may be saved
         :param data: The files to operate on
         :param metadata: Metadata provided from previous operations that may be used as helpful hints
@@ -520,12 +520,28 @@ class ExtractOperation(NCOOperation):
 
     def __post_init__(self):
         from post_processing.utilities.common import expand_paths
-        expanded_paths: typing.List[pathlib.Path] = expand_paths(self.masks, base_path=settings.application_path)
+        from post_processing.utilities.common import find_candidate_paths
+
+        expanded_paths: typing.List[pathlib.Path] = expand_paths(self.masks)
 
         if len(expanded_paths) == 0:
-            raise FileNotFoundError(
-                f"Could not find any files based off of '{self.masks}' with a base path of '{settings.application_path}'"
-            )
+            candidate_paths: typing.Sequence[pathlib.Path] = find_candidate_paths(self.masks)
+
+            template_pattern: re.Pattern = re.compile(r"\{[^}]+}")
+
+            message: str = f"Could not find any files based off of {self.masks}"
+
+            if len(candidate_paths) == 0:
+                if any(template_pattern.search(str(path)) for path in self.masks):
+                    message += os.linesep
+                    message += "Available Metadata for the templates:" + os.linesep
+                    message += to_json(settings.to_dict())
+            else:
+                message += os.linesep + (
+                    f"The following files were found. Were one of these the ones you were looking for?{os.linesep}"
+                    f"    - {(os.linesep + '    - ').join(map(str, candidate_paths))}{os.linesep}"
+                )
+            raise FileNotFoundError(message)
 
         self.masks = expanded_paths
 
@@ -699,7 +715,7 @@ class Peek(NCOOperation):
         previous_operations: typing.List[ProfileOperation],
         metadata: typing.Dict[str, typing.Any]
     ) -> typing.Sequence[pathlib.Path]:
-        from post_processing.utilities.netcdf import load_netcdf
+        from post_processing.utilities.netcdf import peek
         LOGGER.warning(f"Peeking into operations. Do not do this in production!")
 
         if self.show_summary:
@@ -717,8 +733,8 @@ Files:
 
         if self.show_state:
             for path in data:
-                with load_netcdf(path) as netcdf_file:
-                    LOGGER.info(f"{os.linesep * 2}{path}:{os.linesep * 2}{netcdf_file}")
+                details: str = peek(path)
+                LOGGER.info(details)
 
         if self.show_metadata:
             metadata_information: str = f"""

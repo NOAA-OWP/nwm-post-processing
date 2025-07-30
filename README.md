@@ -660,3 +660,9 @@ National Water Model output will include `f##`, indicating a forecast hour for m
 in time, or `tm##`, indicating a duration into the past. These terms are consolidated as the word `frame` within the 
 code base. This name comes from the `frame` terminology in video or animations, where each `frame` is a series of 
 values at a given time.
+
+### Favor settings over Profile configurations
+
+Settings can and **should** be used within Profiles. Favor referencing the settings within your Profile 
+configurations over putting in full or partial paths. `"{mask_path}/serfc.nc"` is more likely to be usable across all 
+environments, whereas `"resources/masks/serfc.nc"` may work in dev but not prod and vice versa.

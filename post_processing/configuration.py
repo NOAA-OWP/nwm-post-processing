@@ -168,6 +168,42 @@ class _Settings(UserDict):
         return key
 
     @property
+    def base_path(self) -> pathlib.Path:
+        """
+        The default starting point for relative search paths
+        """
+        proposed_key: str = f"{self.prefix}_BASE_PATH"
+        key: str = self._find_key(key=proposed_key)
+
+        if key not in self.keys() or self.__getitem__(key=key) is None:
+            base_path: pathlib.Path = pathlib.Path.cwd()
+            self.__setitem__(key=key, item=base_path)
+
+        base_path: pathlib.Path = self.__getitem__(key=key)
+
+        if not isinstance(base_path, pathlib.Path):
+            base_path = pathlib.Path(base_path)
+            self.__setitem__(key=key, item=base_path)
+
+        return base_path
+
+    @base_path.setter
+    def base_path(self, value: pathlib.Path):
+        proposed_key: str = f"{self.prefix}_BASE_PATH"
+        key: str = self._find_key(key=proposed_key)
+
+        if isinstance(value, str):
+            value = pathlib.Path(value)
+        elif not isinstance(value, pathlib.Path):
+            raise TypeError(
+                f"Cannot assign '{value}' (type={type(value)}) to {self.__class__.__name__}.base_path - "
+                f"it must be a pathlib.Path"
+            )
+
+        self.__setitem__(key=key, item=value)
+
+
+    @property
     def prefix(self) -> str:
         """
         The prefix of important application environment parameters

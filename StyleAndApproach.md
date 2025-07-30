@@ -2,24 +2,24 @@
 
 ## Python Version
 
-The targetted version of Python will be 3.10 until changed otherwise within this document by a primary project manager
-or maintainer. The targetted version is not a factor that this team has control over and must be accounted for.
+The targeted version of Python will be 3.12 until changed otherwise within this document by a primary project manager
+or maintainer. The targeted version is not a factor that this team has control over and must be accounted for.
 
 ## Dependencies
 
-This application suite is targetted towards a shared environment with little to no control. 
-That means that access to libraries is **severely** limited. _If_ and operation may be accomplished reasonably
+This application suite is targeted towards a shared environment with little to no control. 
+That means that access to libraries is **severely** limited. _If_ an operation may be accomplished reasonably
 without the need for a third party library, write common functions with as simple of an interface as possible.
-A good example of this is simple HTTP requests. Libraries such as `requests` and `httpx`
+A good example of this is the interpretation of `.env` files. Libraries such as `dotenv`
 make things far more performant and provide an easy interface we would not have to maintain.
-The barrier for the approval and addition of new libraries is high enough for it not be be worth the ask,
+The barrier for the approval and addition of new libraries is high enough for it not be worth the ask,
 however.
 
 Contact the primary project manager and maintainers before seeking to add a new dependency.
 
 ## Functions over Classes
 
-Functions with no affect on their environment are easier to parallelize. Even with little to no intent to parallelize,
+Functions with no effect on their environment are easier to parallelize. Even with little to no intent to parallelize,
 **prefer functions over classes**. Classes are immensely helpful in terms of managing state information and state
 information is just a fact of life. Keep them to a minimum if possible. You never know what will need to be passed
 across a network or into a new process.
@@ -227,6 +227,8 @@ if __name__ == "__main__":
 or
 
 ```python
+import logging
+
 if __name__ == "__main__":
     logging.basicConfig(
         level=logging.INFO,
@@ -244,3 +246,63 @@ Command line parsers like the one from argparse may not be forthcoming with what
 same holds true on a lot of dicts.
 
 If a block of data has expected fields and types, put it into a data transfer object, preferrably a dataclass or very simple class.
+
+### NetCDF IO
+
+When performing read and write operations upon NetCDF, ensure that you use `post_processing.utilities.netcdf` and that 
+you take advantage of the work directories, temporary directories, and the dataset context manager.
+
+The safest approach to working upon a preexisting NetCDF file is:
+
+```python
+import shutil
+import tempfile
+import pathlib
+
+import xarray
+
+from post_processing.utilities import netcdf
+from post_processing.configuration import settings
+
+def do_something(data: xarray.Dataset) -> xarray.Dataset:
+    """This is just an example"""
+    # do stuff
+    return data
+
+input_path: pathlib.Path = pathlib.Path("/path/to/some/file.nc")
+output_path: pathlib.Path = pathlib.Path("/path/to/some/directory/whatever.nc")
+
+# This is just an example for the work directory - there is usually already a definition
+work_directory: pathlib.Path = settings.intermediate_directory
+
+with tempfile.TemporaryDirectory(str(work_directory)) as temporary_directory:
+    temporary_path: pathlib.Path = pathlib.Path(temporary_directory)
+    temporary_output_path: pathlib.Path = temporary_path / output_path.name
+
+    with netcdf.load_netcdf(path=input_path) as input_data:
+        updated_file: xarray.Dataset = do_something(input_data)
+        updated_file.to_netcdf(path=temporary_output_path, engine=settings.default_netcdf_engine)
+    shutil.move(temporary_output_path, output_path)
+```
+
+It seems like a lot, but it saves a lot of heartache. First and foremost: HDF5 and NetCDF4 have IO gotchas due to the 
+underlying IO implementation far and away out of control of anything in Python. Closing a file is not guaranteed to 
+actually flush buffers even if `to_netcdf` was called. Go to write to a file that was supposed to be closed and you 
+may be surprised to find that xarray still has a hold on it and your encounter an error when writing. Instead of 
+dealing with that, follow this pattern.
+
+1. Create a temporary directory
+2. Designate a path within the temporary directory to save your work to
+3. Open a netcdf file as a context manager
+4. Perform your logic
+5. Save the product to the temporary path
+6. Exit the context manager
+7. Call shutil to manually move the data over outside the scope of NetCDF and HDF5
+
+NetCDF is a fragile format - you can still corrupt your data by doing this, but it aligns best with the timing. 
+It ensures that all your data is available upon saving and that all work has been flushed prior to attempting to 
+get your work to the correct location.
+
+Ensure that the directory for the temporary directory is set as well. File movement and copies don't always work if 
+the underlying file systems are different. For best compatibility, run the application and keep your working paths 
+on the same disk.

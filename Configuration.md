@@ -4,7 +4,7 @@
 
 > **Note**
 > 
-> Information valid as of 7/29/2025
+> Information valid as of 7/30/2025
 > 
 > Settings may have been added or removed and best practices may have changed since
 
@@ -25,7 +25,7 @@ different behavior when you might need to make changes. All settings are optiona
 ## Danger
 
 There should be very little application-side risk involved with these settings. Most of these settings affect how data 
-is read and interpretted. The entities most responsible for writing will come from product profiles. 
+is read and interpreted. The entities most responsible for writing will come from product profiles. 
 The worst things these settings should do is maybe result in IO conflicts due to allowed threading or the inability to 
 find data. It should be relatively difficult to inflict any sort of data-loss by tuning these.
 
@@ -160,6 +160,12 @@ will be overridden by the contents of `.env`.
 | profile_path               | `PP_PROFILE_PATH`               | `${PP_RESOURCE_PATH}/profiles`                        | Where to find product Profiles                                                     | The most important directory configuration. If a profile is not in this directory, it will not run                                                                                                                                   |
 
 ## Best Practices
+
+### Favor settings over profile configurations
+
+These settings can and **should** be used within Profiles. Favor referencing the settings within your Profile 
+configurations over putting in full or partial paths. `"{mask_path}/serfc.nc"` is more likely to be usable across all 
+environments, whereas `"resources/masks/serfc.nc"` may work in dev but not prod and vice versa. 
 
 ### Capitalization
 

@@ -14,7 +14,7 @@
                     "function_name": "post_processing.transform.calculate_upstream_flow.calculate_upstream_flow",
                     "comment": "This should end up calling `calculate_upstream_flow(input_path=data, output_path=data, routelink_path='{application_path}/RouteLink_CONUS.nc')`",
                     "kwargs": {
-                        "routelink_path": "{resource_path}/routelink/RouteLink_AK.nc",
+                        "routelink_path": "{routelink_path}/RouteLink_AK.nc",
                         "routelink_from_variable": "from",
                         "output_path": "{work_directory}/upstream.{input_name}"
                     },
@@ -68,7 +68,7 @@
                         "dimension": "feature_id",
                         "mask_coordinate": "feature_id",
                         "masks": [
-                            "resources/masks/alaska.aprfc.nc"
+                            "{mask_path}/alaska.aprfc.nc"
                         ],
                         "identifier_pattern": "^(?P<region>\\w+(\\.(?P<rfc>[MmAaLlCcNnPpWwOoSsHh][BbPpNnMmAaCcEeWwHhRrGg]([Rr][Ff][Cc]|[Vv][Ii])))?)",
                         "output_pattern": "nwm.t{reference_time__date}{cycle}z.{Configuration}.{ModelOutputType}.{region}.nc",
