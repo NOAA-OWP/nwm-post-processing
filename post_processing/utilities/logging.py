@@ -320,6 +320,7 @@ def setup_logging(log_path: typing.Union[pathlib.Path, str] = None):
     Common setup logic for log configurations
     """
     if logging.getLogger().hasHandlers():
+        logging.info(f"No need to setup logging. It has already been done.")
         return
 
     from post_processing.configuration import settings
@@ -340,7 +341,14 @@ def setup_logging(log_path: typing.Union[pathlib.Path, str] = None):
             datefmt=settings.date_format
         )
 
+    if log_path is not None and not log_path.is_file():
+        logging.warning(
+            f"No log configuration could be found at '{log_path}'. Logs will not be properly saved to file and can "
+            f"only be committed to stdout and stderr. Unless redirected, all feedback will be lost"
+        )
+
     if settings.json_log_path:
+        settings.json_log_path.parent.mkdir(parents=True, exist_ok=True)
         root_logger = logging.getLogger()
         handler: JSONLogHandler = JSONLogHandler(
             filename=settings.json_log_path,
