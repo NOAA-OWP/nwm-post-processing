@@ -63,6 +63,57 @@ There are three ways to set variables in your environment:
 3. A `.env` File
     The code will try to find a `.env` file with specialized settings within the application directory when starting up. These settings should be **your** settings within **your** environment. Do not share this. It is recommended that you apply changes here when you just need to configure something for yourself.
 
+### environment.sh **vs** .env
+
+Both the environment.sh file and the .env file are execllent places to put import configuration values, but their use 
+cases aren't interchangeable. 
+
+#### Variable Expansion
+
+The .env file does not expand variables. If I configure:
+
+```shell
+PP_VARIABLE="/home/${USER}/some/directory"
+```
+
+within my .env file, the value of PP_VARIABLE won't be `"/home/christophertubbs/some/directory"`, it will be the 
+literal `"/home/${USER}/some/directory"`. If I instead define:
+
+```shell
+export PP_VARIABLE="/home/${USER}/some/directory"
+```
+
+within my environment.sh file of choice, the value of PP_VARIABLE, at runtime, will be 
+`"/home/christophertubbs/some/directory"`.
+
+#### Privacy
+
+`.env` files are, traditionally, custom tailored to _**you**_: the user. Any sort of important variables specific 
+to **you** should live within this file and not within one of the files in the repository. Similarly, any variable 
+that refers to anything resembling PII or deployment system attributes should be kept within the `.env` rather than an 
+environment.sh. 
+
+```shell
+export PP_MASK_PATH=/path/to/deployment/resources/masks
+```
+
+is a good candidate for an `environment.sh` file.
+
+```shell
+export PP_MASK_PATH=/home/christophertubbs/Downloads/backup/
+```
+
+Is not.
+
+---
+
+## Variable Precedence
+
+Values are resolved by recording first the current environment variables (accessible via `env` in bash or 
+`os.environ` in Python), then from the `.env` file. If a value is defined in the `.env`, that will be used above all 
+else. Sourcing an `environment.sh` file just loads the current environment with the correct variables. Even those 
+will be overridden by the contents of `.env`.  
+
 ---
 
 ## Settings
