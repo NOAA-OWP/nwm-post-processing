@@ -74,15 +74,8 @@ class Arguments:
         """
         Parse passed in command line input
         """
-        subcommand_parser: argparse.ArgumentParser = argparse.ArgumentParser()
-        subparsers = subcommand_parser.add_subparsers(dest="subcommand", required=True)
-        subparsers.add_parser("settings", description="Show available settings")
-        subparsers.add_parser("version", description="Show application version")
-
-        subcommand_usages: str = (
-            f"Subcommands:{os.linesep}"
-            f"    {(os.linesep + '    - ').join([str(action.prog.split()[-1:][0]).ljust(10) + ': ' + (action.description or action.format_help()) for action in subparsers.choices.values()])}"
-        )
+        # TODO: Once the initial version is out, create a subparser that handles the 'settings', 'version',
+        #  and 'run' actions. This hack is here until development has settled down.
 
         if len(sys.argv) > 1 and sys.argv[1].lower() == 'settings':
             self.settings = True
@@ -93,7 +86,11 @@ class Arguments:
 
         parser: argparse.ArgumentParser = argparse.ArgumentParser(
             description="Process National Water Model output for easier use",
-            epilog=subcommand_usages,
+            epilog=(
+                f"Subcommands:{os.linesep}"
+                f"  settings :  Print out all configured settings{os.linesep}"
+                f"  version  :  Print out version information about the application and what commit is in use"
+            ),
             formatter_class=argparse.RawDescriptionHelpFormatter,
         )
 
@@ -134,6 +131,9 @@ class Arguments:
 
 
 def show_version():
+    """
+    Print information about what software version and git commit is currently in use
+    """
     import subprocess
 
     try:
@@ -175,6 +175,9 @@ def show_version():
 
 
 def show_settings():
+    """
+    Print out all configured settings that will be used at runtime
+    """
     from pprint import pprint
     pprint(settings.to_dict())
 
@@ -208,6 +211,9 @@ def main() -> int:
             LOGGER.critical(str(e))
             return 1
 
+    # Get all files that lie within the same cycle. If `arguments.source_file` is
+    # `nwm.t00z.short_range.channel_rt.f018.conus.nc`, this will find all files that belong to t00z, short range,
+    # channel_rt, conus
     try:
         cycle_files: typing.Sequence[pathlib.Path] = get_cycle_files(arguments.source_file)
     except Exception as exception:
@@ -218,15 +224,23 @@ def main() -> int:
         LOGGER.critical("Cycle files could not be found")
         return 1
 
+    # Use the NWM_FILENAME_PATTERN to extract the metadata from the filename
     file_attributes = NWM_FILENAME_PATTERN.match(arguments.source_file.name).groupdict()
 
+    # Use the constants that were used to create the pattern to identify the groups of interest
+    from post_processing.utilities.common import REGION_PATTERN_VARIABLE
+    from post_processing.utilities.common import CONFIGURATION_PATTERN_VARIABLE
+    from post_processing.utilities.common import OUTPUT_TYPE_PATTERN_VARIABLE
+    from post_processing.utilities.common import CYCLE_PATTERN_VARIABLE
+    from post_processing.utilities.common import MEMBER_PATTERN_VARIABLE
+
     manifest: InputManifest = InputManifest(
-        region=Region.from_string(file_attributes["region"]),
-        configuration=Configuration.from_string(file_attributes["configuration"]),
-        output_type=ModelOutputType.from_string(file_attributes["output_type"]),
-        cycle=file_attributes["cycle"],
+        region=Region.from_string(file_attributes[REGION_PATTERN_VARIABLE]),
+        configuration=Configuration.from_string(file_attributes[CONFIGURATION_PATTERN_VARIABLE]),
+        output_type=ModelOutputType.from_string(file_attributes[OUTPUT_TYPE_PATTERN_VARIABLE]),
+        cycle=file_attributes[CYCLE_PATTERN_VARIABLE],
         files=cycle_files,
-        member=file_attributes["member"]
+        member=file_attributes[MEMBER_PATTERN_VARIABLE]
     )
 
     profiles: typing.Sequence[Profile] = get_profile(manifest=manifest)

@@ -92,6 +92,9 @@ def _parse_env_file(env_path: pathlib.Path) -> typing.Dict[str, typing.Any]:
     """
     import re
 
+    if isinstance(env_path, str):
+        env_path = pathlib.Path(env_path)
+
     if not env_path.exists():
         return {}
 
@@ -364,6 +367,10 @@ class _Settings(UserDict):
     def json_log_path(self, value: typing.Optional[pathlib.Path]):
         proposed_key: str = f"{self.prefix}_json_log_path"
         key: str = self._find_key(key=proposed_key)
+
+        if not isinstance(value, (pathlib.Path, None)):
+            value = pathlib.Path(value)
+
         self.__setitem__(key=key, item=value)
 
     @property
@@ -378,6 +385,9 @@ class _Settings(UserDict):
             value = _get_env_from_os(key=key, default=SENTINEL)
 
             if value is not SENTINEL:
+                value = pathlib.Path(value)
+
+            if isinstance(value, str):
                 value = pathlib.Path(value)
 
             self.__setitem__(key=key, item=value)
@@ -479,7 +489,7 @@ class _Settings(UserDict):
 
         if key not in self.keys() or not self.__getitem__(key=key) or not isinstance(self.__getitem__(key=key), (pathlib.Path, str)):
             path: pathlib.Path = self.application_path / "resources"
-            
+            path.mkdir(exist_ok=True, parents=True)
             self.__setitem__(key=key, item=path)
 
         elif isinstance(self.__getitem__(key=key), str):
@@ -520,7 +530,12 @@ class _Settings(UserDict):
             path: pathlib.Path = self.resource_path / "masks"
             self.__setitem__(key=key, item=path)
 
-        return self.__getitem__(key=key)
+        mask_path: typing.Union[str, pathlib.Path] = self.__getitem__(key=key)
+        if not isinstance(mask_path, pathlib.Path):
+            mask_path: pathlib.Path = pathlib.Path(mask_path)
+            self.__setitem__(key=key, item=mask_path)
+
+        return mask_path
 
     @property
     def routelink_path(self) -> pathlib.Path:
@@ -534,7 +549,13 @@ class _Settings(UserDict):
             path: pathlib.Path = self.resource_path / "routelink"
             self.__setitem__(key=key, item=path)
 
-        return self.__getitem__(key=key)
+        routelink_path: pathlib.Path = self.__getitem__(key=key)
+
+        if not isinstance(routelink_path, pathlib.Path):
+            routelink_path: pathlib.Path = pathlib.Path(routelink_path)
+            self.__setitem__(key=key, item=routelink_path)
+
+        return routelink_path
 
     @property
     def threshold_path(self) -> pathlib.Path:
@@ -597,8 +618,14 @@ class _Settings(UserDict):
                     value_type=type(self.__getitem__(key=key))
                 )
             )
+
+        logging_config_path: pathlib.Path = self.__getitem__(key=key)
+
+        if not isinstance(logging_config_path, pathlib.Path):
+            logging_config_path: pathlib.Path = pathlib.Path(logging_config_path)
+            self.__setitem__(key=key, item=logging_config_path)
         
-        return self.__getitem__(key=key)
+        return logging_config_path
 
     @logging_config_path.setter
     def logging_config_path(self, value: pathlib.Path):
@@ -607,6 +634,10 @@ class _Settings(UserDict):
         """
         proposed_key: str = "{prefix}_log_config_path".format(prefix=self.prefix).lower()
         key: str = self._find_key(key=proposed_key)
+
+        if not isinstance(value, pathlib.Path):
+            value = pathlib.Path(value)
+
         self.__setitem__(key=key, item=value)
 
     @property
@@ -636,6 +667,9 @@ class _Settings(UserDict):
 
     @intermediate_directory.setter
     def intermediate_directory(self, value: pathlib.Path):
+        if not isinstance(value, pathlib.Path):
+            value = pathlib.Path(value)
+
         if not value.is_dir():
             raise NotADirectoryError(f"Cannot set the intermediate directory to '{value}' - it is not a directory")
 
@@ -646,7 +680,7 @@ class _Settings(UserDict):
     @property
     def profile_path(self) -> pathlib.Path:
         """
-        The path where you should expect to find profile confingurations
+        The path where you should expect to find profile configurations
         """
         proposed_key: str = "{prefix}_profile_path".format(prefix=self.prefix).lower()
         key: str = self._find_key(key=proposed_key)
@@ -656,11 +690,18 @@ class _Settings(UserDict):
             self.__setitem__(key=key, item=profile_path)
 
         path: pathlib.Path = self.__getitem__(key=key)
+        if not isinstance(path, pathlib.Path):
+            path = pathlib.Path(path)
+            self.__setitem__(key=key, item=path)
+
         path.mkdir(parents=True, exist_ok=True)
         return path
 
     @profile_path.setter
     def profile_path(self, value: pathlib.Path):
+        if not isinstance(value, pathlib.Path):
+            value = pathlib.Path(value)
+
         if not value.is_dir():
             raise NotADirectoryError(f"Cannot set the profile path to '{value}' - it is not a directory")
         proposed_key: str = "{prefix}_profile_path".format(prefix=self.prefix).lower()

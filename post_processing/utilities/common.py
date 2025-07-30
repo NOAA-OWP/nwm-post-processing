@@ -184,11 +184,11 @@ def expand_paths(
     if base_path is None:
         base_path = pathlib.Path.cwd()
 
-    additional_paths: typing.Dict[str, str] = {key: str(value) for key, value in settings.paths.items()}
+    template_variables: typing.Dict[str, str] = {key: str(value) for key, value in settings.to_dict().items()}
 
     try:
         templated_paths: typing.List[pathlib.Path] = list(map(
-            lambda given_path: pathlib.Path(str(given_path).format(**additional_paths)),
+            lambda given_path: pathlib.Path(str(given_path).format(**template_variables)),
             paths
         ))
 
@@ -205,7 +205,7 @@ def expand_paths(
             f"    - {(os.linesep + '     - ').join(map(str, paths))}{os.linesep}"
             f"The base path was: {base_path}{os.linesep}"
             f"The available additional paths used for replacement were:{os.linesep}"
-            f"    - {(os.linesep + '    - ').join([str(key) + ': ' + str(value) for key, value in additional_paths.items()])}"
+            f"    - {(os.linesep + '    - ').join([str(key) + ': ' + str(value) for key, value in template_variables.items()])}"
         )
         raise e
 
@@ -227,6 +227,9 @@ def starmap_threaded(
     """
     from post_processing.configuration import settings
     from post_processing.enums import Verbosity
+
+    if not settings.allow_threading:
+        raise RuntimeError(f"Cannot thread function - threading is disabled.")
 
     if thread_count is None:
         thread_count = settings.maximum_additional_threads
