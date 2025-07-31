@@ -9,16 +9,19 @@ import enum
 
 try:
     from post_processing.configuration import settings
+    from post_processing.enums import Verbosity
     LOG_FORMAT: str = settings.log_format
     DATE_FORMAT: str = settings.date_format
     NETCDF_ENGINE: typing.Literal['netcdf4', 'h5netcdf'] = settings.default_netcdf_engine
     LAZY_LOAD: bool = settings.lazy_load_netcdf
+    PRINT_DETAILED_INFORMATION: bool = settings.verbosity >= Verbosity.LOUD
 except ImportError:
     settings = None
     NETCDF_ENGINE = "netcdf4"
     LAZY_LOAD: bool = True
     LOG_FORMAT = "[%(asctime)s] %(levelname)s %(name)s: %(message)s"
     DATE_FORMAT = "%Y-%m-%d %H:%M:%S%z"
+    PRINT_DETAILED_INFORMATION: bool = False
 
 LOGGER: logging.Logger = logging.getLogger(pathlib.Path(__file__).stem)
 
@@ -184,7 +187,9 @@ def calculate_upstream_flow(
                 )
                 raise
         shutil.move(temporary_output_path, output_path)
-        LOGGER.debug(f"Saved the updated version of '{input_path}' to '{output_path}'")
+
+        if PRINT_DETAILED_INFORMATION:
+            LOGGER.debug(f"Saved the updated version of '{input_path}' to '{output_path}'")
 
     return output_path
 

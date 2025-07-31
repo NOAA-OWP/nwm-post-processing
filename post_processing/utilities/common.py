@@ -136,6 +136,7 @@ def expand_path(path: typing.Union[str, pathlib.Path], strict: bool = True) -> t
 
     path_prefix: pathlib.Path = pathlib.Path(*path.parts[:glob_index])
     glob: str = str(pathlib.Path(*path.parts[glob_index:]))
+
     matching_paths: typing.List[pathlib.Path] = [
         found_path
         for found_path in path_prefix.glob(glob)
@@ -192,13 +193,22 @@ def expand_paths(
             paths
         ))
 
+        templated_paths = [
+            (base_path / path if not path.is_absolute() else path).resolve()
+            for path in templated_paths
+        ]
+
         expanded_paths: typing.List[pathlib.Path] = []
 
         for path in templated_paths:
-            if not path.is_absolute():
-                path = base_path / path
             found_paths: typing.Sequence[pathlib.Path] = expand_path(path=path, strict=strict)
             expanded_paths.extend(found_paths)
+
+        if not expanded_paths:
+            LOGGER.error(
+                f"Could not find any files based on the paths:{os.linesep}"
+                f"    - {(os.linesep + '    - ').join(map(str, templated_paths))}"
+            )
     except Exception as e:
         LOGGER.error(
             f"Could not find paths matching the following specifications:{os.linesep}"
@@ -247,6 +257,12 @@ def find_candidate_paths(
     ]
 
     possible_paths: typing.List[pathlib.Path] = expand_paths(paths=generalized_paths, base_path=base_path)
+
+    if not possible_paths:
+        LOGGER.error(
+            f"Searched within the following paths and could not find a matching path:{os.linesep}"
+            f"    - {(os.linesep + '    - ').join(map(str, generalized_paths))}"
+        )
     return possible_paths
 
 
@@ -925,47 +941,29 @@ class RecursiveEncoder(json.JSONEncoder):
     - `typing.Mapping`s
     - Anything that may be iterated through
     """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
     def default(self, item_to_serialize: typing.Any):
-        import inspect
+        if isinstance(item_to_serialize, (int, float, str, bool, type(None))):
+            return item_to_serialize
 
-        if isinstance(item_to_serialize, (datetime, pathlib.Path)):
-            return str(item_to_serialize)
+        import numpy
 
-        if dataclasses.is_dataclass(item_to_serialize):
-            converted_dataclass: typing.Dict[str, typing.Any] = dataclasses.asdict(item_to_serialize)
-            return self.default(converted_dataclass)
+        if isinstance(item_to_serialize, numpy.integer):
+            return int(item_to_serialize)
 
-        if isinstance(item_to_serialize, typing.Mapping):
-            return {
-                key: self.default(value)
-                for key, value in item_to_serialize.items()
-            }
+        if isinstance(item_to_serialize, numpy.floating):
+            return float(item_to_serialize)
+
+        if isinstance(item_to_serialize, numpy.ndarray):
+            return item_to_serialize.tolist()
 
         if isinstance(item_to_serialize, bytes):
             item_to_serialize = item_to_serialize.decode()
 
-        if isinstance(item_to_serialize, str):
-            return item_to_serialize
-
-        if isinstance(item_to_serialize, (typing.Iterator, typing.Iterable)):
-            return [
-                self.default(item)
-                for item in item_to_serialize
-            ]
-
-        if hasattr(item_to_serialize, '__dict__'):
-            return {
-                key: self.default(value)
-                for key, value in vars(item_to_serialize).items()
-            }
-
-        if hasattr(item_to_serialize, '__slots__') and len(item_to_serialize.__slots__) > 0:
-            return {
-                key: self.default(getattr(item_to_serialize, key))
-                for key in item_to_serialize.__slots__
-                if hasattr(item_to_serialize, key)
-                   and not inspect.isdatadescriptor(getattr(item_to_serialize.__class__, key))
-            }
+        if isinstance(item_to_serialize, (datetime, pathlib.Path)):
+            return str(item_to_serialize)
 
         from enum import Enum
         if isinstance(item_to_serialize, Enum):
@@ -975,7 +973,60 @@ class RecursiveEncoder(json.JSONEncoder):
         if isinstance(item_to_serialize, Decimal):
             return float(item_to_serialize)
 
-        return item_to_serialize
+        if isinstance(item_to_serialize, (typing.BinaryIO, typing.TextIO)):
+            LOGGER.warning(f"Cannot serialize '{repr(item_to_serialize)}' (type={type(item_to_serialize)})")
+            return None
+
+        if isinstance(item_to_serialize, re.Pattern):
+            return item_to_serialize.pattern
+
+        if hasattr(item_to_serialize, "to_dict") and callable(getattr(item_to_serialize, "to_dict")):
+            try:
+                converted_item: typing.Dict[str, typing.Any] = item_to_serialize.to_dict()
+                return self.default(converted_item)
+            except:
+                pass
+
+        import inspect
+
+        if dataclasses.is_dataclass(item_to_serialize):
+            converted_dataclass: typing.Dict[str, typing.Any] = dataclasses.asdict(item_to_serialize)
+            return self.default(converted_dataclass)
+
+        if isinstance(item_to_serialize, typing.Mapping):
+            return {
+                str(key): self.default(value)
+                for key, value in item_to_serialize.items()
+                if value != item_to_serialize
+            }
+
+        if isinstance(item_to_serialize, (typing.Iterator, typing.Iterable)):
+            return [
+                self.default(item)
+                for item in item_to_serialize
+                if item != item_to_serialize
+            ]
+
+        if hasattr(item_to_serialize, '__dict__'):
+            return {
+                str(key): self.default(value)
+                for key, value in vars(item_to_serialize).items()
+                if value != item_to_serialize
+            }
+
+        if hasattr(item_to_serialize, '__slots__') and len(item_to_serialize.__slots__) > 0:
+            return {
+                str(key): self.default(getattr(item_to_serialize, key))
+                for key in item_to_serialize.__slots__
+                if hasattr(item_to_serialize, key)
+                   and not inspect.isdatadescriptor(getattr(item_to_serialize.__class__, key))
+                   and getattr(item_to_serialize, key) != item_to_serialize
+            }
+
+        raise TypeError(
+            f"'{repr(item_to_serialize)}' (type={type(item_to_serialize)}) is not "
+            f"serializable by the JSON '{self.__class__.__name__}'"
+        )
 
 def to_json(obj: object) -> str:
     """

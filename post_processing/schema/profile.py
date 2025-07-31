@@ -19,6 +19,7 @@ from datetime import datetime
 
 import xarray
 
+import enums
 from post_processing.schema.base import BaseModel
 from post_processing.schema.base import member
 from post_processing.schema.base import get_fields
@@ -96,12 +97,6 @@ class OperationType(enum.StrEnum):
     """Save a netcdf file to a targetted location"""
     BRANCH = "branch"
     """Perform mutually exclusive operations on passed in data"""
-    INTO_PYTHON = "into_python"
-    """Transform file based netcdf files into python based netcdf structures"""
-    TO_PYTHON = "to_python"
-    """Pass python based netcdf structures to another python function"""
-    OUT_OF_PYTHON = "out_of_python"
-    """Convert netcdf structures within python code to files"""
     FUNCTION = "function"
     """Call a function on the input data"""
     LOAD = "load"
@@ -259,6 +254,12 @@ class ProfileOperation(BaseModel, OperationHandler[InputType, OutputType], abc.A
     def operation(cls) -> OperationType:
         """Get the type of operation the ProfileOperation fulfills"""
 
+    def to_dict(self) -> typing.Mapping[str, typing.Any]:
+        dictionary_representation: typing.Dict[str, typing.Any] = dict(super().to_dict())
+        if 'operation' not in dictionary_representation:
+            dictionary_representation['operation'] = self.operation()
+        return dictionary_representation
+
     def __str__(self):
         return f"{self.operation_id + ': ' if self.operation_id else ''}{self.operation().replace('_', ' ').title()}"
 
@@ -404,9 +405,9 @@ class RaiseOperation(ProfileOperation[InputType, InputType]):
     message: str
 
 
-class NCOOperation(ProfileOperation[typing.Sequence[pathlib.Path], typing.Sequence[pathlib.Path]]):
+class PathToPathOperation(ProfileOperation[typing.Sequence[pathlib.Path], typing.Sequence[pathlib.Path]]):
     """
-    Base class for file-set to file-set operations that mimic or wrap functions from CLI Netcdf Operators
+    Base class for file-set to file-set operations
     """
     @classmethod
     def operation(cls) -> OperationType:
@@ -421,10 +422,10 @@ class NCOOperation(ProfileOperation[typing.Sequence[pathlib.Path], typing.Sequen
         previous_operations: typing.List["ProfileOperation"],
         metadata: typing.Dict[str, typing.Any]
     ) -> typing.Sequence[pathlib.Path]:
-        pass
+        raise NotImplementedError(f"Cannot execute a plain {self.__class__.__qualname__}")
 
 @dataclasses.dataclass
-class ExtractOperation(NCOOperation):
+class ExtractOperation(PathToPathOperation):
     """
     Describes how to extract and operate on individual pieces of data
     """
@@ -519,6 +520,7 @@ class ExtractOperation(NCOOperation):
         return [path for inner_results in results for path in inner_results]
 
     def __post_init__(self):
+        errors: typing.List[Exception] = []
         from post_processing.utilities.common import expand_paths
         from post_processing.utilities.common import find_candidate_paths
 
@@ -541,25 +543,30 @@ class ExtractOperation(NCOOperation):
                     f"The following files were found. Were one of these the ones you were looking for?{os.linesep}"
                     f"    - {(os.linesep + '    - ').join(map(str, candidate_paths))}{os.linesep}"
                 )
-            raise FileNotFoundError(message)
+            errors.append(FileNotFoundError(message))
+        else:
+            self.masks = expanded_paths
 
-        self.masks = expanded_paths
+            missing_masks: typing.List[pathlib.Path] = [path for path in self.masks if not path.is_file()]
 
-        missing_masks: typing.List[pathlib.Path] = [path for path in self.masks if not path.is_file()]
-
-        assert self.masks and not any(missing_masks), f"A {self.__class__.__name__} is missing a required mask(s): {missing_masks}"
+            if self.masks and missing_masks:
+                errors.append(
+                    FileNotFoundError(f"The following masks are missing: {', '.join(map(str, missing_masks))}")
+                )
 
         try:
             self._pattern = re.compile(self.identifier_pattern)
         except BaseException as e:
-            raise ValueError(f"Cannot use '{self.identifier_pattern}' to find identifiers in masks") from e
+            error = ValueError(f"Cannot use '{self.identifier_pattern}' to find identifiers in masks")
+            errors.append(error)
 
         if not self._pattern.groupindex:
-            raise ValueError(
+            error = ValueError(
                 f"'{self.identifier_pattern}' is not a valid pattern for finding identifiers in mask files - "
                 f"it has not parameter groups. "
                 f"Please define parameter groups via strings like '(?P<variable_name>pattern)'"
             )
+            errors.append(error)
 
         masks_without_identifiers: typing.List[pathlib.Path] = []
 
@@ -577,24 +584,35 @@ class ExtractOperation(NCOOperation):
             }
 
         if masks_without_identifiers:
-            raise ValueError(
+            error = ValueError(
                 f"The following files did not contain identifiers: "
                 f"{', '.join(map(pathlib.Path.name.fget, masks_without_identifiers))}"
             )
+            errors.append(error)
 
-        if not self.each:
-            raise ValueError(f"There must be at least one operation to perform on split data")
+        if self.each:
+            for operation_index, operation in enumerate(self.each):
+                try:
+                    if isinstance(operation, typing.Mapping):
+                        operation = load_operation(specification=operation)
+                        self.each[operation_index] = operation
+                    elif not isinstance(operation, ProfileOperation):
+                        error = ValueError(
+                            f"Encountered an invalid sub-operation for a {self.__class__.__qualname__} - item "
+                            f"{operation_index} holds a '{type(operation)}', which cannot be converted into a "
+                            f"{ProfileOperation.__qualname__}"
+                        )
+                        errors.append(error)
+                except Exception as exception:
+                    errors.append(exception)
+        else:
+            error = ValueError(f"There must be at least one operation to perform on split data")
+            errors.append(error)
 
-        for operation_index, operation in enumerate(self.each):
-            if isinstance(operation, typing.Mapping):
-                operation = load_operation(specification=operation)
-                self.each[operation_index] = operation
-            elif not isinstance(operation, ProfileOperation):
-                raise ValueError(
-                    f"Encountered an invalid sub-operation for a {self.__class__.__qualname__} - item "
-                    f"{operation_index} holds a '{type(operation)}', which cannot be converted into a "
-                    f"{ProfileOperation.__qualname__}"
-                )
+        if len(errors) == 1:
+            raise errors[0]
+        elif errors:
+            raise ExceptionGroup(f"Encountered an invalid {self.__class__.__qualname__}", errors)
 
     def __hash__(self):
         try:
@@ -631,7 +649,7 @@ class ExtractOperation(NCOOperation):
     _identifier_mapping: typing.Dict[pathlib.Path, typing.Dict[str, str]] = member(default_factory=dict)
 
 @dataclasses.dataclass(unsafe_hash=True)
-class MergeOperation(NCOOperation):
+class MergeOperation(PathToPathOperation):
     """
     Tells how to combine data
     """
@@ -682,7 +700,7 @@ class MergeOperation(NCOOperation):
 
 
 @dataclasses.dataclass(unsafe_hash=True)
-class Peek(NCOOperation):
+class Peek(PathToPathOperation):
     """
 
     """
@@ -744,7 +762,7 @@ Files:
         return data
 
 @dataclasses.dataclass
-class DropOperation(NCOOperation, InPlaceOperationMixin):
+class DropOperation(PathToPathOperation, InPlaceOperationMixin):
     """
     Tells how to drop variables
     """
@@ -831,7 +849,7 @@ class DropOperation(NCOOperation, InPlaceOperationMixin):
     exclude: bool = dataclasses.field(default=False)
 
 @dataclasses.dataclass
-class RenameOperation(NCOOperation, InPlaceOperationMixin):
+class RenameOperation(PathToPathOperation, InPlaceOperationMixin):
     """
     Tells how to rename variables or dimensions
     """
@@ -903,7 +921,7 @@ class RenameOperation(NCOOperation, InPlaceOperationMixin):
     rename_variable: bool = dataclasses.field(default=True)
 
 @dataclasses.dataclass(unsafe_hash=True)
-class AttributeOperation(NCOOperation, InPlaceOperationMixin):
+class AttributeOperation(PathToPathOperation, InPlaceOperationMixin):
     """
     Tells how to add, modify, or remove attributes on variables or globally
     """
@@ -978,17 +996,30 @@ class AttributeOperation(NCOOperation, InPlaceOperationMixin):
         return new_paths
 
     def __post_init__(self):
+        errors: typing.List[Exception] = []
         if not isinstance(self.attribute_type, nco.NetcdfType):
-            if isinstance(self.attribute_type, str):
-                self.attribute_type = nco.NetcdfType.from_string(self.attribute_type)
-            else:
-                raise ValueError(f"'{self.attribute_type}' is not a valid NCO attribute type")
+            try:
+                if isinstance(self.attribute_type, str):
+                    self.attribute_type = nco.NetcdfType.from_string(self.attribute_type)
+                else:
+                    error = ValueError(f"'{self.attribute_type}' is not a valid NCO attribute type")
+                    errors.append(error)
+            except Exception as exception:
+                errors.append(exception)
 
         if not isinstance(self.mode, nco.EditMode):
-            if isinstance(self.mode, str):
-                self.mode = nco.EditMode.from_string(self.mode)
-            else:
-                raise ValueError(f"'{self.mode}' is not a valid NCO Edit Mode")
+            try:
+                if isinstance(self.mode, str):
+                    self.mode = nco.EditMode.from_string(self.mode)
+                else:
+                    errors.append(ValueError(f"'{self.mode}' is not a valid NCO Edit Mode"))
+            except Exception as exception:
+                errors.append(exception)
+
+        if len(errors) == 1:
+            raise errors[0]
+        elif errors:
+            raise ExceptionGroup(f"Encountered an invalid {self.__class__.__qualname__}", errors)
 
     attribute_name: str
     field: typing.Optional[str] = dataclasses.field(default="global")
@@ -998,7 +1029,7 @@ class AttributeOperation(NCOOperation, InPlaceOperationMixin):
 
 
 @dataclasses.dataclass(unsafe_hash=True)
-class SaveOperation(NCOOperation):
+class SaveOperation(PathToPathOperation):
     """
     Save the given files in another location
     """
@@ -1014,14 +1045,25 @@ class SaveOperation(NCOOperation):
         )
 
     def __post_init__(self):
+        errors: typing.List[Exception] = []
         if self.identifier_pattern:
-            compiled_pattern: re.Pattern = re.compile(self.identifier_pattern)
-            if not compiled_pattern.groupindex:
-                raise ValueError(
-                    f"'{self.identifier_pattern}' is not a valid identifier pattern - groups must be identified by it. "
-                    f"Please include clauses like '(?P<identifier_name>pattern)'"
-                )
-            self._compiled_pattern = compiled_pattern
+            try:
+                compiled_pattern: re.Pattern = re.compile(self.identifier_pattern)
+                if compiled_pattern.groupindex:
+                    self._compiled_pattern = compiled_pattern
+                else:
+                    error = ValueError(
+                        f"'{self.identifier_pattern}' is not a valid identifier pattern - groups must be identified by it. "
+                        f"Please include clauses like '(?P<identifier_name>pattern)'"
+                    )
+                    errors.append(error)
+            except Exception as exception:
+                errors.append(exception)
+
+        if len(errors) == 1:
+            raise errors[0]
+        elif errors:
+            raise ExceptionGroup(f"Encountered an invalid {self.__class__.__qualname__}", errors)
 
     def __call__(
         self,
@@ -1205,23 +1247,34 @@ class BranchOperation(ProfileOperation[InputType, typing.Sequence[pathlib.Path]]
         return OperationType.BRANCH
 
     def __post_init__(self):
+        errors: typing.List[Exception] = []
+
         for branch_name, branch_logic in self.branches.items():
+            if len(branch_logic) == 0:
+                error = ValueError(f"There was no configured logic within the '{branch_name}' branch.")
+                errors.append(error)
+                continue
+
             for operation_index, operation in enumerate(branch_logic):
-                if isinstance(operation, typing.Mapping):
-                    operation = load_operation(specification=operation)
-                    self.branches[branch_name][operation_index] = operation
-                elif not isinstance(operation, ProfileOperation):
-                    raise ValueError(
-                        f"Encountered an invalid sub-operation for a {self.__class__.__qualname__} - item "
-                        f"{operation_index} in the '{branch_name}' branch holds a '{type(operation)}', which cannot "
-                        f"be converted into a {ProfileOperation.__qualname__}"
-                    )
+                try:
+                    if isinstance(operation, typing.Mapping):
+                        operation = load_operation(specification=operation)
+                        self.branches[branch_name][operation_index] = operation
+                    elif not isinstance(operation, ProfileOperation):
+                        error = ValueError(
+                            f"Encountered an invalid sub-operation for a {self.__class__.__qualname__} - item "
+                            f"{operation_index} in the '{branch_name}' branch holds a '{type(operation)}', which cannot "
+                            f"be converted into a {ProfileOperation.__qualname__}"
+                        )
+                        errors.append(error)
+                except Exception as e:
+                    errors.append(e)
 
         invalid_ends_names: typing.List[str] = []
         for branch_name, branch_logic in self.branches.items():
             if len(branch_logic) == 0:
                 invalid_ends_names.append(branch_name)
-            elif not isinstance(branch_logic[-1], (NCOOperation, EchoOperation, Peek)):
+            elif not isinstance(branch_logic[-1], (PathToPathOperation, EchoOperation, Peek)):
                 invalid_ends_names.append(branch_name)
 
         if invalid_ends_names:
@@ -1230,7 +1283,12 @@ class BranchOperation(ProfileOperation[InputType, typing.Sequence[pathlib.Path]]
                 f"branches must end in operations that return lists of paths. Invalid branches: "
                 f"{', '.join(invalid_ends_names)}"
             )
-            raise ValueError(message)
+            errors.append(ValueError(message))
+
+        if len(errors) == 1:
+            raise errors[0]
+        elif errors:
+            raise ExceptionGroup(f"Encountered an invalid {self.__class__.__qualname__}", errors)
 
     def branch_concurrently(
         self,
@@ -1465,16 +1523,31 @@ class OnEachOperation(
         return OperationType.ON_EACH
 
     def __post_init__(self):
-        for operation_index, operation in enumerate(self.on_each):
-            if isinstance(operation, typing.Mapping):
-                operation = load_operation(specification=operation)
-                self.on_each[operation_index] = operation
-            elif not isinstance(operation, ProfileOperation):
-                raise ValueError(
-                    f"Encountered an invalid sub-operation for a {self.__class__.__qualname__} - item "
-                    f"{operation_index}  holds a '{type(operation)}', which cannot "
-                    f"be converted into a {ProfileOperation.__qualname__}"
+        errors: typing.List[Exception] = []
+        if len(self.on_each) == 0:
+            errors.append(
+                ValueError(
+                    f"Encountered an invalid {self.__class__.__qualname__} operation - there is no configured logic"
                 )
+            )
+        for operation_index, operation in enumerate(self.on_each):
+            try:
+                if isinstance(operation, typing.Mapping):
+                    operation = load_operation(specification=operation)
+                    self.on_each[operation_index] = operation
+                elif not isinstance(operation, ProfileOperation):
+                    raise ValueError(
+                        f"Encountered an invalid sub-operation for a {self.__class__.__qualname__} - item "
+                        f"{operation_index}  holds a '{type(operation)}', which cannot "
+                        f"be converted into a {ProfileOperation.__qualname__}"
+                    )
+            except Exception as exception:
+                errors.append(exception)
+
+        if len(errors) == 1:
+            raise errors[0]
+        elif errors:
+            raise ExceptionGroup(f"Encountered an invalid {self.__class__.__qualname__} operation", errors)
 
     def __call__(
         self,
@@ -1533,7 +1606,7 @@ class OnEachOperation(
 
 
 @dataclasses.dataclass
-class AnomalyOperation(NCOOperation):
+class AnomalyOperation(PathToPathOperation):
     """
     Attaches anomaly variables to netcdf files based on thresholds
     """
@@ -1574,21 +1647,32 @@ class AnomalyOperation(NCOOperation):
         return OperationType.ANOMALY
 
     def __post_init__(self):
+        errors: typing.List[Exception] = []
+
         if len(self.thresholds) == 0:
             raise ValueError(
                 f"At least one threshold must be specified for an {self.__class__.__qualname__}"
             )
         from post_processing.transform.anomaly import ThresholdDefinition
         for threshold_index, threshold in enumerate(self.thresholds):
-            if isinstance(threshold, typing.Mapping):
-                threshold = ThresholdDefinition(**threshold)
-                self.thresholds[threshold_index] = threshold
-            elif not isinstance(threshold, ThresholdDefinition):
-                raise TypeError(
-                    f"'{threshold}' (type={type(threshold)}) is not a valid value in "
-                    f"{self.__class__.__qualname__}.thresholds. It must be indicated via a Mapping or a "
-                    f"ThresholdDefinition"
-                )
+            try:
+                if isinstance(threshold, typing.Mapping):
+                    threshold = ThresholdDefinition(**threshold)
+                    self.thresholds[threshold_index] = threshold
+                elif not isinstance(threshold, ThresholdDefinition):
+                    error = TypeError(
+                        f"'{threshold}' (type={type(threshold)}) is not a valid value in "
+                        f"{self.__class__.__qualname__}.thresholds. It must be indicated via a Mapping or a "
+                        f"ThresholdDefinition"
+                    )
+                    errors.append(error)
+            except Exception as e:
+                errors.append(e)
+
+        if len(errors) == 1:
+            raise errors[0]
+        elif errors:
+            raise ExceptionGroup(f"Encountered an invalid {self.__class__.__qualname__}", errors)
 
     def __call__(
         self,
@@ -1715,10 +1799,24 @@ class FunctionOperation(ProfileOperation[InputType, OutputType]):
             mapping_source['input_stem'] = data.stem
             mapping_source['input_suffix'] = data.suffix
 
-        kwargs = {
-            key: value.format(**mapping_source) if isinstance(value, str) else value
-            for key, value in self.kwargs.items()
-        }
+        kwargs: typing.Dict[str, typing.Any] = {}
+
+        for key, value in self.kwargs.items():
+            if isinstance(value, str):
+                try:
+                    value = value.format(**mapping_source)
+                except:
+                    options: typing.Sequence[str] = [
+                        f"{key}: {value}"
+                        for key, value in mapping_source.items()
+                    ]
+                    LOGGER.error(
+                        f"Could not format the value for the '{key}' parameter in {self.function_name}.{os.linesep}"
+                        f"The value was: '{value}' and the available values were:{os.linesep}"
+                        f"    - {(os.linesep + '    - ').join(options)}"
+                    )
+                    raise
+            kwargs[key] = value
 
         args: typing.Dict[str, typing.Any] = {}
 
@@ -1802,54 +1900,81 @@ class Profile(BaseModel):
             initial_id += 1
 
     def __post_init__(self):
-        if not len(self.operations):
-            raise ValueError(f"{self} must have at least one operation")
+        errors: typing.List[Exception] = []
 
         if not isinstance(self.configuration, Configuration):
-            if isinstance(self.configuration, str):
-                self.configuration = Configuration.from_string(self.configuration)
-            else:
-                raise ValueError(
-                    f"'{self.configuration}' (type={type(self.configuration)}) is not a valid type of configuration"
-                )
+            try:
+                if isinstance(self.configuration, str):
+                    self.configuration = Configuration.from_string(self.configuration)
+                else:
+                    error = ValueError(
+                        f"'{self.configuration}' (type={type(self.configuration)}) is not a valid type of configuration"
+                    )
+                    errors.append(error)
+            except Exception as exception:
+                errors.append(exception)
 
         if not isinstance(self.output_type, ModelOutputType):
-            if isinstance(self.output_type, str):
-                self.output_type = ModelOutputType.from_string(self.output_type)
-            else:
-                raise ValueError(
-                    f"'{self.output_type}' (type={type(self.output_type)}) is not a valid output type"
-                )
+            try:
+                if isinstance(self.output_type, str):
+                    self.output_type = ModelOutputType.from_string(self.output_type)
+                else:
+                    error = ValueError(
+                        f"'{self.output_type}' (type={type(self.output_type)}) is not a valid output type"
+                    )
+                    errors.append(error)
+            except Exception as e:
+                errors.append(e)
 
         if not isinstance(self.region, Region):
-            if isinstance(self.region, str):
-                self.region = Region.from_string(self.region)
-            else:
-                raise ValueError(
-                    f"'{self.region}' (type={type(self.region)}) is not a valid region"
-                )
+            try:
+                if isinstance(self.region, str):
+                    self.region = Region.from_string(self.region)
+                else:
+                    error = ValueError(
+                        f"'{self.region}' (type={type(self.region)}) is not a valid region"
+                    )
+                    errors.append(error)
+            except Exception as e:
+                errors.append(e)
 
-        for operation_index, operation in enumerate(self.operations):
-            if isinstance(operation, typing.Mapping):
-                operation = load_operation(specification=operation)
-                self.operations[operation_index] = operation
-            elif not isinstance(operation, ProfileOperation):
-                raise ValueError(
-                    f"Operation {operation_index} under {self} must be a {ProfileOperation.__qualname__}, "
-                    f"but instead received {type(operation)}({operation})"
-                )
+        if len(self.operations):
+            for operation_index, operation in enumerate(self.operations):
+                try:
+                    if isinstance(operation, typing.Mapping):
+                        operation = load_operation(specification=operation)
+                        self.operations[operation_index] = operation
+                    elif not isinstance(operation, ProfileOperation):
+                        error = ValueError(
+                            f"Operation {operation_index} under {self} must be a {ProfileOperation.__qualname__}, "
+                            f"but instead received {type(operation)}({operation})"
+                        )
+                        errors.append(error)
+                except Exception as exception:
+                    errors.append(exception)
 
-        first_operation: ProfileOperation = self.operations[0]
-        first_operation_type_is_entry: bool = isinstance(
-            first_operation,
-            (NCOOperation, BranchOperation, EchoOperation, FunctionOperation, LoadOperation, OnEachOperation)
-        )
-        if not first_operation_type_is_entry or first_operation.operation() == OperationType.INTO_PYTHON:
-            raise ValueError(
-                f"The first operation in {self} must operate on files, but the first operation was instead "
-                f"{type(first_operation).__qualname__}({first_operation})"
+            first_operation: ProfileOperation = self.operations[0]
+            first_operation_type_is_entry: bool = isinstance(
+                first_operation,
+                (PathToPathOperation, BranchOperation, EchoOperation, FunctionOperation, LoadOperation, OnEachOperation)
             )
-        self.assign_ids()
+            if not first_operation_type_is_entry:
+                error = ValueError(
+                    f"The first operation in {self} must operate on files, but the first operation was instead "
+                    f"{type(first_operation).__qualname__}({first_operation})"
+                )
+                errors.append(error)
+            try:
+                self.assign_ids()
+            except Exception as error:
+                errors.append(error)
+        else:
+            errors.append(ValueError(f"{self} must have at least one operation"))
+
+        if len(errors) == 1:
+            raise errors[0]
+        elif errors:
+            raise ExceptionGroup(f"Encountered an improper Profile", errors)
 
     def run(
         self,
@@ -1868,7 +1993,7 @@ class Profile(BaseModel):
         from post_processing.utilities.netcdf import load_metadata
         input_metadata: typing.Dict[str, typing.Any] = load_metadata(path=files)
         metadata: typing.Dict[str, typing.Any] = {
-            **settings.paths,
+            **settings.to_dict(),
             **additional_metadata,
             self.output_type.__class__.__name__: str(self.output_type.value),
             self.region.__class__.__name__: self.region.value,
@@ -1912,6 +2037,13 @@ class Profile(BaseModel):
                     f"configuration as {self.source_file}"
                 )
 
+            if isinstance(output, typing.Sequence):
+                output = [
+                    entry.resolve() if isinstance(entry, pathlib.Path) else entry
+                    for entry in output
+                ]
+            elif isinstance(output, pathlib.Path):
+                output = output.resolve()
             return output
         finally:
             if safe_to_remove_intermediate_output:
@@ -1991,6 +2123,7 @@ def load_profiles(profile_path: typing.Union[str, pathlib.Path] = settings.profi
         profile_path = pathlib.Path(profile_path)
 
     profiles: typing.List[Profile] = []
+    unreadable_profiles: typing.List[pathlib.Path] = []
 
     for directory_member in profile_path.iterdir():
         if not directory_member.is_file():
@@ -2004,17 +2137,28 @@ def load_profiles(profile_path: typing.Union[str, pathlib.Path] = settings.profi
         if not directory_member.suffix == ".json":
             LOGGER.debug(f"Not loading {directory_member} since it is not a JSON file")
             continue
-
         try:
             profile: Profile = Profile.from_json(directory_member)
         except Exception as e:
             if 'return lists of paths' in str(e):
                 LOGGER.error(e)
                 continue
-            raise
+            LOGGER.warning(
+                f"Could not load the profile from {directory_member}: {e}",
+                exc_info=settings.debug
+            )
+            unreadable_profiles.append(directory_member)
+            continue
 
         profile.source_file = directory_member
         profiles.append(profile)
+
+    if unreadable_profiles:
+        LOGGER.warning(
+            f"{len(unreadable_profiles)} profiles could not be read. This application may be unable to process data if "
+            f"the appropriate profile is missing.{os.linesep}"
+            f"    - {(os.linesep + '    - ').join(map(str, unreadable_profiles))}"
+        )
 
     if not profiles:
         raise FileNotFoundError(f"No profiles found in {profile_path}")
@@ -2166,8 +2310,11 @@ def call_generic_operations(
 
         if not any(op.operation_id == operation.operation_id for op in previous_operations):
             previous_operations.append(operation)
-        else:
-            LOGGER.debug(f"Not adding a record of a call to '{operation.operation_id}) {operation.__class__.__qualname__}' - there is already a record")
+        elif settings.verbosity >= enums.Verbosity.LOUD:
+            LOGGER.debug(
+                f"Not adding a record of a call to '{operation.operation_id}) {operation.__class__.__qualname__}' - "
+                f"there is already a record"
+            )
 
     return current_data
 
@@ -2212,7 +2359,10 @@ def call_operations(
         if not any(op.operation_id == operation.operation_id for op in previous_operations):
             previous_operations.append(operation)
         else:
-            LOGGER.warning(f"Not adding a record of a call to '{operation.operation_id}) {operation.__class__.__qualname__}' - there is already a record")
+            LOGGER.warning(
+                f"Not adding a record of a call to '{operation.operation_id}) {operation.__class__.__qualname__}' "
+                f"- there is already a record"
+            )
 
     return current_data
 
@@ -2241,6 +2391,9 @@ def get_profile(
            and profile.member == manifest.member
            and profile.output_type == manifest.output_type
     ]
+
+    if not profiles:
+        raise FileNotFoundError(f"A profile for {manifest} could not be found within {profile_path}")
 
     return profiles
 
@@ -2345,7 +2498,8 @@ def load_operation(specification: typing.Mapping[str, typing.Any]) -> ProfileOpe
             f"The following extra fields were encountered in the specification for a {operation_class.__qualname__}: "
             f"{', '.join(extra_fields)}"
         )
-        LOGGER.debug(message)
+        if settings.verbosity >= enums.Verbosity.LOUD:
+            LOGGER.debug(message)
 
     constructor_arguments: typing.Dict[str, typing.Any] = {
         field.name: specification[field.name]
