@@ -26,7 +26,7 @@
         },
         {
             "operation": "merge",
-            "file_name_pattern": "nwm.t{reference_time__date}{cycle}z.{ModelOutputType}.{Configuration}.{Region}.nc"
+            "file_name_pattern": "nwm.t{cycle}z.{ModelOutputType}.{Configuration}.{Region}.nc"
         },
         {
             "operation": "branch",
@@ -38,7 +38,7 @@
                     },
                     {
                         "operation": "save",
-                        "filename_pattern": "nwm.t{reference_time__date}{cycle}z.{Configuration}.{ModelOutputType}.{Region}.nc",
+                        "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.{Region}.nc",
                         "directory": "{output_path}/WMS/"
                     }
                 ],
@@ -55,7 +55,7 @@
                             "{mask_path}/aprfc.nc"
                         ],
                         "identifier_pattern": "^(?P<region>\\w+(\\.(?P<rfc>[MmAaLlCcNnPpWwOoSsHh][BbPpNnMmAaCcEeWwHhRrGg]([Rr][Ff][Cc]|[Vv][Ii])))?)",
-                        "output_pattern": "split.nwm.t{reference_time__date}{cycle}z.{Configuration}.{ModelOutputType}.{region}.nc",
+                        "output_pattern": "split.nwm.t{cycle}z.{Configuration}.{ModelOutputType}.{region}.nc",
                         "each": [
                             {
                                 "operation": "rename",
@@ -72,7 +72,7 @@
                             },
                             {
                                 "operation": "save",
-                                "filename_pattern": "nwm.t{reference_time__date}{cycle}z.{Configuration}.{ModelOutputType}.aprfc.nc",
+                                "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.aprfc.nc",
                                 "identifier_pattern": "(?P<rfc>[A-Za-z]{2}[Rr][Ff][Cc])",
                                 "directory": "{output_path}/RFC/AP/"
                             }

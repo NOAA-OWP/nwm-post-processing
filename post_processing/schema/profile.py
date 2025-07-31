@@ -19,7 +19,7 @@ from datetime import datetime
 
 import xarray
 
-import enums
+from post_processing import enums
 from post_processing.schema.base import BaseModel
 from post_processing.schema.base import member
 from post_processing.schema.base import get_fields

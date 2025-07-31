@@ -7,7 +7,7 @@
         },
         {
             "operation": "save",
-            "filename_pattern": "nwm.t{reference_time__date}{cycle}z.{Configuration}.{ModelOutputType}.tm{tminus}.{Region}.serfc.nc",
+            "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.tm{tminus}.{Region}.serfc.nc",
             "directory": "{output_path}/WMS/",
             "return_new_paths": false
         },
@@ -51,7 +51,7 @@
                 "{mask_path}/prvi.serfc.nc"
             ],
             "identifier_pattern": "^(?P<region>\\w+(\\.(?P<rfc>[MmAaLlCcNnPpWwOoSsHh][BbPpNnMmAaCcEeWwHhRrGg]([Rr][Ff][Cc]|[Vv][Ii])))?)",
-            "output_pattern": "nwm.t{reference_time__date}{cycle}z.{Configuration}.{ModelOutputType}.{frame}.puertorico.serfc.nc",
+            "output_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.{frame}.puertorico.serfc.nc",
             "each": [
                 {
                     "operation": "save",
