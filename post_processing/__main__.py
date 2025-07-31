@@ -179,6 +179,8 @@ def show_settings():
     Print out all configured settings that will be used at runtime
     """
     from pprint import pprint
+    print(f"{LOGGER.name} Settings:")
+    print(f"===============================================================")
     pprint(settings.to_dict())
 
 
@@ -210,6 +212,13 @@ def main() -> int:
         except Exception as e:
             LOGGER.critical(str(e))
             return 1
+
+    if settings.debug:
+        LOGGER.info(' '.join(map(str, sys.argv)))
+        show_version()
+        print()
+        show_settings()
+        print()
 
     # Get all files that lie within the same cycle. If `arguments.source_file` is
     # `nwm.t00z.short_range.channel_rt.f018.conus.nc`, this will find all files that belong to t00z, short range,
@@ -251,7 +260,10 @@ def main() -> int:
                 if arguments.summarize:
                     print(str(profile))
                     continue
-                    
+
+                if settings.debug:
+                    LOGGER.info(f"Running the profile from {profile.source_file}")
+
                 outputs: typing.Sequence[pathlib.Path] = profile.run(
                     cycle=manifest.cycle,
                     files=manifest.files,

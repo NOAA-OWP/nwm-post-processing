@@ -5,10 +5,14 @@ from __future__ import annotations
 import typing
 import dataclasses
 import pathlib
+import logging
 
 T = typing.TypeVar("T")
 
 MEMBER_FIELD_KEY: typing.Final[str] = "__IS_MEMBER__"
+
+
+LOGGER: logging.Logger = logging.getLogger(pathlib.Path(__file__).stem)
 
 
 @dataclasses.dataclass
@@ -56,12 +60,19 @@ class BaseModel:
             import json
             import os
             from post_processing.utilities.common import to_json
-            message: str = (
-                f"Could not construct a {cls.__qualname__} from the following configuration:{os.linesep}"
-                f"{to_json(kwargs)}{os.linesep*2}"
-                f"Due to: {e}"
-            )
-            raise RuntimeError(message) from e
+            try:
+                message: str = (
+                    f"Could not construct a {cls.__qualname__} from the following configuration:{os.linesep}"
+                    f"{to_json(kwargs)}{os.linesep*2}"
+                    f"Due to: {e}"
+                )
+                raise RuntimeError(message) from e
+            except Exception as json_exception:
+                LOGGER.error(
+                    f"Could not serialize the inputs to create a {cls.__qualname__}",
+                    exc_info=json_exception
+                )
+                raise
         return instance
 
     @classmethod
@@ -93,6 +104,35 @@ class BaseModel:
         Validate and/or transform values on the model
         """
         pass
+
+    def to_dict(self) -> typing.Mapping[str, typing.Any]:
+        """
+        Convert the model to a dictionary ready for serialization
+
+        Ensures that only fields needed to create the model are returned and not private state
+
+        :returns: A mapping between public field name and field value for the model
+        """
+        fields = [
+            field
+            for field in dataclasses.fields(self)
+            if field.init
+               and MEMBER_FIELD_KEY not in field.metadata
+               and not field.name.startswith("_")
+        ]
+
+        values: typing.Dict[str, typing.Any] = {}
+
+        for field in fields:
+            value: typing.Any = getattr(self, field.name)
+
+            if hasattr(value, "to_dict") and callable(getattr(value, "to_dict")):
+                value = value.to_dict()
+
+            if value != field.default:
+                values[field.name] = value
+
+        return values
 
 ModelType = typing.TypeVar("ModelType", bound=BaseModel)
 

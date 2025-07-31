@@ -52,7 +52,7 @@
             "level": "DEBUG",
             "formatter": "detailed",
             "filename": "pp_info.log",
-            "maxBytes": 52428800,
+            "maxBytes": 5000000,
             "backupCount": 5,
             "filters": [
                 "exclude_errors"
@@ -63,7 +63,7 @@
             "level": "ERROR",
             "formatter": "detailed",
             "filename": "pp_error.log",
-            "maxBytes": 52428800,
+            "maxBytes": 5000000,
             "backupCount": 5,
             "filters": [
                 "only_errors"

@@ -334,15 +334,19 @@ def setup_logging(log_path: typing.Union[pathlib.Path, str] = None):
         import json
         configuration: typing.Dict = json.loads(log_path.read_text())
         logging.config.dictConfig(config=configuration)
+
+        if settings.debug:
+            for handler in logging.root.handlers:
+                from logging import handlers
+                if isinstance(handler, logging.FileHandler) or isinstance(handler, handlers.RotatingFileHandler):
+                    logging.info(f"The '{handler.name}' saves its data in {pathlib.Path(handler.baseFilename).resolve()}")
     else:
         logging.basicConfig(
             level=logging.DEBUG if settings.debug else logging.INFO,
             format=settings.log_format,
             datefmt=settings.date_format
         )
-
-    if log_path is not None and not log_path.is_file():
-        logging.warning(
+        logging.error(
             f"No log configuration could be found at '{log_path}'. Logs will not be properly saved to file and can "
             f"only be committed to stdout and stderr. Unless redirected, all feedback will be lost"
         )
@@ -360,5 +364,21 @@ def setup_logging(log_path: typing.Union[pathlib.Path, str] = None):
     for logger_name in settings.loggers_to_quiet:
         logger: logging.Logger = logging.getLogger(logger_name)
         logger.setLevel(logging.WARNING)
+
+    if settings.debug:
+        logging.root.setLevel(logging.DEBUG)
+        for handler in logging.root.handlers:
+            handler.setLevel(logging.DEBUG)
+
+    file_handlers: typing.List[logging.Handler] = list(filter(
+        lambda hndlr: isinstance(hndlr, logging.FileHandler),
+        logging.root.handlers
+    ))
+
+    if len(file_handlers) == 0:
+        logging.error(
+            "There are no configured file handlers - no messages will be saved for posterity and the only "
+            "details will be stored in stdout/stderr"
+        )
 
     override_log_levels(log_level_override_path=settings.log_level_override_path)

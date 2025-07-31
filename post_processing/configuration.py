@@ -420,7 +420,11 @@ class _Settings(UserDict):
         if key not in self.keys():
             value = _get_env_from_os(key=key, default=SENTINEL)
 
-            if value is not SENTINEL:
+            if value is SENTINEL:
+                possible_path: pathlib.Path = self.resource_path / "log_level_override.json"
+                if possible_path.is_file():
+                    value = possible_path
+            else:
                 value = pathlib.Path(value)
 
             if isinstance(value, str):
@@ -806,30 +810,6 @@ class _Settings(UserDict):
         value = int(value)
 
         self.__setitem__(key=key, item=value)
-
-    @property
-    def paths(self) -> typing.Dict[str, pathlib.Path]:
-        """
-        Get all paths pertinent to application settings
-        """
-        import inspect
-        paths: typing.Dict[str, pathlib.Path] = {}
-
-        properties: typing.List[typing.Tuple[str, property]] = inspect.getmembers(
-            self.__class__,
-            predicate=lambda member: isinstance(member, property)
-        )
-
-        for name, prop in properties:
-            if name == "paths":
-                continue
-
-            property_value: typing.Any = prop.fget(self)
-
-            if isinstance(property_value, pathlib.Path):
-                paths[name] = property_value
-
-        return paths
 
     def to_dict(self) -> typing.Dict[str, typing.Any]:
         """

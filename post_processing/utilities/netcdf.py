@@ -9,6 +9,7 @@ from threading import RLock
 from post_processing.configuration import settings
 from post_processing.utilities.simple_cache import simple_cache
 from post_processing.utilities.simple_cache import CacheEntry
+from post_processing.enums import Verbosity
 
 if typing.TYPE_CHECKING:
     import xarray
@@ -237,10 +238,7 @@ def peek(
 
     variable_definition_template: str = "{dtype} {variable_name}({dimensions}):"
     lines: typing.List[str] = [
-        str(path),
-        os.linesep,
         separator_placeholder,
-        os.linesep,
     ]
 
     def format_variable(var: xarray.DataArray) -> typing.Sequence[str]:
@@ -285,8 +283,6 @@ def peek(
                     for attribute_name, attribute_value in var.encoding.items()
                 ]
             ])
-
-        lines_for_variable.append(os.linesep)
         return lines_for_variable
 
     with load_netcdf(path=path, engine=engine, chunks='force', **kwargs) as netcdf_file:
@@ -298,21 +294,15 @@ def peek(
                 f"{tab}{str(dimension).ljust(dimension_name_length)}: {count}"
                 for dimension, count in netcdf_file.sizes.items()
             ],
-            os.linesep,
             separator_placeholder,
-            os.linesep,
             "Variables:",
-            os.linesep
         ])
 
         for variable in [*list(netcdf_file.data_vars.values()), *list(netcdf_file.coords.values())]:
             variable_lines: typing.Iterable[str] = map(lambda line: tab + line, format_variable(var=variable))
             lines.extend(variable_lines)
 
-        lines.extend([
-            separator_placeholder,
-            os.linesep,
-        ])
+        lines.append(separator_placeholder)
 
         if netcdf_file.attrs:
             lines.append(f"{tab}Attributes:")
@@ -362,6 +352,8 @@ def save_netcdf(
 
     compute = str(kwargs.get('compute', True)).lower() in ('true', 'yes', 't', 'y', '1')
     dataset.to_netcdf(path=path, engine=engine, **kwargs, compute=compute)
-    LOGGER.debug(f"Saved netcdf data to: {path}")
+
+    if settings.verbosity >= Verbosity.LOUD:
+        LOGGER.debug(f"Saved netcdf data to: {path}")
     record_saved_file(path=path)
     return path.is_file()

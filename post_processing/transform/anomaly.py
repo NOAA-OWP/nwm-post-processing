@@ -28,6 +28,18 @@ class ThresholdDefinition:
     time_coordinate: str = dataclasses.field(default='time')
     _data: typing.Dict[int, "xarray.DataArray"] = member(default_factory=dict)
 
+    def to_dict(self) -> typing.Mapping[str, typing.Any]:
+        """
+        Convert the definition to a dictionary in pure python types and avoiding private data
+        """
+        representation: typing.Dict[str, typing.Any] = {
+            "data_path": str(self.data_path),
+            "level": self.level if isinstance(self.level, (int, float)) else float(str(self.level)),
+            "variable": self.variable,
+            "time_coordinate": self.time_coordinate,
+        }
+        return representation
+
     def __post_init__(self):
         import numpy
         if not isinstance(self.level, numpy.float32):
@@ -188,7 +200,7 @@ def calculate_anomaly(
     try:
         dataset = load_netcdf(path=input_path)
     except:
-        LOGGER.error(f"Could not load the netcdf data at '{input_path.absolute()}'")
+        LOGGER.error(f"Could not load the netcdf data at '{input_path.resolve()}'")
         raise
 
     if variable_to_bin not in dataset:
@@ -289,7 +301,7 @@ def calculate_anomaly(
         updated_dataset: xarray.Dataset = dataset.assign(**{output_array.name: output_array})
     except:
         LOGGER.error(
-            f"Could not attach the new anomaly values to the data in '{input_path.absolute()}'"
+            f"Could not attach the new anomaly values to the data in '{input_path.resolve()}'"
         )
         raise
 
@@ -297,7 +309,7 @@ def calculate_anomaly(
         from post_processing.utilities.netcdf import save_netcdf
         save_netcdf(path=output_path, dataset=updated_dataset)
     except:
-        LOGGER.error(f"Could not save the dataset with the newly calculated anomaly data to '{output_path.absolute()}'")
+        LOGGER.error(f"Could not save the dataset with the newly calculated anomaly data to '{output_path.resolve()}'")
         raise
 
     return output_path
