@@ -51,10 +51,16 @@ class PostProcessingEnumeration(enum.Enum):
 
     def describe(self) -> str:
         from post_processing.utilities.common import format_identifier_to_title
-        raw_value: str = self.value
-        for key, replacement in _PRINT_REPLACEMENTS.items():
-            raw_value = raw_value.replace(key, replacement)
-        return format_identifier_to_title(raw_value)
+        value_parts: typing.List[str] = format_identifier_to_title(self.value).split(" ")
+
+        for part_index, part in enumerate(value_parts):
+            for key, replacement in _PRINT_REPLACEMENTS.items():
+                if part.lower() == key.lower():
+                    value_parts[part_index] = replacement
+                    break
+
+        description: str = " ".join(value_parts)
+        return description
 
     def __str__(self):
         return self.value
