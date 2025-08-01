@@ -337,17 +337,48 @@ class EchoOperation(ProfileOperation[InputType, InputType]):
         metadata: typing.Dict[str, typing.Any]
     ) -> InputType:
         message_metadata: typing.Dict[str, typing.Any] = {
-            "profile": str(profile),
+            "profile": (
+                f"Profile for {profile.configuration.describe()} executions for {profile.output_type.describe()} "
+                f"data over {profile.region.describe()}"
+                f"{', for ensemble member ' + str(profile.member) if profile.member is not None else ''}"
+            ),
             "process_identifier": process_identifier,
             "work_directory": str(work_directory),
-            "previous_operations": "->".join(map(str, previous_operations)),
+            "previous_operations": (os.linesep + "|-->").join(map(str, previous_operations)),
             **metadata,
         }
+
+        if isinstance(data, pathlib.Path):
+            message_metadata['input_name'] = data.name
+            message_metadata['input_path'] = str(data)
+        elif isinstance(data, typing.Sequence) and all(isinstance(path, pathlib.Path) for path in data):
+            message_metadata['input_name'] = ', '.join(map(lambda path: path.name, data))
+            message_metadata['input_path'] = ', '.join(map(str, data))
+        else:
+            message_metadata['input_name'] = str(data)
+            message_metadata['input_path'] = repr(data)
+
+        message_metadata['input_file'] = message_metadata['input_path']
 
         if profile.source_file is not None:
             message_metadata["source_file"] = str(profile.source_file)
 
-        self._logger.log(self.level, self.message.format(**message_metadata))
+        try:
+            formatted_message: str = self.message.format(**message_metadata)
+        except KeyError as error:
+            available_keys: typing.Iterable[str] = map(
+                lambda kv_pair: f"{kv_pair[0]}: {kv_pair[1]}",
+                message_metadata.items()
+            )
+            message: str = (
+                f"Cannot format echo message because the following keys are missing from the template: {error}{os.linesep}"
+                f"Available variables are:{os.linesep}"
+                f"    - {(os.linesep + '    - ').join(available_keys)}"
+            )
+            LOGGER.error(message)
+            raise
+
+        self._logger.log(self.level, formatted_message)
         return data
 
     def __post_init__(self) -> None:

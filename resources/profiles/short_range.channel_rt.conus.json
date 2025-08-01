@@ -92,8 +92,16 @@
                 ],
                 "RFC": [
                     {
+                        "operation": "echo",
+                        "message": "Dropping 'streamflow' anomaly from: {input_name}"
+                    },
+                    {
                         "operation": "drop",
                         "fields": ["streamflow_anomaly"]
+                    },
+                    {
+                        "operation": "echo",
+                        "message": "dropped streamflow anomaly from '{input_name}', now extracting data by rfc"
                     },
                     {
                         "operation": "extract",
@@ -112,11 +120,19 @@
                         "output_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.{region}.nc",
                         "each": [
                             {
+                                "operation": "echo",
+                                "message": "Renaming the 'feature_id' variable to 'station' on '{file_name}'"
+                            },
+                            {
                                 "operation": "rename",
                                 "mapping": {
                                     "feature_id": "station"
                                 },
                                 "inplace": true
+                            },
+                            {
+                                "operation": "echo",
+                                "message": "Renamed the 'feature_id' variable to 'station' on {input_file}. Now renaming the 'feature_id' dimension to 'station_id'"
                             },
                             {
                                 "operation": "rename",
@@ -125,6 +141,10 @@
                                     "feature_id": "station_id"
                                 },
                                 "inplace": true
+                            },
+                            {
+                                "operation": "echo",
+                                "message": "Renamed the 'feature_id' dimension to 'station_id'. Now Saving '{input_file}'"
                             },
                             {
                                 "operation": "save",
