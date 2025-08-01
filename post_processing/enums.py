@@ -222,3 +222,18 @@ class Verbosity(enum.IntEnum):
     ALL = 3
     """Indicates a message that should only be output if we're being over the top"""
 
+    @classmethod
+    def from_string(cls, string: str) -> "Verbosity":
+        """
+        Get a verbosity value from a string
+        """
+        clean_string: str = string.lower().strip()
+
+        for member in cls:
+            member_name: str = member.name.lower()
+            member_value: str = str(member.value)
+
+            if clean_string in (member_name, member_value):
+                return member
+        raise KeyError(f"'{string}' is not a valid value for '{cls.__name__}'")
+

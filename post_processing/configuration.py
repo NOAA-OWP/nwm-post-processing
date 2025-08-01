@@ -785,15 +785,20 @@ class _Settings(UserDict):
             ...     message = "detailed message"
             ... logging.getLogger().debug(message)
         """
+        from post_processing.enums import Verbosity
         proposed_key: str = "{prefix}_VERBOSITY".format(prefix=self.prefix).lower()
         key: str = self._find_key(key=proposed_key)
 
         if key not in self.keys() or not self.__getitem__(key=key):
-            from post_processing.enums import Verbosity
-            verbosity: int = int(_get_env_from_os(key=key, default=Verbosity.NORMAL))
+            verbosity: typing.Union[str, int] = _get_env_from_os(key=key, default=Verbosity.NORMAL)
             self.__setitem__(key=key, item=verbosity)
 
-        return int(self.__getitem__(key=key))
+        verbosity: typing.Union[int, str, Verbosity] = self.__getitem__(key=key)
+        if isinstance(verbosity, str):
+            verbosity = Verbosity.from_string(string=verbosity)
+            self.__setitem__(key=key, item=verbosity)
+
+        return int(verbosity)
 
     @verbosity.setter
     def verbosity(self, value: int):
