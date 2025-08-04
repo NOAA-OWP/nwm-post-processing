@@ -1894,7 +1894,7 @@ class Profile(BaseModel):
     region: Region = dataclasses.field()
     operations: typing.List[ProfileOperation] = dataclasses.field()
     output_file_pattern: str = dataclasses.field(default="nwm.t{date}{cycle}z.{configuration}.{output_type}.{region}.nc")
-    member: typing.Optional[int] = dataclasses.field(default=None)
+    member: typing.Optional[typing.Union[str, int]] = dataclasses.field(default=None)
     date_format: str = dataclasses.field(default="%Y%m%d")
     output_directory: typing.Optional[pathlib.Path] = dataclasses.field(default=None)
     intermediate_directory: typing.Optional[pathlib.Path] = dataclasses.field(default_factory=lambda: settings.intermediate_directory)
@@ -1945,6 +1945,9 @@ class Profile(BaseModel):
                     errors.append(error)
             except Exception as exception:
                 errors.append(exception)
+
+        if isinstance(self.member, str) and self.member.isdigit():
+            self.member = int(self.member)
 
         if not isinstance(self.output_type, ModelOutputType):
             try:
