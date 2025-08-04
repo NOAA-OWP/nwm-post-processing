@@ -1,0 +1,32 @@
+{
+    "operations": [
+        {
+            "operation": "echo",
+            "message": "An output for 'nwm.t<cycle>z.analysis_assim.land.tm00.puertorico.nc' should be generated, as defined in {source_file}.",
+            "level": "error",
+            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/WMS/analysis_assim/land/nwm.t2025060718z.analysis_assim.land.tm00.puertorico.nc"
+        },
+        {
+            "operation": "echo",
+            "message": "An output for 'nwm.t<cycle>z.analysis_assim.land.tm00.puertorico.serfc.nc' should be generated, as defined in {source_file}.",
+            "level": "error",
+            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/SE/land/nwm.t2025060718z.analysis_assim.land.tm00.puertorico.serfc.nc"
+        },
+        {
+            "operation": "echo",
+            "message": "An output for 'nwm.t<cycle>z.analysis_assim.land.tm01.puertorico.serfc.nc' should be generated, as defined in {source_file}.",
+            "level": "error",
+            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/SE/land/nwm.t2025060718z.analysis_assim.land.tm01.puertorico.serfc.nc"
+        },
+        {
+            "operation": "echo",
+            "message": "An output for 'nwm.t<cycle>z.analysis_assim.land.tm02.puertorico.serfc.nc' should be generated, as defined in {source_file}.",
+            "level": "error",
+            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/SE/land/nwm.t2025060718z.analysis_assim.land.tm02.puertorico.serfc.nc"
+        }
+    ],
+    "configuration": "analysis_assim",
+    "output_type": "land",
+    "region": "puertorico",
+    "member": null
+}

@@ -2,7 +2,7 @@
     "operations": [
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.medium_range.channel_rt_4.alaska.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.medium_range.channel_rt_4.alaska.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/WMS/medium_range/channel_rt/nwm.t2025060712z.medium_range.channel_rt_4.alaska.nc"
         }
