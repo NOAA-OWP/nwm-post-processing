@@ -1,10 +1,18 @@
 {
     "operations": [
         {
-            "operation": "echo",
-            "message": "An output for 'nwm.t<cycle>z.medium_range.channel_rt.alaska.nc' should be generated, as defined in {source_file}.",
-            "level": "error",
-            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/WMS/medium_range/channel_rt/nwm.t2025060712z.medium_range.channel_rt.alaska.nc"
+            "operation": "drop",
+            "exclude": true,
+            "fields": ["feature_id", "time", "reference_time", "streamflow", "crs"]
+        },
+        {
+            "operation": "merge",
+            "file_name_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}_{member}.{Region}.nc"
+        },
+        {
+            "operation": "save",
+            "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}_{member}.{Region}.nc",
+            "directory": "{output_path}/"
         }
     ],
     "configuration": "medium_range",

@@ -1,76 +1,59 @@
 {
     "operations": [
         {
-            "operation": "echo",
-            "message": "An output for 'nwm.t<cycle>z.analysis_assim_no_da.channel_rt.tm0000.hawaii.nc' should be generated, as defined in {source_file}.",
-            "level": "error",
-            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AP/channel_rt/nwm.t2025060718z.analysis_assim_no_da.channel_rt.tm0000.hawaii.aprfc.nc"
+            "operation": "drop",
+            "exclude": true,
+            "fields": ["feature_id", "time", "reference_time", "streamflow", "crs"]
         },
         {
-            "operation": "echo",
-            "message": "An output for 'nwm.t<cycle>z.analysis_assim_no_da.channel_rt.tm0015.hawaii.nc' should be generated, as defined in {source_file}.",
-            "level": "error",
-            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AP/channel_rt/nwm.t2025060718z.analysis_assim_no_da.channel_rt.tm0015.hawaii.aprfc.nc"
+            "operation": "on_each",
+            "comment": "Add upstreamflow to each input file by calling 'post_processing.transform.calculate_upstream_flow.calculate_upstream_flow' on each",
+            "on_each": [
+                {
+                    "operation": "function",
+                    "function_name": "post_processing.transform.calculate_upstream_flow.calculate_upstream_flow",
+                    "comment": "This should end up calling `calculate_upstream_flow(input_path=data, output_path=data, routelink_path='{application_path}/RouteLink_CONUS.nc')`",
+                    "kwargs": {
+                        "routelink_path": "{routelink_path}/RouteLink_HI.nc",
+                        "routelink_from_variable": "from",
+                        "output_path": "{work_directory}/upstream.{input_name}"
+                    },
+                    "argument_mapping": {
+                        "input_path": "data"
+                    }
+                }
+            ]
         },
         {
-            "operation": "echo",
-            "message": "An output for 'nwm.t<cycle>z.analysis_assim_no_da.channel_rt.tm0030.hawaii.nc' should be generated, as defined in {source_file}.",
-            "level": "error",
-            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AP/channel_rt/nwm.t2025060718z.analysis_assim_no_da.channel_rt.tm0030.hawaii.aprfc.nc"
+            "operation": "rename",
+            "mapping": {
+                "feature_id": "station_id"
+            }
         },
         {
-            "operation": "echo",
-            "message": "An output for 'nwm.t<cycle>z.analysis_assim_no_da.channel_rt.tm0045.hawaii.nc' should be generated, as defined in {source_file}.",
-            "level": "error",
-            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AP/channel_rt/nwm.t2025060718z.analysis_assim_no_da.channel_rt.tm0045.hawaii.aprfc.nc"
+            "operation": "rename",
+            "rename_variable": false,
+            "mapping": {
+                "feature_id": "station"
+            }
         },
         {
-            "operation": "echo",
-            "message": "An output for 'nwm.t<cycle>z.analysis_assim_no_da.channel_rt.tm0100.hawaii.nc' should be generated, as defined in {source_file}.",
-            "level": "error",
-            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AP/channel_rt/nwm.t2025060718z.analysis_assim_no_da.channel_rt.tm0100.hawaii.aprfc.nc"
-        },
-        {
-            "operation": "echo",
-            "message": "An output for 'nwm.t<cycle>z.analysis_assim_no_da.channel_rt.tm0115.hawaii.nc' should be generated, as defined in {source_file}.",
-            "level": "error",
-            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AP/channel_rt/nwm.t2025060718z.analysis_assim_no_da.channel_rt.tm0115.hawaii.aprfc.nc"
-        },
-        {
-            "operation": "echo",
-            "message": "An output for 'nwm.t<cycle>z.analysis_assim_no_da.channel_rt.tm0130.hawaii.nc' should be generated, as defined in {source_file}.",
-            "level": "error",
-            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AP/channel_rt/nwm.t2025060718z.analysis_assim_no_da.channel_rt.tm0130.hawaii.aprfc.nc"
-        },
-        {
-            "operation": "echo",
-            "message": "An output for 'nwm.t<cycle>z.analysis_assim_no_da.channel_rt.tm0145.hawaii.nc' should be generated, as defined in {source_file}.",
-            "level": "error",
-            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AP/channel_rt/nwm.t2025060718z.analysis_assim_no_da.channel_rt.tm0145.hawaii.aprfc.nc"
-        },
-        {
-            "operation": "echo",
-            "message": "An output for 'nwm.t<cycle>z.analysis_assim_no_da.channel_rt.tm0200.hawaii.nc' should be generated, as defined in {source_file}.",
-            "level": "error",
-            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AP/channel_rt/nwm.t2025060718z.analysis_assim_no_da.channel_rt.tm0200.hawaii.aprfc.nc"
-        },
-        {
-            "operation": "echo",
-            "message": "An output for 'nwm.t<cycle>z.analysis_assim_no_da.channel_rt.tm0215.hawaii.nc' should be generated, as defined in {source_file}.",
-            "level": "error",
-            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AP/channel_rt/nwm.t2025060718z.analysis_assim_no_da.channel_rt.tm0215.hawaii.aprfc.nc"
-        },
-        {
-            "operation": "echo",
-            "message": "An output for 'nwm.t<cycle>z.analysis_assim_no_da.channel_rt.tm0230.hawaii.nc' should be generated, as defined in {source_file}.",
-            "level": "error",
-            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AP/channel_rt/nwm.t2025060718z.analysis_assim_no_da.channel_rt.tm0230.hawaii.aprfc.nc"
-        },
-        {
-            "operation": "echo",
-            "message": "An output for 'nwm.t<cycle>z.analysis_assim_no_da.channel_rt.tm0245.hawaii.nc' should be generated, as defined in {source_file}.",
-            "level": "error",
-            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AP/channel_rt/nwm.t2025060718z.analysis_assim_no_da.channel_rt.tm0245.hawaii.aprfc.nc"
+            "operation": "extract",
+            "dimension": "station_id",
+            "mask_coordinate": "feature_id",
+            "masks": [
+                "{mask_path}/aprfc.nc"
+            ],
+            "identifier_pattern": "^(?P<region>\\w+(\\.(?P<rfc>[MmAaLlCcNnPpWwOoSsHh][BbPpNnMmAaCcEeWwHhRrGg]([Rr][Ff][Cc]|[Vv][Ii])))?)",
+            "output_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.{frame}.hawaii.aprfc.nc",
+            "each": [
+                {
+                    "operation": "save",
+                    "filename_pattern": "{file_name}",
+                    "identifier_pattern": "(?P<rfc>[A-Za-z]{2}[Rr][Ff][Cc])",
+                    "directory": "{output_path}/"
+                }
+            ]
         }
     ],
     "configuration": "analysis_assim_no_da",
