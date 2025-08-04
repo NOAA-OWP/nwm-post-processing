@@ -50,7 +50,7 @@
         {
             "operation": "save",
             "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.tm{tminus}.{Region}.nc",
-            "directory": "{output_path}/WMS/",
+            "directory": "{output_path}/",
             "return_new_paths": false
         },
         {
@@ -97,7 +97,7 @@
                     "operation": "save",
                     "filename_pattern": "{file_name}",
                     "identifier_pattern": "(?P<rfc>[A-Za-z]{2}[Rr][Ff][Cc])",
-                    "directory": "{output_path}/RFC/{RFC}/"
+                    "directory": "{output_path}/"
                 }
             ]
         },
