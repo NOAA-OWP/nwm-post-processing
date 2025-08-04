@@ -15,11 +15,66 @@ MEMBER_FIELD_KEY: typing.Final[str] = "__IS_MEMBER__"
 LOGGER: logging.Logger = logging.getLogger(pathlib.Path(__file__).stem)
 
 
+def member(
+    *,
+    default: T = dataclasses.MISSING,
+    default_factory: typing.Callable[[], T] = dataclasses.MISSING,
+    metadata: typing.Dict = None,
+    kw_only: bool = False,
+) -> dataclasses.Field:
+    """
+    Create a member specific field
+    """
+    if metadata is None:
+        metadata = {}
+
+    metadata[MEMBER_FIELD_KEY] = True
+
+    if dataclasses.MISSING not in (default, default_factory):
+        raise ValueError(
+            f"Cannot create a field - both a default value and a default factory cannot be specified - "
+            f"choose one or the other"
+        )
+    elif default == dataclasses.MISSING and default_factory == dataclasses.MISSING:
+        raise ValueError(f"An initial value must be given if a member variable is to be added")
+
+    if default_factory != dataclasses.MISSING:
+        if not callable(default_factory):
+            raise TypeError(
+                f"Cannot use '{default_factory}' (type={type(default_factory)} as the default factory as it is not callable"
+            )
+        field = dataclasses.field(
+            default_factory=default_factory,
+            metadata=metadata,
+            init=False,
+            compare=False,
+            repr=False,
+            kw_only=kw_only
+        )
+    else:
+        field = dataclasses.field(
+            default=default,
+            metadata=metadata,
+            init=False,
+            compare=False,
+            repr=False,
+            kw_only=kw_only
+        )
+
+    return field
+
+
 @dataclasses.dataclass
 class BaseModel:
     """
     A base class for post-processing model objects
     """
+    _raw_configuration: typing.Optional[str] = member(default=None, kw_only=True)
+
+    @property
+    def raw_configuration(self) -> typing.Optional[str]:
+        return self._raw_configuration
+
     def __post_init__(self):
         self._validate()
 
@@ -34,7 +89,7 @@ class BaseModel:
         type_hints: typing.Dict[str, typing.Any] = typing.get_type_hints(cls)
         initial_values: typing.Dict[str, typing.Any] = {}
 
-        for field in dataclasses.fields(cls):  # type: dataclasses.Field
+        for field in get_fields(cls):  # type: dataclasses.Field
             if field.name in kwargs:
                 value: typing.Union[typing.Dict, typing.Any] = kwargs[field.name]
                 expected_type: typing.Optional[typing.Type] = type_hints.get(field.name)
@@ -91,10 +146,13 @@ class BaseModel:
         try:
             if isinstance(path_or_buffer, (pathlib.Path, str)):
                 with open(path_or_buffer, "r") as json_file:
-                    data: typing.Dict = json.load(json_file)
+                    text: str = json_file.read()
             elif isinstance(path_or_buffer, typing.IO):
-                data = json.load(path_or_buffer)
+                text = path_or_buffer.read()
+            data = json.loads(text)
+
             deserialized_model: ModelType = cls.from_dict(**data)
+            deserialized_model._raw_configuration = text
         except Exception as e:
             raise Exception(f"Could not load the configuration from {path_or_buffer}: {e}") from e
         return deserialized_model
@@ -135,53 +193,6 @@ class BaseModel:
         return values
 
 ModelType = typing.TypeVar("ModelType", bound=BaseModel)
-
-
-def member(
-    *,
-    default: T = dataclasses.MISSING,
-    default_factory: typing.Callable[[], T] = dataclasses.MISSING,
-    metadata: typing.Dict = None,
-    kw_only: bool = False,
-) -> dataclasses.Field:
-    """
-    Create a member specific field
-    """
-    if metadata is None:
-        metadata = {}
-
-    if dataclasses.MISSING not in (default, default_factory):
-        raise ValueError(
-            f"Cannot create a field - both a default value and a default factory cannot be specified - "
-            f"choose one or the other"
-        )
-    elif default == dataclasses.MISSING and default_factory == dataclasses.MISSING:
-        raise ValueError(f"An initial value must be given if a member variable is to be added")
-
-    if default_factory != dataclasses.MISSING:
-        if not callable(default_factory):
-            raise TypeError(
-                f"Cannot use '{default_factory}' (type={type(default_factory)} as the default factory as it is not callable"
-            )
-        field = dataclasses.field(
-            default_factory=default_factory,
-            metadata=metadata,
-            init=False,
-            compare=False,
-            repr=False,
-            kw_only=kw_only
-        )
-    else:
-        field = dataclasses.field(
-            default=default,
-            metadata=metadata,
-            init=False,
-            compare=False,
-            repr=False,
-            kw_only=kw_only
-        )
-
-    return field
 
 
 def get_fields(class_or_instance) -> typing.Sequence[dataclasses.Field]:

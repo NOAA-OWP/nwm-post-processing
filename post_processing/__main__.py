@@ -257,34 +257,43 @@ def main() -> int:
     try:
         if profiles:
             for profile in profiles:
-                if arguments.summarize:
-                    print(str(profile))
-                    continue
+                try:
+                    if arguments.summarize:
+                        print(str(profile))
+                        continue
 
-                if settings.debug:
-                    LOGGER.info(f"Running the profile from {profile.source_file}")
+                    if settings.debug:
+                        LOGGER.info(f"Running the profile from {profile.source_file}")
 
-                outputs: typing.Sequence[pathlib.Path] = profile.run(
-                    cycle=manifest.cycle,
-                    files=manifest.files,
-                    output_path=arguments.destination
-                )
-                LOGGER.info(
-                    f"The results for the profile for {profile.output_type.describe()} data run within the "
-                    f"{profile.configuration.describe()} configuration across {profile.region.describe()} were written to:{os.linesep}"
-                    f"    - {(os.linesep + '    - ').join(map(str, outputs))}"
-                )
+                    outputs: typing.Sequence[pathlib.Path] = profile.run(
+                        cycle=manifest.cycle,
+                        files=manifest.files,
+                        output_path=arguments.destination
+                    )
+                    LOGGER.info(
+                        f"The results for the profile for {profile.output_type.describe()} data run within the "
+                        f"{profile.configuration.describe()} configuration across {profile.region.describe()} were written to:{os.linesep}"
+                        f"    - {(os.linesep + '    - ').join(map(str, outputs))}"
+                    )
 
-                if settings.debug or arguments.peek:
-                    for output in outputs:
-                        from post_processing.utilities.netcdf import load_netcdf
-                        from post_processing.utilities.netcdf import peek
-                        representation: str = peek(output)
-                        LOGGER.info(f"Output: {output}:{os.linesep}{representation}")
+                    if settings.debug or arguments.peek:
+                        for output in outputs:
+                            from post_processing.utilities.netcdf import load_netcdf
+                            from post_processing.utilities.netcdf import peek
+                            representation: str = peek(output)
+                            LOGGER.info(f"Output: {output}:{os.linesep}{representation}")
+                except:
+                    if profile.raw_configuration:
+                        LOGGER.debug(
+                            f"Could not execute the following Profile:{os.linesep}"
+                            f"{profile.raw_configuration}"
+                        )
+                    raise
         else:
             LOGGER.warning(f"No profiles were found for '{manifest}'. Nothing will be processed")
     except BaseException as exception:
-        LOGGER.critical(exception, exc_info=True)
+        LOGGER.error(exception, exc_info=True)
+        LOGGER.critical(f"National Water Model Post Processing could not provide outputs", exc_info=False)
         return 1
     LOGGER.info(f"Operation complete in {datetime.now() - start_time}")
     return 0
