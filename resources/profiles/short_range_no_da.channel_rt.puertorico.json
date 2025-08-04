@@ -54,7 +54,7 @@
                 {
                     "operation": "save",
                     "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.puertorico.serfc.nc",
-                    "directory": "{output_path}/RFC/SE/"
+                    "directory": "{output_path}/"
                 }
             ]
         }
