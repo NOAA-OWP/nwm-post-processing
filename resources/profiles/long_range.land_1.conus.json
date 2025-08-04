@@ -2,2161 +2,2161 @@
     "operations": [
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f024.abrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f024.abrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AB/land/nwm.t2025060712z.long_range.land_1.f024.abrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f048.abrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f048.abrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AB/land/nwm.t2025060712z.long_range.land_1.f048.abrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f072.abrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f072.abrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AB/land/nwm.t2025060712z.long_range.land_1.f072.abrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f096.abrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f096.abrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AB/land/nwm.t2025060712z.long_range.land_1.f096.abrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f120.abrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f120.abrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AB/land/nwm.t2025060712z.long_range.land_1.f120.abrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f144.abrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f144.abrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AB/land/nwm.t2025060712z.long_range.land_1.f144.abrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f168.abrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f168.abrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AB/land/nwm.t2025060712z.long_range.land_1.f168.abrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f192.abrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f192.abrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AB/land/nwm.t2025060712z.long_range.land_1.f192.abrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f216.abrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f216.abrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AB/land/nwm.t2025060712z.long_range.land_1.f216.abrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f240.abrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f240.abrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AB/land/nwm.t2025060712z.long_range.land_1.f240.abrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f264.abrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f264.abrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AB/land/nwm.t2025060712z.long_range.land_1.f264.abrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f288.abrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f288.abrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AB/land/nwm.t2025060712z.long_range.land_1.f288.abrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f312.abrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f312.abrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AB/land/nwm.t2025060712z.long_range.land_1.f312.abrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f336.abrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f336.abrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AB/land/nwm.t2025060712z.long_range.land_1.f336.abrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f360.abrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f360.abrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AB/land/nwm.t2025060712z.long_range.land_1.f360.abrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f384.abrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f384.abrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AB/land/nwm.t2025060712z.long_range.land_1.f384.abrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f408.abrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f408.abrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AB/land/nwm.t2025060712z.long_range.land_1.f408.abrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f432.abrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f432.abrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AB/land/nwm.t2025060712z.long_range.land_1.f432.abrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f456.abrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f456.abrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AB/land/nwm.t2025060712z.long_range.land_1.f456.abrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f480.abrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f480.abrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AB/land/nwm.t2025060712z.long_range.land_1.f480.abrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f504.abrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f504.abrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AB/land/nwm.t2025060712z.long_range.land_1.f504.abrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f528.abrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f528.abrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AB/land/nwm.t2025060712z.long_range.land_1.f528.abrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f552.abrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f552.abrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AB/land/nwm.t2025060712z.long_range.land_1.f552.abrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f576.abrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f576.abrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AB/land/nwm.t2025060712z.long_range.land_1.f576.abrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f600.abrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f600.abrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AB/land/nwm.t2025060712z.long_range.land_1.f600.abrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f624.abrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f624.abrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AB/land/nwm.t2025060712z.long_range.land_1.f624.abrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f648.abrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f648.abrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AB/land/nwm.t2025060712z.long_range.land_1.f648.abrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f672.abrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f672.abrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AB/land/nwm.t2025060712z.long_range.land_1.f672.abrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f696.abrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f696.abrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AB/land/nwm.t2025060712z.long_range.land_1.f696.abrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f720.abrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f720.abrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AB/land/nwm.t2025060712z.long_range.land_1.f720.abrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f024.cbrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f024.cbrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/CB/land/nwm.t2025060712z.long_range.land_1.f024.cbrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f048.cbrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f048.cbrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/CB/land/nwm.t2025060712z.long_range.land_1.f048.cbrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f072.cbrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f072.cbrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/CB/land/nwm.t2025060712z.long_range.land_1.f072.cbrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f096.cbrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f096.cbrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/CB/land/nwm.t2025060712z.long_range.land_1.f096.cbrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f120.cbrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f120.cbrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/CB/land/nwm.t2025060712z.long_range.land_1.f120.cbrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f144.cbrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f144.cbrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/CB/land/nwm.t2025060712z.long_range.land_1.f144.cbrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f168.cbrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f168.cbrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/CB/land/nwm.t2025060712z.long_range.land_1.f168.cbrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f192.cbrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f192.cbrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/CB/land/nwm.t2025060712z.long_range.land_1.f192.cbrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f216.cbrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f216.cbrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/CB/land/nwm.t2025060712z.long_range.land_1.f216.cbrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f240.cbrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f240.cbrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/CB/land/nwm.t2025060712z.long_range.land_1.f240.cbrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f264.cbrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f264.cbrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/CB/land/nwm.t2025060712z.long_range.land_1.f264.cbrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f288.cbrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f288.cbrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/CB/land/nwm.t2025060712z.long_range.land_1.f288.cbrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f312.cbrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f312.cbrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/CB/land/nwm.t2025060712z.long_range.land_1.f312.cbrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f336.cbrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f336.cbrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/CB/land/nwm.t2025060712z.long_range.land_1.f336.cbrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f360.cbrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f360.cbrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/CB/land/nwm.t2025060712z.long_range.land_1.f360.cbrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f384.cbrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f384.cbrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/CB/land/nwm.t2025060712z.long_range.land_1.f384.cbrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f408.cbrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f408.cbrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/CB/land/nwm.t2025060712z.long_range.land_1.f408.cbrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f432.cbrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f432.cbrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/CB/land/nwm.t2025060712z.long_range.land_1.f432.cbrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f456.cbrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f456.cbrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/CB/land/nwm.t2025060712z.long_range.land_1.f456.cbrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f480.cbrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f480.cbrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/CB/land/nwm.t2025060712z.long_range.land_1.f480.cbrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f504.cbrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f504.cbrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/CB/land/nwm.t2025060712z.long_range.land_1.f504.cbrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f528.cbrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f528.cbrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/CB/land/nwm.t2025060712z.long_range.land_1.f528.cbrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f552.cbrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f552.cbrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/CB/land/nwm.t2025060712z.long_range.land_1.f552.cbrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f576.cbrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f576.cbrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/CB/land/nwm.t2025060712z.long_range.land_1.f576.cbrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f600.cbrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f600.cbrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/CB/land/nwm.t2025060712z.long_range.land_1.f600.cbrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f624.cbrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f624.cbrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/CB/land/nwm.t2025060712z.long_range.land_1.f624.cbrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f648.cbrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f648.cbrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/CB/land/nwm.t2025060712z.long_range.land_1.f648.cbrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f672.cbrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f672.cbrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/CB/land/nwm.t2025060712z.long_range.land_1.f672.cbrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f696.cbrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f696.cbrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/CB/land/nwm.t2025060712z.long_range.land_1.f696.cbrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f720.cbrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f720.cbrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/CB/land/nwm.t2025060712z.long_range.land_1.f720.cbrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f024.cnrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f024.cnrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/CN/land/nwm.t2025060712z.long_range.land_1.f024.cnrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f048.cnrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f048.cnrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/CN/land/nwm.t2025060712z.long_range.land_1.f048.cnrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f072.cnrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f072.cnrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/CN/land/nwm.t2025060712z.long_range.land_1.f072.cnrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f096.cnrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f096.cnrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/CN/land/nwm.t2025060712z.long_range.land_1.f096.cnrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f120.cnrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f120.cnrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/CN/land/nwm.t2025060712z.long_range.land_1.f120.cnrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f144.cnrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f144.cnrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/CN/land/nwm.t2025060712z.long_range.land_1.f144.cnrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f168.cnrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f168.cnrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/CN/land/nwm.t2025060712z.long_range.land_1.f168.cnrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f192.cnrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f192.cnrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/CN/land/nwm.t2025060712z.long_range.land_1.f192.cnrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f216.cnrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f216.cnrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/CN/land/nwm.t2025060712z.long_range.land_1.f216.cnrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f240.cnrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f240.cnrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/CN/land/nwm.t2025060712z.long_range.land_1.f240.cnrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f264.cnrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f264.cnrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/CN/land/nwm.t2025060712z.long_range.land_1.f264.cnrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f288.cnrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f288.cnrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/CN/land/nwm.t2025060712z.long_range.land_1.f288.cnrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f312.cnrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f312.cnrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/CN/land/nwm.t2025060712z.long_range.land_1.f312.cnrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f336.cnrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f336.cnrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/CN/land/nwm.t2025060712z.long_range.land_1.f336.cnrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f360.cnrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f360.cnrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/CN/land/nwm.t2025060712z.long_range.land_1.f360.cnrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f384.cnrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f384.cnrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/CN/land/nwm.t2025060712z.long_range.land_1.f384.cnrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f408.cnrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f408.cnrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/CN/land/nwm.t2025060712z.long_range.land_1.f408.cnrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f432.cnrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f432.cnrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/CN/land/nwm.t2025060712z.long_range.land_1.f432.cnrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f456.cnrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f456.cnrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/CN/land/nwm.t2025060712z.long_range.land_1.f456.cnrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f480.cnrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f480.cnrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/CN/land/nwm.t2025060712z.long_range.land_1.f480.cnrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f504.cnrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f504.cnrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/CN/land/nwm.t2025060712z.long_range.land_1.f504.cnrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f528.cnrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f528.cnrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/CN/land/nwm.t2025060712z.long_range.land_1.f528.cnrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f552.cnrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f552.cnrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/CN/land/nwm.t2025060712z.long_range.land_1.f552.cnrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f576.cnrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f576.cnrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/CN/land/nwm.t2025060712z.long_range.land_1.f576.cnrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f600.cnrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f600.cnrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/CN/land/nwm.t2025060712z.long_range.land_1.f600.cnrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f624.cnrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f624.cnrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/CN/land/nwm.t2025060712z.long_range.land_1.f624.cnrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f648.cnrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f648.cnrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/CN/land/nwm.t2025060712z.long_range.land_1.f648.cnrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f672.cnrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f672.cnrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/CN/land/nwm.t2025060712z.long_range.land_1.f672.cnrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f696.cnrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f696.cnrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/CN/land/nwm.t2025060712z.long_range.land_1.f696.cnrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f720.cnrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f720.cnrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/CN/land/nwm.t2025060712z.long_range.land_1.f720.cnrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f024.lmrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f024.lmrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/LM/land/nwm.t2025060712z.long_range.land_1.f024.lmrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f048.lmrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f048.lmrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/LM/land/nwm.t2025060712z.long_range.land_1.f048.lmrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f072.lmrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f072.lmrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/LM/land/nwm.t2025060712z.long_range.land_1.f072.lmrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f096.lmrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f096.lmrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/LM/land/nwm.t2025060712z.long_range.land_1.f096.lmrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f120.lmrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f120.lmrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/LM/land/nwm.t2025060712z.long_range.land_1.f120.lmrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f144.lmrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f144.lmrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/LM/land/nwm.t2025060712z.long_range.land_1.f144.lmrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f168.lmrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f168.lmrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/LM/land/nwm.t2025060712z.long_range.land_1.f168.lmrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f192.lmrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f192.lmrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/LM/land/nwm.t2025060712z.long_range.land_1.f192.lmrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f216.lmrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f216.lmrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/LM/land/nwm.t2025060712z.long_range.land_1.f216.lmrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f240.lmrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f240.lmrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/LM/land/nwm.t2025060712z.long_range.land_1.f240.lmrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f264.lmrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f264.lmrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/LM/land/nwm.t2025060712z.long_range.land_1.f264.lmrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f288.lmrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f288.lmrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/LM/land/nwm.t2025060712z.long_range.land_1.f288.lmrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f312.lmrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f312.lmrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/LM/land/nwm.t2025060712z.long_range.land_1.f312.lmrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f336.lmrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f336.lmrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/LM/land/nwm.t2025060712z.long_range.land_1.f336.lmrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f360.lmrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f360.lmrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/LM/land/nwm.t2025060712z.long_range.land_1.f360.lmrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f384.lmrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f384.lmrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/LM/land/nwm.t2025060712z.long_range.land_1.f384.lmrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f408.lmrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f408.lmrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/LM/land/nwm.t2025060712z.long_range.land_1.f408.lmrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f432.lmrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f432.lmrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/LM/land/nwm.t2025060712z.long_range.land_1.f432.lmrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f456.lmrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f456.lmrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/LM/land/nwm.t2025060712z.long_range.land_1.f456.lmrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f480.lmrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f480.lmrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/LM/land/nwm.t2025060712z.long_range.land_1.f480.lmrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f504.lmrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f504.lmrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/LM/land/nwm.t2025060712z.long_range.land_1.f504.lmrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f528.lmrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f528.lmrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/LM/land/nwm.t2025060712z.long_range.land_1.f528.lmrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f552.lmrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f552.lmrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/LM/land/nwm.t2025060712z.long_range.land_1.f552.lmrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f576.lmrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f576.lmrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/LM/land/nwm.t2025060712z.long_range.land_1.f576.lmrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f600.lmrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f600.lmrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/LM/land/nwm.t2025060712z.long_range.land_1.f600.lmrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f624.lmrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f624.lmrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/LM/land/nwm.t2025060712z.long_range.land_1.f624.lmrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f648.lmrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f648.lmrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/LM/land/nwm.t2025060712z.long_range.land_1.f648.lmrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f672.lmrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f672.lmrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/LM/land/nwm.t2025060712z.long_range.land_1.f672.lmrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f696.lmrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f696.lmrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/LM/land/nwm.t2025060712z.long_range.land_1.f696.lmrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f720.lmrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f720.lmrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/LM/land/nwm.t2025060712z.long_range.land_1.f720.lmrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f024.marfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f024.marfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/MA/land/nwm.t2025060712z.long_range.land_1.f024.marfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f048.marfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f048.marfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/MA/land/nwm.t2025060712z.long_range.land_1.f048.marfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f072.marfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f072.marfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/MA/land/nwm.t2025060712z.long_range.land_1.f072.marfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f096.marfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f096.marfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/MA/land/nwm.t2025060712z.long_range.land_1.f096.marfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f120.marfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f120.marfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/MA/land/nwm.t2025060712z.long_range.land_1.f120.marfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f144.marfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f144.marfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/MA/land/nwm.t2025060712z.long_range.land_1.f144.marfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f168.marfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f168.marfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/MA/land/nwm.t2025060712z.long_range.land_1.f168.marfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f192.marfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f192.marfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/MA/land/nwm.t2025060712z.long_range.land_1.f192.marfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f216.marfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f216.marfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/MA/land/nwm.t2025060712z.long_range.land_1.f216.marfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f240.marfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f240.marfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/MA/land/nwm.t2025060712z.long_range.land_1.f240.marfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f264.marfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f264.marfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/MA/land/nwm.t2025060712z.long_range.land_1.f264.marfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f288.marfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f288.marfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/MA/land/nwm.t2025060712z.long_range.land_1.f288.marfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f312.marfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f312.marfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/MA/land/nwm.t2025060712z.long_range.land_1.f312.marfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f336.marfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f336.marfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/MA/land/nwm.t2025060712z.long_range.land_1.f336.marfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f360.marfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f360.marfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/MA/land/nwm.t2025060712z.long_range.land_1.f360.marfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f384.marfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f384.marfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/MA/land/nwm.t2025060712z.long_range.land_1.f384.marfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f408.marfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f408.marfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/MA/land/nwm.t2025060712z.long_range.land_1.f408.marfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f432.marfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f432.marfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/MA/land/nwm.t2025060712z.long_range.land_1.f432.marfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f456.marfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f456.marfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/MA/land/nwm.t2025060712z.long_range.land_1.f456.marfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f480.marfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f480.marfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/MA/land/nwm.t2025060712z.long_range.land_1.f480.marfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f504.marfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f504.marfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/MA/land/nwm.t2025060712z.long_range.land_1.f504.marfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f528.marfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f528.marfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/MA/land/nwm.t2025060712z.long_range.land_1.f528.marfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f552.marfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f552.marfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/MA/land/nwm.t2025060712z.long_range.land_1.f552.marfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f576.marfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f576.marfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/MA/land/nwm.t2025060712z.long_range.land_1.f576.marfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f600.marfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f600.marfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/MA/land/nwm.t2025060712z.long_range.land_1.f600.marfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f624.marfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f624.marfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/MA/land/nwm.t2025060712z.long_range.land_1.f624.marfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f648.marfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f648.marfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/MA/land/nwm.t2025060712z.long_range.land_1.f648.marfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f672.marfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f672.marfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/MA/land/nwm.t2025060712z.long_range.land_1.f672.marfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f696.marfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f696.marfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/MA/land/nwm.t2025060712z.long_range.land_1.f696.marfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f720.marfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f720.marfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/MA/land/nwm.t2025060712z.long_range.land_1.f720.marfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f024.mbrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f024.mbrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/MB/land/nwm.t2025060712z.long_range.land_1.f024.mbrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f048.mbrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f048.mbrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/MB/land/nwm.t2025060712z.long_range.land_1.f048.mbrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f072.mbrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f072.mbrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/MB/land/nwm.t2025060712z.long_range.land_1.f072.mbrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f096.mbrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f096.mbrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/MB/land/nwm.t2025060712z.long_range.land_1.f096.mbrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f120.mbrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f120.mbrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/MB/land/nwm.t2025060712z.long_range.land_1.f120.mbrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f144.mbrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f144.mbrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/MB/land/nwm.t2025060712z.long_range.land_1.f144.mbrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f168.mbrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f168.mbrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/MB/land/nwm.t2025060712z.long_range.land_1.f168.mbrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f192.mbrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f192.mbrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/MB/land/nwm.t2025060712z.long_range.land_1.f192.mbrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f216.mbrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f216.mbrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/MB/land/nwm.t2025060712z.long_range.land_1.f216.mbrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f240.mbrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f240.mbrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/MB/land/nwm.t2025060712z.long_range.land_1.f240.mbrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f264.mbrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f264.mbrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/MB/land/nwm.t2025060712z.long_range.land_1.f264.mbrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f288.mbrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f288.mbrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/MB/land/nwm.t2025060712z.long_range.land_1.f288.mbrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f312.mbrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f312.mbrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/MB/land/nwm.t2025060712z.long_range.land_1.f312.mbrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f336.mbrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f336.mbrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/MB/land/nwm.t2025060712z.long_range.land_1.f336.mbrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f360.mbrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f360.mbrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/MB/land/nwm.t2025060712z.long_range.land_1.f360.mbrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f384.mbrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f384.mbrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/MB/land/nwm.t2025060712z.long_range.land_1.f384.mbrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f408.mbrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f408.mbrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/MB/land/nwm.t2025060712z.long_range.land_1.f408.mbrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f432.mbrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f432.mbrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/MB/land/nwm.t2025060712z.long_range.land_1.f432.mbrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f456.mbrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f456.mbrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/MB/land/nwm.t2025060712z.long_range.land_1.f456.mbrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f480.mbrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f480.mbrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/MB/land/nwm.t2025060712z.long_range.land_1.f480.mbrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f504.mbrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f504.mbrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/MB/land/nwm.t2025060712z.long_range.land_1.f504.mbrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f528.mbrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f528.mbrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/MB/land/nwm.t2025060712z.long_range.land_1.f528.mbrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f552.mbrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f552.mbrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/MB/land/nwm.t2025060712z.long_range.land_1.f552.mbrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f576.mbrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f576.mbrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/MB/land/nwm.t2025060712z.long_range.land_1.f576.mbrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f600.mbrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f600.mbrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/MB/land/nwm.t2025060712z.long_range.land_1.f600.mbrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f624.mbrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f624.mbrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/MB/land/nwm.t2025060712z.long_range.land_1.f624.mbrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f648.mbrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f648.mbrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/MB/land/nwm.t2025060712z.long_range.land_1.f648.mbrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f672.mbrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f672.mbrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/MB/land/nwm.t2025060712z.long_range.land_1.f672.mbrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f696.mbrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f696.mbrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/MB/land/nwm.t2025060712z.long_range.land_1.f696.mbrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f720.mbrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f720.mbrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/MB/land/nwm.t2025060712z.long_range.land_1.f720.mbrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f024.ncrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f024.ncrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NC/land/nwm.t2025060712z.long_range.land_1.f024.ncrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f048.ncrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f048.ncrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NC/land/nwm.t2025060712z.long_range.land_1.f048.ncrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f072.ncrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f072.ncrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NC/land/nwm.t2025060712z.long_range.land_1.f072.ncrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f096.ncrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f096.ncrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NC/land/nwm.t2025060712z.long_range.land_1.f096.ncrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f120.ncrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f120.ncrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NC/land/nwm.t2025060712z.long_range.land_1.f120.ncrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f144.ncrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f144.ncrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NC/land/nwm.t2025060712z.long_range.land_1.f144.ncrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f168.ncrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f168.ncrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NC/land/nwm.t2025060712z.long_range.land_1.f168.ncrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f192.ncrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f192.ncrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NC/land/nwm.t2025060712z.long_range.land_1.f192.ncrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f216.ncrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f216.ncrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NC/land/nwm.t2025060712z.long_range.land_1.f216.ncrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f240.ncrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f240.ncrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NC/land/nwm.t2025060712z.long_range.land_1.f240.ncrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f264.ncrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f264.ncrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NC/land/nwm.t2025060712z.long_range.land_1.f264.ncrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f288.ncrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f288.ncrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NC/land/nwm.t2025060712z.long_range.land_1.f288.ncrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f312.ncrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f312.ncrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NC/land/nwm.t2025060712z.long_range.land_1.f312.ncrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f336.ncrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f336.ncrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NC/land/nwm.t2025060712z.long_range.land_1.f336.ncrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f360.ncrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f360.ncrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NC/land/nwm.t2025060712z.long_range.land_1.f360.ncrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f384.ncrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f384.ncrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NC/land/nwm.t2025060712z.long_range.land_1.f384.ncrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f408.ncrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f408.ncrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NC/land/nwm.t2025060712z.long_range.land_1.f408.ncrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f432.ncrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f432.ncrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NC/land/nwm.t2025060712z.long_range.land_1.f432.ncrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f456.ncrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f456.ncrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NC/land/nwm.t2025060712z.long_range.land_1.f456.ncrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f480.ncrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f480.ncrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NC/land/nwm.t2025060712z.long_range.land_1.f480.ncrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f504.ncrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f504.ncrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NC/land/nwm.t2025060712z.long_range.land_1.f504.ncrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f528.ncrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f528.ncrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NC/land/nwm.t2025060712z.long_range.land_1.f528.ncrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f552.ncrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f552.ncrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NC/land/nwm.t2025060712z.long_range.land_1.f552.ncrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f576.ncrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f576.ncrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NC/land/nwm.t2025060712z.long_range.land_1.f576.ncrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f600.ncrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f600.ncrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NC/land/nwm.t2025060712z.long_range.land_1.f600.ncrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f624.ncrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f624.ncrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NC/land/nwm.t2025060712z.long_range.land_1.f624.ncrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f648.ncrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f648.ncrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NC/land/nwm.t2025060712z.long_range.land_1.f648.ncrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f672.ncrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f672.ncrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NC/land/nwm.t2025060712z.long_range.land_1.f672.ncrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f696.ncrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f696.ncrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NC/land/nwm.t2025060712z.long_range.land_1.f696.ncrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f720.ncrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f720.ncrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NC/land/nwm.t2025060712z.long_range.land_1.f720.ncrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f024.nerfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f024.nerfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NE/land/nwm.t2025060712z.long_range.land_1.f024.nerfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f048.nerfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f048.nerfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NE/land/nwm.t2025060712z.long_range.land_1.f048.nerfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f072.nerfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f072.nerfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NE/land/nwm.t2025060712z.long_range.land_1.f072.nerfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f096.nerfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f096.nerfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NE/land/nwm.t2025060712z.long_range.land_1.f096.nerfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f120.nerfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f120.nerfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NE/land/nwm.t2025060712z.long_range.land_1.f120.nerfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f144.nerfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f144.nerfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NE/land/nwm.t2025060712z.long_range.land_1.f144.nerfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f168.nerfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f168.nerfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NE/land/nwm.t2025060712z.long_range.land_1.f168.nerfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f192.nerfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f192.nerfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NE/land/nwm.t2025060712z.long_range.land_1.f192.nerfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f216.nerfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f216.nerfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NE/land/nwm.t2025060712z.long_range.land_1.f216.nerfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f240.nerfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f240.nerfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NE/land/nwm.t2025060712z.long_range.land_1.f240.nerfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f264.nerfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f264.nerfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NE/land/nwm.t2025060712z.long_range.land_1.f264.nerfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f288.nerfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f288.nerfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NE/land/nwm.t2025060712z.long_range.land_1.f288.nerfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f312.nerfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f312.nerfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NE/land/nwm.t2025060712z.long_range.land_1.f312.nerfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f336.nerfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f336.nerfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NE/land/nwm.t2025060712z.long_range.land_1.f336.nerfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f360.nerfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f360.nerfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NE/land/nwm.t2025060712z.long_range.land_1.f360.nerfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f384.nerfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f384.nerfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NE/land/nwm.t2025060712z.long_range.land_1.f384.nerfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f408.nerfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f408.nerfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NE/land/nwm.t2025060712z.long_range.land_1.f408.nerfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f432.nerfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f432.nerfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NE/land/nwm.t2025060712z.long_range.land_1.f432.nerfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f456.nerfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f456.nerfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NE/land/nwm.t2025060712z.long_range.land_1.f456.nerfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f480.nerfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f480.nerfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NE/land/nwm.t2025060712z.long_range.land_1.f480.nerfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f504.nerfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f504.nerfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NE/land/nwm.t2025060712z.long_range.land_1.f504.nerfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f528.nerfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f528.nerfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NE/land/nwm.t2025060712z.long_range.land_1.f528.nerfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f552.nerfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f552.nerfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NE/land/nwm.t2025060712z.long_range.land_1.f552.nerfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f576.nerfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f576.nerfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NE/land/nwm.t2025060712z.long_range.land_1.f576.nerfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f600.nerfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f600.nerfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NE/land/nwm.t2025060712z.long_range.land_1.f600.nerfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f624.nerfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f624.nerfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NE/land/nwm.t2025060712z.long_range.land_1.f624.nerfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f648.nerfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f648.nerfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NE/land/nwm.t2025060712z.long_range.land_1.f648.nerfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f672.nerfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f672.nerfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NE/land/nwm.t2025060712z.long_range.land_1.f672.nerfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f696.nerfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f696.nerfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NE/land/nwm.t2025060712z.long_range.land_1.f696.nerfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f720.nerfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f720.nerfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NE/land/nwm.t2025060712z.long_range.land_1.f720.nerfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f024.nwrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f024.nwrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NW/land/nwm.t2025060712z.long_range.land_1.f024.nwrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f048.nwrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f048.nwrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NW/land/nwm.t2025060712z.long_range.land_1.f048.nwrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f072.nwrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f072.nwrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NW/land/nwm.t2025060712z.long_range.land_1.f072.nwrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f096.nwrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f096.nwrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NW/land/nwm.t2025060712z.long_range.land_1.f096.nwrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f120.nwrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f120.nwrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NW/land/nwm.t2025060712z.long_range.land_1.f120.nwrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f144.nwrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f144.nwrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NW/land/nwm.t2025060712z.long_range.land_1.f144.nwrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f168.nwrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f168.nwrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NW/land/nwm.t2025060712z.long_range.land_1.f168.nwrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f192.nwrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f192.nwrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NW/land/nwm.t2025060712z.long_range.land_1.f192.nwrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f216.nwrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f216.nwrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NW/land/nwm.t2025060712z.long_range.land_1.f216.nwrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f240.nwrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f240.nwrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NW/land/nwm.t2025060712z.long_range.land_1.f240.nwrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f264.nwrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f264.nwrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NW/land/nwm.t2025060712z.long_range.land_1.f264.nwrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f288.nwrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f288.nwrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NW/land/nwm.t2025060712z.long_range.land_1.f288.nwrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f312.nwrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f312.nwrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NW/land/nwm.t2025060712z.long_range.land_1.f312.nwrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f336.nwrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f336.nwrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NW/land/nwm.t2025060712z.long_range.land_1.f336.nwrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f360.nwrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f360.nwrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NW/land/nwm.t2025060712z.long_range.land_1.f360.nwrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f384.nwrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f384.nwrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NW/land/nwm.t2025060712z.long_range.land_1.f384.nwrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f408.nwrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f408.nwrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NW/land/nwm.t2025060712z.long_range.land_1.f408.nwrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f432.nwrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f432.nwrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NW/land/nwm.t2025060712z.long_range.land_1.f432.nwrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f456.nwrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f456.nwrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NW/land/nwm.t2025060712z.long_range.land_1.f456.nwrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f480.nwrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f480.nwrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NW/land/nwm.t2025060712z.long_range.land_1.f480.nwrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f504.nwrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f504.nwrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NW/land/nwm.t2025060712z.long_range.land_1.f504.nwrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f528.nwrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f528.nwrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NW/land/nwm.t2025060712z.long_range.land_1.f528.nwrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f552.nwrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f552.nwrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NW/land/nwm.t2025060712z.long_range.land_1.f552.nwrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f576.nwrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f576.nwrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NW/land/nwm.t2025060712z.long_range.land_1.f576.nwrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f600.nwrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f600.nwrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NW/land/nwm.t2025060712z.long_range.land_1.f600.nwrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f624.nwrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f624.nwrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NW/land/nwm.t2025060712z.long_range.land_1.f624.nwrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f648.nwrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f648.nwrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NW/land/nwm.t2025060712z.long_range.land_1.f648.nwrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f672.nwrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f672.nwrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NW/land/nwm.t2025060712z.long_range.land_1.f672.nwrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f696.nwrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f696.nwrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NW/land/nwm.t2025060712z.long_range.land_1.f696.nwrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f720.nwrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f720.nwrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NW/land/nwm.t2025060712z.long_range.land_1.f720.nwrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f024.ohrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f024.ohrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/OH/land/nwm.t2025060712z.long_range.land_1.f024.ohrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f048.ohrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f048.ohrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/OH/land/nwm.t2025060712z.long_range.land_1.f048.ohrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f072.ohrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f072.ohrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/OH/land/nwm.t2025060712z.long_range.land_1.f072.ohrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f096.ohrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f096.ohrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/OH/land/nwm.t2025060712z.long_range.land_1.f096.ohrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f120.ohrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f120.ohrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/OH/land/nwm.t2025060712z.long_range.land_1.f120.ohrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f144.ohrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f144.ohrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/OH/land/nwm.t2025060712z.long_range.land_1.f144.ohrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f168.ohrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f168.ohrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/OH/land/nwm.t2025060712z.long_range.land_1.f168.ohrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f192.ohrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f192.ohrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/OH/land/nwm.t2025060712z.long_range.land_1.f192.ohrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f216.ohrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f216.ohrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/OH/land/nwm.t2025060712z.long_range.land_1.f216.ohrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f240.ohrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f240.ohrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/OH/land/nwm.t2025060712z.long_range.land_1.f240.ohrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f264.ohrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f264.ohrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/OH/land/nwm.t2025060712z.long_range.land_1.f264.ohrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f288.ohrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f288.ohrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/OH/land/nwm.t2025060712z.long_range.land_1.f288.ohrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f312.ohrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f312.ohrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/OH/land/nwm.t2025060712z.long_range.land_1.f312.ohrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f336.ohrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f336.ohrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/OH/land/nwm.t2025060712z.long_range.land_1.f336.ohrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f360.ohrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f360.ohrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/OH/land/nwm.t2025060712z.long_range.land_1.f360.ohrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f384.ohrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f384.ohrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/OH/land/nwm.t2025060712z.long_range.land_1.f384.ohrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f408.ohrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f408.ohrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/OH/land/nwm.t2025060712z.long_range.land_1.f408.ohrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f432.ohrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f432.ohrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/OH/land/nwm.t2025060712z.long_range.land_1.f432.ohrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f456.ohrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f456.ohrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/OH/land/nwm.t2025060712z.long_range.land_1.f456.ohrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f480.ohrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f480.ohrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/OH/land/nwm.t2025060712z.long_range.land_1.f480.ohrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f504.ohrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f504.ohrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/OH/land/nwm.t2025060712z.long_range.land_1.f504.ohrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f528.ohrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f528.ohrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/OH/land/nwm.t2025060712z.long_range.land_1.f528.ohrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f552.ohrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f552.ohrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/OH/land/nwm.t2025060712z.long_range.land_1.f552.ohrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f576.ohrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f576.ohrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/OH/land/nwm.t2025060712z.long_range.land_1.f576.ohrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f600.ohrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f600.ohrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/OH/land/nwm.t2025060712z.long_range.land_1.f600.ohrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f624.ohrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f624.ohrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/OH/land/nwm.t2025060712z.long_range.land_1.f624.ohrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f648.ohrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f648.ohrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/OH/land/nwm.t2025060712z.long_range.land_1.f648.ohrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f672.ohrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f672.ohrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/OH/land/nwm.t2025060712z.long_range.land_1.f672.ohrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f696.ohrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f696.ohrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/OH/land/nwm.t2025060712z.long_range.land_1.f696.ohrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f720.ohrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f720.ohrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/OH/land/nwm.t2025060712z.long_range.land_1.f720.ohrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f024.serfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f024.serfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/SE/land/nwm.t2025060712z.long_range.land_1.f024.serfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f048.serfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f048.serfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/SE/land/nwm.t2025060712z.long_range.land_1.f048.serfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f072.serfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f072.serfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/SE/land/nwm.t2025060712z.long_range.land_1.f072.serfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f096.serfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f096.serfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/SE/land/nwm.t2025060712z.long_range.land_1.f096.serfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f120.serfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f120.serfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/SE/land/nwm.t2025060712z.long_range.land_1.f120.serfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f144.serfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f144.serfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/SE/land/nwm.t2025060712z.long_range.land_1.f144.serfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f168.serfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f168.serfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/SE/land/nwm.t2025060712z.long_range.land_1.f168.serfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f192.serfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f192.serfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/SE/land/nwm.t2025060712z.long_range.land_1.f192.serfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f216.serfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f216.serfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/SE/land/nwm.t2025060712z.long_range.land_1.f216.serfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f240.serfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f240.serfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/SE/land/nwm.t2025060712z.long_range.land_1.f240.serfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f264.serfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f264.serfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/SE/land/nwm.t2025060712z.long_range.land_1.f264.serfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f288.serfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f288.serfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/SE/land/nwm.t2025060712z.long_range.land_1.f288.serfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f312.serfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f312.serfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/SE/land/nwm.t2025060712z.long_range.land_1.f312.serfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f336.serfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f336.serfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/SE/land/nwm.t2025060712z.long_range.land_1.f336.serfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f360.serfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f360.serfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/SE/land/nwm.t2025060712z.long_range.land_1.f360.serfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f384.serfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f384.serfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/SE/land/nwm.t2025060712z.long_range.land_1.f384.serfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f408.serfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f408.serfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/SE/land/nwm.t2025060712z.long_range.land_1.f408.serfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f432.serfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f432.serfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/SE/land/nwm.t2025060712z.long_range.land_1.f432.serfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f456.serfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f456.serfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/SE/land/nwm.t2025060712z.long_range.land_1.f456.serfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f480.serfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f480.serfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/SE/land/nwm.t2025060712z.long_range.land_1.f480.serfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f504.serfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f504.serfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/SE/land/nwm.t2025060712z.long_range.land_1.f504.serfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f528.serfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f528.serfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/SE/land/nwm.t2025060712z.long_range.land_1.f528.serfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f552.serfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f552.serfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/SE/land/nwm.t2025060712z.long_range.land_1.f552.serfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f576.serfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f576.serfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/SE/land/nwm.t2025060712z.long_range.land_1.f576.serfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f600.serfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f600.serfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/SE/land/nwm.t2025060712z.long_range.land_1.f600.serfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f624.serfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f624.serfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/SE/land/nwm.t2025060712z.long_range.land_1.f624.serfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f648.serfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f648.serfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/SE/land/nwm.t2025060712z.long_range.land_1.f648.serfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f672.serfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f672.serfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/SE/land/nwm.t2025060712z.long_range.land_1.f672.serfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f696.serfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f696.serfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/SE/land/nwm.t2025060712z.long_range.land_1.f696.serfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f720.serfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f720.serfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/SE/land/nwm.t2025060712z.long_range.land_1.f720.serfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f024.wgrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f024.wgrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/WG/land/nwm.t2025060712z.long_range.land_1.f024.wgrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f048.wgrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f048.wgrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/WG/land/nwm.t2025060712z.long_range.land_1.f048.wgrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f072.wgrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f072.wgrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/WG/land/nwm.t2025060712z.long_range.land_1.f072.wgrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f096.wgrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f096.wgrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/WG/land/nwm.t2025060712z.long_range.land_1.f096.wgrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f120.wgrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f120.wgrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/WG/land/nwm.t2025060712z.long_range.land_1.f120.wgrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f144.wgrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f144.wgrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/WG/land/nwm.t2025060712z.long_range.land_1.f144.wgrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f168.wgrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f168.wgrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/WG/land/nwm.t2025060712z.long_range.land_1.f168.wgrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f192.wgrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f192.wgrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/WG/land/nwm.t2025060712z.long_range.land_1.f192.wgrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f216.wgrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f216.wgrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/WG/land/nwm.t2025060712z.long_range.land_1.f216.wgrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f240.wgrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f240.wgrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/WG/land/nwm.t2025060712z.long_range.land_1.f240.wgrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f264.wgrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f264.wgrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/WG/land/nwm.t2025060712z.long_range.land_1.f264.wgrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f288.wgrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f288.wgrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/WG/land/nwm.t2025060712z.long_range.land_1.f288.wgrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f312.wgrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f312.wgrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/WG/land/nwm.t2025060712z.long_range.land_1.f312.wgrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f336.wgrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f336.wgrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/WG/land/nwm.t2025060712z.long_range.land_1.f336.wgrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f360.wgrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f360.wgrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/WG/land/nwm.t2025060712z.long_range.land_1.f360.wgrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f384.wgrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f384.wgrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/WG/land/nwm.t2025060712z.long_range.land_1.f384.wgrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f408.wgrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f408.wgrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/WG/land/nwm.t2025060712z.long_range.land_1.f408.wgrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f432.wgrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f432.wgrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/WG/land/nwm.t2025060712z.long_range.land_1.f432.wgrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f456.wgrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f456.wgrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/WG/land/nwm.t2025060712z.long_range.land_1.f456.wgrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f480.wgrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f480.wgrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/WG/land/nwm.t2025060712z.long_range.land_1.f480.wgrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f504.wgrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f504.wgrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/WG/land/nwm.t2025060712z.long_range.land_1.f504.wgrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f528.wgrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f528.wgrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/WG/land/nwm.t2025060712z.long_range.land_1.f528.wgrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f552.wgrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f552.wgrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/WG/land/nwm.t2025060712z.long_range.land_1.f552.wgrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f576.wgrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f576.wgrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/WG/land/nwm.t2025060712z.long_range.land_1.f576.wgrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f600.wgrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f600.wgrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/WG/land/nwm.t2025060712z.long_range.land_1.f600.wgrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f624.wgrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f624.wgrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/WG/land/nwm.t2025060712z.long_range.land_1.f624.wgrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f648.wgrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f648.wgrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/WG/land/nwm.t2025060712z.long_range.land_1.f648.wgrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f672.wgrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f672.wgrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/WG/land/nwm.t2025060712z.long_range.land_1.f672.wgrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f696.wgrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f696.wgrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/WG/land/nwm.t2025060712z.long_range.land_1.f696.wgrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.land_1.f720.wgrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.land_1.f720.wgrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/WG/land/nwm.t2025060712z.long_range.land_1.f720.wgrfc.nc"
         }

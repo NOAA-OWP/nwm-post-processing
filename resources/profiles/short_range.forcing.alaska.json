@@ -2,289 +2,289 @@
     "operations": [
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.short_range.forcing.15hour.alaska.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.short_range.forcing.15hour.alaska.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/WMS/short_range/fe/nwm.t2025060718z.short_range.forcing.15hour.alaska.aprfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.short_range.forcing.45hour.alaska.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.short_range.forcing.45hour.alaska.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/WMS/short_range/fe/nwm.t2025060721z.short_range.forcing.45hour.alaska.aprfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.short_range.forcing.day1.alaska.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.short_range.forcing.day1.alaska.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/WMS/short_range/fe/nwm.t2025060721z.short_range.forcing.day1.alaska.aprfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.short_range.forcing.f001.alaska.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.short_range.forcing.f001.alaska.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AP/fe/nwm.t2025060718z.short_range.forcing.f001.alaska.aprfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.short_range.forcing.f002.alaska.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.short_range.forcing.f002.alaska.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AP/fe/nwm.t2025060718z.short_range.forcing.f002.alaska.aprfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.short_range.forcing.f003.alaska.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.short_range.forcing.f003.alaska.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AP/fe/nwm.t2025060718z.short_range.forcing.f003.alaska.aprfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.short_range.forcing.f004.alaska.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.short_range.forcing.f004.alaska.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AP/fe/nwm.t2025060718z.short_range.forcing.f004.alaska.aprfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.short_range.forcing.f005.alaska.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.short_range.forcing.f005.alaska.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AP/fe/nwm.t2025060718z.short_range.forcing.f005.alaska.aprfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.short_range.forcing.f006.alaska.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.short_range.forcing.f006.alaska.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AP/fe/nwm.t2025060718z.short_range.forcing.f006.alaska.aprfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.short_range.forcing.f007.alaska.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.short_range.forcing.f007.alaska.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AP/fe/nwm.t2025060718z.short_range.forcing.f007.alaska.aprfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.short_range.forcing.f008.alaska.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.short_range.forcing.f008.alaska.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AP/fe/nwm.t2025060718z.short_range.forcing.f008.alaska.aprfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.short_range.forcing.f009.alaska.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.short_range.forcing.f009.alaska.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AP/fe/nwm.t2025060718z.short_range.forcing.f009.alaska.aprfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.short_range.forcing.f010.alaska.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.short_range.forcing.f010.alaska.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AP/fe/nwm.t2025060718z.short_range.forcing.f010.alaska.aprfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.short_range.forcing.f011.alaska.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.short_range.forcing.f011.alaska.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AP/fe/nwm.t2025060718z.short_range.forcing.f011.alaska.aprfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.short_range.forcing.f012.alaska.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.short_range.forcing.f012.alaska.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AP/fe/nwm.t2025060718z.short_range.forcing.f012.alaska.aprfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.short_range.forcing.f013.alaska.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.short_range.forcing.f013.alaska.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AP/fe/nwm.t2025060718z.short_range.forcing.f013.alaska.aprfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.short_range.forcing.f014.alaska.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.short_range.forcing.f014.alaska.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AP/fe/nwm.t2025060718z.short_range.forcing.f014.alaska.aprfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.short_range.forcing.f015.alaska.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.short_range.forcing.f015.alaska.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AP/fe/nwm.t2025060718z.short_range.forcing.f015.alaska.aprfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.short_range.forcing.f016.alaska.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.short_range.forcing.f016.alaska.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AP/fe/nwm.t2025060721z.short_range.forcing.f016.alaska.aprfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.short_range.forcing.f017.alaska.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.short_range.forcing.f017.alaska.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AP/fe/nwm.t2025060721z.short_range.forcing.f017.alaska.aprfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.short_range.forcing.f018.alaska.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.short_range.forcing.f018.alaska.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AP/fe/nwm.t2025060721z.short_range.forcing.f018.alaska.aprfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.short_range.forcing.f019.alaska.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.short_range.forcing.f019.alaska.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AP/fe/nwm.t2025060721z.short_range.forcing.f019.alaska.aprfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.short_range.forcing.f020.alaska.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.short_range.forcing.f020.alaska.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AP/fe/nwm.t2025060721z.short_range.forcing.f020.alaska.aprfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.short_range.forcing.f021.alaska.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.short_range.forcing.f021.alaska.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AP/fe/nwm.t2025060721z.short_range.forcing.f021.alaska.aprfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.short_range.forcing.f022.alaska.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.short_range.forcing.f022.alaska.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AP/fe/nwm.t2025060721z.short_range.forcing.f022.alaska.aprfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.short_range.forcing.f023.alaska.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.short_range.forcing.f023.alaska.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AP/fe/nwm.t2025060721z.short_range.forcing.f023.alaska.aprfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.short_range.forcing.f024.alaska.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.short_range.forcing.f024.alaska.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AP/fe/nwm.t2025060721z.short_range.forcing.f024.alaska.aprfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.short_range.forcing.f025.alaska.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.short_range.forcing.f025.alaska.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AP/fe/nwm.t2025060721z.short_range.forcing.f025.alaska.aprfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.short_range.forcing.f026.alaska.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.short_range.forcing.f026.alaska.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AP/fe/nwm.t2025060721z.short_range.forcing.f026.alaska.aprfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.short_range.forcing.f027.alaska.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.short_range.forcing.f027.alaska.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AP/fe/nwm.t2025060721z.short_range.forcing.f027.alaska.aprfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.short_range.forcing.f028.alaska.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.short_range.forcing.f028.alaska.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AP/fe/nwm.t2025060721z.short_range.forcing.f028.alaska.aprfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.short_range.forcing.f029.alaska.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.short_range.forcing.f029.alaska.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AP/fe/nwm.t2025060721z.short_range.forcing.f029.alaska.aprfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.short_range.forcing.f030.alaska.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.short_range.forcing.f030.alaska.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AP/fe/nwm.t2025060721z.short_range.forcing.f030.alaska.aprfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.short_range.forcing.f031.alaska.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.short_range.forcing.f031.alaska.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AP/fe/nwm.t2025060721z.short_range.forcing.f031.alaska.aprfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.short_range.forcing.f032.alaska.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.short_range.forcing.f032.alaska.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AP/fe/nwm.t2025060721z.short_range.forcing.f032.alaska.aprfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.short_range.forcing.f033.alaska.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.short_range.forcing.f033.alaska.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AP/fe/nwm.t2025060721z.short_range.forcing.f033.alaska.aprfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.short_range.forcing.f034.alaska.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.short_range.forcing.f034.alaska.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AP/fe/nwm.t2025060721z.short_range.forcing.f034.alaska.aprfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.short_range.forcing.f035.alaska.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.short_range.forcing.f035.alaska.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AP/fe/nwm.t2025060721z.short_range.forcing.f035.alaska.aprfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.short_range.forcing.f036.alaska.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.short_range.forcing.f036.alaska.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AP/fe/nwm.t2025060721z.short_range.forcing.f036.alaska.aprfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.short_range.forcing.f037.alaska.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.short_range.forcing.f037.alaska.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AP/fe/nwm.t2025060721z.short_range.forcing.f037.alaska.aprfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.short_range.forcing.f038.alaska.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.short_range.forcing.f038.alaska.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AP/fe/nwm.t2025060721z.short_range.forcing.f038.alaska.aprfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.short_range.forcing.f039.alaska.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.short_range.forcing.f039.alaska.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AP/fe/nwm.t2025060721z.short_range.forcing.f039.alaska.aprfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.short_range.forcing.f040.alaska.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.short_range.forcing.f040.alaska.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AP/fe/nwm.t2025060721z.short_range.forcing.f040.alaska.aprfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.short_range.forcing.f041.alaska.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.short_range.forcing.f041.alaska.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AP/fe/nwm.t2025060721z.short_range.forcing.f041.alaska.aprfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.short_range.forcing.f042.alaska.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.short_range.forcing.f042.alaska.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AP/fe/nwm.t2025060721z.short_range.forcing.f042.alaska.aprfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.short_range.forcing.f043.alaska.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.short_range.forcing.f043.alaska.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AP/fe/nwm.t2025060721z.short_range.forcing.f043.alaska.aprfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.short_range.forcing.f044.alaska.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.short_range.forcing.f044.alaska.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AP/fe/nwm.t2025060721z.short_range.forcing.f044.alaska.aprfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.short_range.forcing.f045.alaska.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.short_range.forcing.f045.alaska.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AP/fe/nwm.t2025060721z.short_range.forcing.f045.alaska.aprfc.nc"
         }

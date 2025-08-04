@@ -2,79 +2,79 @@
     "operations": [
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.channel_rt_3.conus.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.channel_rt_3.conus.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/WMS/long_range/channel_rt/nwm.t2025060712z.long_range.channel_rt_3.conus.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.channel_rt_3.abrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.channel_rt_3.abrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AB/channel_rt/nwm.t2025060712z.long_range.channel_rt_3.abrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.channel_rt_3.cbrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.channel_rt_3.cbrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/CB/channel_rt/nwm.t2025060712z.long_range.channel_rt_3.cbrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.channel_rt_3.cnrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.channel_rt_3.cnrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/CN/channel_rt/nwm.t2025060712z.long_range.channel_rt_3.cnrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.channel_rt_3.lmrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.channel_rt_3.lmrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/LM/channel_rt/nwm.t2025060712z.long_range.channel_rt_3.lmrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.channel_rt_3.marfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.channel_rt_3.marfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/MA/channel_rt/nwm.t2025060712z.long_range.channel_rt_3.marfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.channel_rt_3.mbrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.channel_rt_3.mbrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/MB/channel_rt/nwm.t2025060712z.long_range.channel_rt_3.mbrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.channel_rt_3.ncrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.channel_rt_3.ncrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NC/channel_rt/nwm.t2025060712z.long_range.channel_rt_3.ncrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.channel_rt_3.nerfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.channel_rt_3.nerfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NE/channel_rt/nwm.t2025060712z.long_range.channel_rt_3.nerfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.channel_rt_3.nwrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.channel_rt_3.nwrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NW/channel_rt/nwm.t2025060712z.long_range.channel_rt_3.nwrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.channel_rt_3.ohrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.channel_rt_3.ohrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/OH/channel_rt/nwm.t2025060712z.long_range.channel_rt_3.ohrfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.channel_rt_3.serfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.channel_rt_3.serfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/SE/channel_rt/nwm.t2025060712z.long_range.channel_rt_3.serfc.nc"
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.long_range.channel_rt_3.wgrfc.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.long_range.channel_rt_3.wgrfc.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/WG/channel_rt/nwm.t2025060712z.long_range.channel_rt_3.wgrfc.nc"
         }

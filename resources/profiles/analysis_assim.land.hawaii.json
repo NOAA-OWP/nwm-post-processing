@@ -2,7 +2,7 @@
     "operations": [
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<date><cycle>z.analysis_assim.land.tm0000.hawaii.nc' should be generated, as defined in {source_file}.",
+            "message": "An output for 'nwm.t<cycle>z.analysis_assim.land.tm0000.hawaii.nc' should be generated, as defined in {source_file}.",
             "level": "error",
             "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/WMS/analysis_assim/land/nwm.t2025060718z.analysis_assim.land.tm0000.hawaii.nc"
         }
