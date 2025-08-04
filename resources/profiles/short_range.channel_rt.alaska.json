@@ -48,22 +48,6 @@
                 ],
                 "RFC": [
                     {
-                        "operation": "echo",
-                        "message": "Renaming 'feature_id' to 'station_id'"
-                    },
-                    {
-                        "operation": "echo",
-                        "message": "Dropping streamflow_anomaly. Operations need to be rearranged to allow anomaly to only be calculated on the WMS branch"
-                    },
-                    {
-                        "operation": "drop",
-                        "fields": ["streamflow_anomaly"]
-                    },
-                    {
-                        "operation": "echo",
-                        "message": "Now splitting {Region} data up by RFC"
-                    },
-                    {
                         "operation": "extract",
                         "dimension": "feature_id",
                         "mask_coordinate": "feature_id",
@@ -90,7 +74,7 @@
                                 "operation": "save",
                                 "filename_pattern": "{file_name}",
                                 "identifier_pattern": "(?P<rfc>[A-Za-z]{2}[Rr][Ff][Cc])",
-                                "directory": "{output_path}/RFC/{RFC}/"
+                                "directory": "{output_path}/"
                             }
                         ]
                     }
