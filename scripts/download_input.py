@@ -38,6 +38,8 @@ _DEFAULT_SOURCE_URL: str = "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/v
 
 _VALID_CONFIGURATIONS: typing.List[str] = [
     "analysis_assim",
+    "analysis_assim_extend",
+    "analysis_assim_extend_no_da",
     "analysis_assim_alaska",
     "analysis_assim_alaska_no_da",
     "analysis_assim_hawaii",
@@ -186,8 +188,8 @@ class Arguments:
         if self.configuration == Configuration.MediumRange and self.member > 6:
             raise ValueError(f"The maximum ensemble member for medium range data is 6 - received {self.member}")
         
-        if self.configuration in (Configuration.ExtendedAnalysisAssimilation, Configuration.ExtendedAnalysisAssimilationNoDA):
-            raise ValueError(f"The downloading of {str(self.configuration).replace('_', ' ').title()} data is not yet supported")
+        #if self.configuration in (Configuration.ExtendedAnalysisAssimilation, Configuration.ExtendedAnalysisAssimilationNoDA):
+        #    raise ValueError(f"The downloading of {str(self.configuration).replace('_', ' ').title()} data is not yet supported")
 
         if not NUMERIC_PATTERN_PATTERN.match(self.frame):
             raise argparse.ArgumentTypeError(
@@ -217,7 +219,7 @@ class Arguments:
         parser.add_argument(
             "configuration",
             type=Configuration,
-            choices=[configuration for configuration in Configuration if 'extend' not in configuration.value],
+            choices=[configuration for configuration in Configuration],
             help="What NWM configuration to download",
         )
 

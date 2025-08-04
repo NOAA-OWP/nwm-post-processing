@@ -1,82 +1,161 @@
 {
     "operations": [
         {
-            "operation": "echo",
-            "message": "An output for 'nwm.t<cycle>z.medium_range.channel_rt_1.conus.nc' should be generated, as defined in {source_file}.",
-            "level": "error",
-            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/WMS/medium_range/channel_rt/nwm.t2025060712z.medium_range.channel_rt_1.conus.nc"
+            "operation": "drop",
+            "exclude": true,
+            "fields": ["feature_id", "time", "reference_time", "streamflow", "crs"]
+        },
+        {
+            "operation": "anomaly",
+            "variable_name": "streamflow",
+            "default_score": 3,
+            "output_pattern": "anomaly.nwm.t{cycle}z.{Configuration}.{ModelOutputType}_{member}.{frame}.{region}.nc",
+            "time_variable": "time",
+            "dimension_names": "feature_id",
+            "output_variable_name": "streamflow_anomaly",
+            "comment": "The previous version of CONUS excluded the 50th percentile, so this will as well. Data from in (25th, 75th] is the IQR, which is considered 'fairly normal'. This variable is for identifying 'weird' values, so the IQR is set at a value of '0.0'",
+            "thresholds": [
+                {
+                    "data_path": "{threshold_path}/p05.nc",
+                    "level": -5.0,
+                    "variable": "streamflow_0_4"
+                },
+                {
+                    "data_path": "{threshold_path}/p10.nc",
+                    "level": -3.0,
+                    "variable": "streamflow_5_9"
+                },
+                {
+                    "data_path": "{threshold_path}/p25.nc",
+                    "level": -1.25,
+                    "variable": "streamflow_10_24"
+                },
+                {
+                    "data_path": "{threshold_path}/p75.nc",
+                    "level": 0.0,
+                    "variable": "streamflow_50_75"
+                },
+                {
+                    "data_path": "{threshold_path}/p90.nc",
+                    "level": 0.5,
+                    "variable": "streamflow_76_90"
+                },
+                {
+                    "data_path": "{threshold_path}/p95.nc",
+                    "level": 1.5,
+                    "variable": "streamflow_91_95"
+                }
+            ]
         },
         {
             "operation": "echo",
-            "message": "An output for 'nwm.t<cycle>z.medium_range.channel_rt_1.abrfc.nc' should be generated, as defined in {source_file}.",
-            "level": "error",
-            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AB/channel_rt/nwm.t2025060712z.medium_range.channel_rt_1.abrfc.nc"
+            "message": "Calculated Anomaly, now calculating upstreamflow",
+            "level": "INFO"
         },
         {
-            "operation": "echo",
-            "message": "An output for 'nwm.t<cycle>z.medium_range.channel_rt_1.cbrfc.nc' should be generated, as defined in {source_file}.",
-            "level": "error",
-            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/CB/channel_rt/nwm.t2025060712z.medium_range.channel_rt_1.cbrfc.nc"
+            "operation": "on_each",
+            "comment": "Add upstreamflow to each input file by calling 'post_processing.transform.calculate_upstream_flow.calculate_upstream_flow' on each",
+            "on_each": [
+                {
+                    "operation": "function",
+                    "function_name": "post_processing.transform.calculate_upstream_flow.calculate_upstream_flow",
+                    "comment": "This should end up calling `calculate_upstream_flow(input_path=data, output_path=data, routelink_path='{application_path}/RouteLink_CONUS.nc')`",
+                    "kwargs": {
+                        "routelink_path": "{routelink_path}/RouteLink_CONUS.nc",
+                        "routelink_from_variable": "from",
+                        "output_path": "{work_directory}/upstream.{input_name}"
+                    },
+                    "argument_mapping": {
+                        "input_path": "data"
+                    }
+                }
+            ]
         },
         {
-            "operation": "echo",
-            "message": "An output for 'nwm.t<cycle>z.medium_range.channel_rt_1.cnrfc.nc' should be generated, as defined in {source_file}.",
-            "level": "error",
-            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/CN/channel_rt/nwm.t2025060712z.medium_range.channel_rt_1.cnrfc.nc"
+            "operation": "merge",
+            "file_name_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}_{member}.{Region}.nc"
         },
         {
-            "operation": "echo",
-            "message": "An output for 'nwm.t<cycle>z.medium_range.channel_rt_1.lmrfc.nc' should be generated, as defined in {source_file}.",
-            "level": "error",
-            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/LM/channel_rt/nwm.t2025060712z.medium_range.channel_rt_1.lmrfc.nc"
-        },
-        {
-            "operation": "echo",
-            "message": "An output for 'nwm.t<cycle>z.medium_range.channel_rt_1.marfc.nc' should be generated, as defined in {source_file}.",
-            "level": "error",
-            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/MA/channel_rt/nwm.t2025060712z.medium_range.channel_rt_1.marfc.nc"
-        },
-        {
-            "operation": "echo",
-            "message": "An output for 'nwm.t<cycle>z.medium_range.channel_rt_1.mbrfc.nc' should be generated, as defined in {source_file}.",
-            "level": "error",
-            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/MB/channel_rt/nwm.t2025060712z.medium_range.channel_rt_1.mbrfc.nc"
-        },
-        {
-            "operation": "echo",
-            "message": "An output for 'nwm.t<cycle>z.medium_range.channel_rt_1.ncrfc.nc' should be generated, as defined in {source_file}.",
-            "level": "error",
-            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NC/channel_rt/nwm.t2025060712z.medium_range.channel_rt_1.ncrfc.nc"
-        },
-        {
-            "operation": "echo",
-            "message": "An output for 'nwm.t<cycle>z.medium_range.channel_rt_1.nerfc.nc' should be generated, as defined in {source_file}.",
-            "level": "error",
-            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NE/channel_rt/nwm.t2025060712z.medium_range.channel_rt_1.nerfc.nc"
-        },
-        {
-            "operation": "echo",
-            "message": "An output for 'nwm.t<cycle>z.medium_range.channel_rt_1.nwrfc.nc' should be generated, as defined in {source_file}.",
-            "level": "error",
-            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NW/channel_rt/nwm.t2025060712z.medium_range.channel_rt_1.nwrfc.nc"
-        },
-        {
-            "operation": "echo",
-            "message": "An output for 'nwm.t<cycle>z.medium_range.channel_rt_1.ohrfc.nc' should be generated, as defined in {source_file}.",
-            "level": "error",
-            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/OH/channel_rt/nwm.t2025060712z.medium_range.channel_rt_1.ohrfc.nc"
-        },
-        {
-            "operation": "echo",
-            "message": "An output for 'nwm.t<cycle>z.medium_range.channel_rt_1.serfc.nc' should be generated, as defined in {source_file}.",
-            "level": "error",
-            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/SE/channel_rt/nwm.t2025060712z.medium_range.channel_rt_1.serfc.nc"
-        },
-        {
-            "operation": "echo",
-            "message": "An output for 'nwm.t<cycle>z.medium_range.channel_rt_1.wgrfc.nc' should be generated, as defined in {source_file}.",
-            "level": "error",
-            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/WG/channel_rt/nwm.t2025060712z.medium_range.channel_rt_1.wgrfc.nc"
+            "operation": "branch",
+            "branches": {
+                "WMS": [
+                    {
+                        "operation": "drop",
+                        "fields": ["upstreamflow"],
+                        "output_pattern": "no_upstream.nwm.t{cycle}z.{Configuration}.{ModelOutputType}_{member}.{Region}.nc"
+                    },
+                    {
+                        "operation": "save",
+                        "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.{Region}.nc",
+                        "directory": "{output_path}/"
+                    }
+                ],
+                "RFC": [
+                    {
+                        "operation": "echo",
+                        "message": "Dropping 'streamflow' anomaly from: {input_name}"
+                    },
+                    {
+                        "operation": "drop",
+                        "fields": ["streamflow_anomaly"]
+                    },
+                    {
+                        "operation": "echo",
+                        "message": "dropped streamflow anomaly from '{input_name}', now extracting data by rfc"
+                    },
+                    {
+                        "operation": "extract",
+                        "dimension": "feature_id",
+                        "mask_coordinate": "feature_id",
+                        "masks": [
+                            "{mask_path}/abrfc.nc",
+                            "{mask_path}/c*rfc.nc",
+                            "{mask_path}/m*rfc.nc",
+                            "{mask_path}/lmrfc.nc",
+                            "{mask_path}/n*rfc.nc",
+                            "{mask_path}/serfc.nc",
+                            "{mask_path}/wgrfc.nc"
+                        ],
+                        "identifier_pattern": "^(?P<region>\\w+(\\.(?P<rfc>[MmAaLlCcNnPpWwOoSsHh][BbPpNnMmAaCcEeWwHhRrGg]([Rr][Ff][Cc]|[Vv][Ii])))?)",
+                        "output_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}_{member}.{region}.nc",
+                        "each": [
+                            {
+                                "operation": "echo",
+                                "message": "Renaming the 'feature_id' variable to 'station' on '{file_name}'"
+                            },
+                            {
+                                "operation": "rename",
+                                "mapping": {
+                                    "feature_id": "station"
+                                },
+                                "inplace": true
+                            },
+                            {
+                                "operation": "echo",
+                                "message": "Renamed the 'feature_id' variable to 'station' on {input_file}. Now renaming the 'feature_id' dimension to 'station_id'"
+                            },
+                            {
+                                "operation": "rename",
+                                "rename_variable": false,
+                                "mapping": {
+                                    "feature_id": "station_id"
+                                },
+                                "inplace": true
+                            },
+                            {
+                                "operation": "echo",
+                                "message": "Renamed the 'feature_id' dimension to 'station_id'. Now Saving '{input_file}'"
+                            },
+                            {
+                                "operation": "save",
+                                "filename_pattern": "{file_name}",
+                                "identifier_pattern": "(?P<rfc>[A-Za-z]{2}[Rr][Ff][Cc])",
+                                "directory": "{output_path}/"
+                            }
+                        ]
+                    }
+                ]
+            }
         }
     ],
     "configuration": "medium_range",
