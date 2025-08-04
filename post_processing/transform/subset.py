@@ -125,7 +125,9 @@ def subset_file_into_file_by_mask(
                 if coordinate in input_data.indexes:
                     subset_data: xarray.Dataset = input_data.sel(**{coordinate: allowable_ids})
                 else:
-                    LOGGER.error(f"'{coordinate}' is not an index in '{input_file.name}' - this might result in a slowdown.")
+                    LOGGER.warning(
+                        f"'{coordinate}' is not an index in '{input_file.name}' - this might result in a slowdown."
+                    )
                     subset_data: xarray.Dataset = input_data.where(input_data[coordinate].compute().isin(allowable_ids), drop=True)
             except Exception as e:
                 if "not all values found in index" in str(e):
