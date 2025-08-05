@@ -119,7 +119,7 @@ class OperationType(enum.StrEnum):
 
 
 @dataclasses.dataclass
-class InPlaceOperationMixin:
+class FileOutputMixin:
     """
     A mixin for data classes adding a field determining whether the files should be operated on in place or into a new file
     """
@@ -127,7 +127,7 @@ class InPlaceOperationMixin:
     """
     Dictates whether the changes made to the data should be applied in place or if the changes should go into a new file
     """
-    output_pattern: typing.Optional[str] = dataclasses.field(default=None, kw_only=True)
+    output_pattern: typing.Optional[str] = dataclasses.field(default="{stage}.{input_name}", kw_only=True)
     """
     The file name pattern to use when not making a change in place
     """
@@ -136,7 +136,11 @@ class InPlaceOperationMixin:
         if self.in_place:
             return input_path
 
-        filename: str = self.render_output_name(
+        context['input_path'] = input_path
+        context['input_name'] = input_path.name
+        context['operation_name'] = self.__class__.__name__
+
+        filename: str = self._render_output_name(
             input_file=input_path.stem,
             **context
         )
@@ -148,7 +152,7 @@ class InPlaceOperationMixin:
             return []
         return get_template_variables(self.output_pattern)
 
-    def render_output_name(self, input_file: str, **context: typing.Any) -> str:
+    def _render_output_name(self, input_file: str, **context: typing.Any) -> str:
         """
         Attempt to render a filename from the output pattern
 
@@ -157,6 +161,7 @@ class InPlaceOperationMixin:
             >>> instance.render_output_name(one="three", two="four")
             False_three_four.nc
 
+        :param input_file: The path to the original file
         :param context: key-value pairs describing variable values that might be needed to fulfill variables within the template
         :returns: The formatted output name
         """
@@ -181,9 +186,15 @@ class InPlaceOperationMixin:
                 missing_arguments.append(key)
 
         if missing_arguments:
+            available_values: typing.List[str] = [
+                f"{key}: {value}"
+                for key, value in context.items()
+            ]
             raise ValueError(
                 f"Cannot render output name - missing the following arguments for '{self.output_pattern}': "
-                f"{', '.join(missing_arguments)}"
+                f"{', '.join(missing_arguments)}{os.linesep}"
+                f"Available Values:{os.linesep}"
+                f"    - {(os.linesep + '    - ').join(available_values)}"
             )
 
         formatted_name: str = self.output_pattern.format(**template_arguments)
@@ -794,7 +805,7 @@ Files:
         return data
 
 @dataclasses.dataclass
-class DropOperation(PathToPathOperation, InPlaceOperationMixin):
+class DropOperation(PathToPathOperation, FileOutputMixin):
     """
     Tells how to drop variables
     """
@@ -881,7 +892,7 @@ class DropOperation(PathToPathOperation, InPlaceOperationMixin):
     exclude: bool = dataclasses.field(default=False)
 
 @dataclasses.dataclass
-class RenameOperation(PathToPathOperation, InPlaceOperationMixin):
+class RenameOperation(PathToPathOperation, FileOutputMixin):
     """
     Tells how to rename variables or dimensions
     """
@@ -953,7 +964,7 @@ class RenameOperation(PathToPathOperation, InPlaceOperationMixin):
     rename_variable: bool = dataclasses.field(default=True)
 
 @dataclasses.dataclass(unsafe_hash=True)
-class AttributeOperation(PathToPathOperation, InPlaceOperationMixin):
+class AttributeOperation(PathToPathOperation, FileOutputMixin):
     """
     Tells how to add, modify, or remove attributes on variables or globally
     """
@@ -2078,7 +2089,7 @@ class Profile(BaseModel):
                     for entry in output
                 ]
             elif isinstance(output, pathlib.Path):
-                output = output.resolve()
+                output = [output.resolve()]
             return output
         finally:
             if safe_to_remove_intermediate_output:
