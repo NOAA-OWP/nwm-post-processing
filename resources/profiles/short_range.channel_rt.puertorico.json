@@ -54,11 +54,6 @@
                         "output_pattern": "split.nwm.t{cycle}z.{Configuration}.{ModelOutputType}.puertorico.nc",
                         "each": [
                             {
-                                "operation": "peek",
-                                "show_state": false,
-                                "show_summary": false
-                            },
-                            {
                                 "operation": "rename",
                                 "mapping": {
                                     "feature_id": "station_id"

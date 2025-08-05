@@ -45,7 +45,7 @@
         },
         {
             "operation": "extract",
-            "dimension": "feature_id",
+            "dimension": "station_id",
             "mask_coordinate": "station_id",
             "masks": [
                 "{mask_path}/prvi.serfc.nc"
