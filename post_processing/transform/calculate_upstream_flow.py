@@ -82,6 +82,9 @@ def calculate_upstream_flow(
     import tempfile
     import shutil
 
+    if "long_name" not in attributes:
+        attributes['long_name'] = "Upstream River Flow"
+
     try:
         from post_processing.utilities.netcdf import load_netcdf
         from post_processing.utilities.netcdf import save_netcdf
@@ -143,21 +146,21 @@ def calculate_upstream_flow(
             # The 'to' values won't be in the order of the 'from' values and there won't be matches for all 'from' values
             #   * numpy.vectorize is used here for a large performance improvement based on the relatively simple operation
             mapped_flow: numpy.ndarray = numpy.vectorize(organized_values.get)(from_values)
+            encoding: typing.Dict[str, typing.Any] = {**data_to_transform[variable].encoding, **encoding}
 
             # Create the upstreamflow variable and add it to the dataset
             upstreamflow_variable = xarray.Variable(
                 dims=data_to_transform[variable].dims,
                 data=mapped_flow,
-                attrs={**attributes, **data_to_transform[variable].attrs},
-                encoding={**encoding, **data_to_transform[variable].encoding}
+                attrs={**data_to_transform[variable].attrs, **attributes},
             )
 
             # Make sure that there aren't any 'None' values from the above 'get' operation and instead hold
             # the missing_value or '_FillValue' encoding value
-            fill_value: typing.Union[int, float] = upstreamflow_variable.encoding.get("missing_value")
+            fill_value: typing.Union[int, float] = encoding.get("missing_value")
 
             if fill_value is None:
-                fill_value = upstreamflow_variable.encoding.get("_FillValue")
+                fill_value = encoding.get("_FillValue")
 
             if fill_value is None:
                 raise ValueError(
@@ -167,7 +170,7 @@ def calculate_upstream_flow(
 
             # Add the 'add_offset' encoding value to the resulting value. This often ensures that the stored data is of the
             # correct data type
-            add_offset: typing.Optional[float] = upstreamflow_variable.encoding.get('add_offset')
+            add_offset: typing.Optional[float] = encoding.get('add_offset')
 
             if add_offset is None:
                 LOGGER.warning(
@@ -177,6 +180,9 @@ def calculate_upstream_flow(
                 fill_value += add_offset
 
             upstreamflow_variable = upstreamflow_variable.fillna(fill_value)
+
+            upstreamflow_variable.encoding.update(encoding)
+
             data_to_transform[target_variable] = upstreamflow_variable
 
             try:

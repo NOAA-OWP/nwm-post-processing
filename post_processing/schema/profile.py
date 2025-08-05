@@ -48,6 +48,10 @@ OutputType = typing.TypeVar("OutputType")
 OPERATION_KEY: typing.Final[str] = "operation"
 """The key for a ProfileOperation dictionary stating what the ProfileOperation is supposed to do"""
 
+STAGE_ATTRIBUTE: str = "process_step"
+
+STAGE_PATTERN: re.Pattern = re.compile(r"^(\d+\.)*\d+_")
+
 @typing.runtime_checkable
 class OperationHandler(typing.Protocol[InputType, OutputType]):
     """
@@ -127,7 +131,7 @@ class FileOutputMixin:
     """
     Dictates whether the changes made to the data should be applied in place or if the changes should go into a new file
     """
-    output_pattern: typing.Optional[str] = dataclasses.field(default="{stage}.{input_name}", kw_only=True)
+    output_pattern: typing.Optional[str] = dataclasses.field(default="{stage}_{input_name}", kw_only=True)
     """
     The file name pattern to use when not making a change in place
     """
@@ -137,7 +141,7 @@ class FileOutputMixin:
             return input_path
 
         context['input_path'] = input_path
-        context['input_name'] = input_path.name
+        context['input_name'] = STAGE_PATTERN.sub("", input_path.name)
         context['operation_name'] = self.__class__.__name__
 
         filename: str = self._render_output_name(
@@ -877,7 +881,7 @@ class DropOperation(PathToPathOperation, FileOutputMixin):
         ]
 
         try:
-            starmap(
+            updated_files: typing.Sequence[pathlib.Path] = starmap(
                 function=drop_function,
                 args=arguments
             )
@@ -1174,7 +1178,11 @@ class SaveOperation(PathToPathOperation):
                         file_specific_metadata["RFC"] = rfc_abbreviation
 
                 try:
-                    if self.filename_pattern:
+                    # If the logic says "Just let the name fall through",
+                    # scrub off any references to the stage in the name
+                    if self.filename_pattern == "{file_name}" or self.filename_pattern == "{input_name}":
+                        filename: str = STAGE_PATTERN.sub("", file.name)
+                    elif self.filename_pattern:
                         filename: str = self.filename_pattern.format(**file_specific_metadata)
                     else:
                         filename: str = file.name
@@ -2354,6 +2362,18 @@ def call_generic_operations(
             metadata=metadata
         )
 
+        if isinstance(current_data, typing.Sequence):
+            for entry in filter(lambda value: isinstance(value, pathlib.Path), current_data):
+                try:
+                    assign_stage(entry, operation.operation_id)
+                except Exception as e:
+                    LOGGER.warning(f"Could not assign the profile stage to '{entry}': {e}")
+        elif isinstance(current_data, pathlib.Path):
+            try:
+                assign_stage(current_data, operation.operation_id)
+            except Exception as e:
+                LOGGER.warning(f"Could not assign the profile stage to '{current_data}': {e}")
+
         if not any(op.operation_id == operation.operation_id for op in previous_operations):
             previous_operations.append(operation)
         elif settings.verbosity >= enums.Verbosity.LOUD:
@@ -2402,6 +2422,18 @@ def call_operations(
             metadata=metadata
         )
 
+        if not isinstance(operation, BranchOperation) and isinstance(current_data, typing.Sequence):
+            for entry in filter(lambda value: isinstance(value, pathlib.Path), current_data):
+                try:
+                    assign_stage(entry, operation.operation_id)
+                except Exception as e:
+                    LOGGER.warning(f"Could not assign the profile stage to '{entry}': {e}")
+        elif not isinstance(operation, BranchOperation) and isinstance(current_data, pathlib.Path):
+            try:
+                assign_stage(current_data, operation.operation_id)
+            except Exception as e:
+                LOGGER.warning(f"Could not assign the profile stage to '{current_data}': {e}")
+
         if not any(op.operation_id == operation.operation_id for op in previous_operations):
             previous_operations.append(operation)
         else:
@@ -2411,6 +2443,17 @@ def call_operations(
             )
 
     return current_data
+
+
+def assign_stage(path: pathlib.Path, stage: str):
+    """
+    Assign the stage attribute to the netcdf file at the given path
+
+    :param path: The path to a netcdf file
+    :param stage: The identifier for the stage of the profile that was just completed
+    """
+    from post_processing.nco import add_or_modify_attribute
+    add_or_modify_attribute(input_file=path, attribute_name=STAGE_ATTRIBUTE, attribute_value=stage)
 
 
 def get_profile(

@@ -52,6 +52,16 @@ class NetcdfTypeDetails:
     alternate_names: typing.List[str] = dataclasses.field(default_factory=list)
     print_unit: bool = dataclasses.field(default=True)
 
+    def __hash__(self):
+        return hash((
+            self.dtype,
+            self.code,
+            self.rank,
+            *self.alternate_names,
+            self.print_unit,
+            self.group.value
+        ))
+
     def __str__(self):
         return f"{self.group.name}: {self.dtype}"
 
@@ -117,6 +127,9 @@ class NetcdfType(enum.Enum):
     UNSIGNED_INTEGER_64 = NetcdfTypeDetails(dtype="uint64", code="ull", group=AttributeTypeGroup.UNSIGNED_NATURAL_NUMBERS, rank=3)
     CHAR = NetcdfTypeDetails(dtype="char", code="c", group=AttributeTypeGroup.STRINGS, rank=0, print_unit=False)
     STRING = NetcdfTypeDetails(dtype="string", code="string", group=AttributeTypeGroup.STRINGS, rank=1, print_unit=False)
+
+    def __hash__(self):
+        return hash(self.value)
 
     def __eq__(self, other):
         if not isinstance(other, NetcdfType):

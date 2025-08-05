@@ -218,8 +218,28 @@ def calculate_anomaly(
     if field_metadata is None:
         field_metadata = {}
 
+    if "long_name" not in field_metadata:
+        if "long_name" in variable.attrs:
+            long_name: str = f"{variable.attrs['long_name']} Anomaly"
+        elif "standard_name" in variable.attrs:
+            long_name: str = f"{variable.attrs['standard_name']} Anomaly"
+        else:
+            long_name: str = "Anomaly"
+        field_metadata['long_name'] = long_name.title()
+
     if encoding is None:
-        encoding: typing.Dict[str, typing.Any] = dict(variable.encoding)
+        encoding: typing.Dict[str, typing.Any] = {
+            "chunksizes": (396677, 2),
+            "fletcher32": False,
+            "shuffle": True,
+            "preferred_chunks": {'feature_id': 396677, "time": 2},
+            "zlib": True,
+            "complevel": 1,
+            "dtype": numpy.int32,
+            "missing_value": -99990,
+            "_FillValue": -99990,
+            "scale_factor": 0.1
+        }
 
     minimum_id = variable[dimension_names].min()
     variable_size: int = variable.size
