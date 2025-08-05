@@ -24,6 +24,37 @@ def merge_files(files: typing.Sequence[typing.Union[str, pathlib.Path]]) -> xarr
         for file in files
     ]
     combined_files: xarray.Dataset = load_netcdf(files)
+
+    for variable_name, variable in combined_files.data_vars.items():
+        if len(variable.dims) != 1:
+            continue
+
+        first_value: typing.Any = variable.isel({dimension: 0 for dimension in variable.dims})
+
+        if hasattr(first_value, 'compute') and callable(getattr(first_value, 'compute')):
+            first_value = first_value.compute()
+
+        first_value = first_value.item()
+
+        from post_processing.utilities.common import is_nan_safe
+        if is_nan_safe(first_value):
+            values_match_first: xarray.DataArray = variable.isnull().all()
+        else:
+            values_match_first: xarray.DataArray = (variable == first_value).all()
+
+        if hasattr(values_match_first, 'compute') and callable(getattr(values_match_first, 'compute')):
+            values_match_first = values_match_first.compute()
+
+        data_is_uniform: bool = values_match_first.item()
+
+        if data_is_uniform:
+            simplified_variable: xarray.DataArray = xarray.DataArray(
+                data=first_value,
+                attrs=variable.attrs,
+                name=variable.name
+            )
+            combined_files[variable_name] = simplified_variable
+
     dimension_groups: typing.Set[typing.Tuple[str, ...]] = {
         tuple(map(str, variable.dims))
         for variable in combined_files.data_vars.values()
