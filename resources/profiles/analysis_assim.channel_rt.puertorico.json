@@ -55,6 +55,7 @@
             "each": [
                 {
                     "operation": "save",
+                    "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.{frame}.puertorico.serfc.nc",
                     "identifier_pattern": "(?P<rfc>[A-Za-z]{2}[Rr][Ff][Cc])",
                     "directory": "{output_path}/"
                 }

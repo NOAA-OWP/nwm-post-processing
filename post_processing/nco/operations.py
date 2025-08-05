@@ -128,11 +128,16 @@ def add_or_modify_attribute(
     """
     if output_file is None:
         output_file = input_file
+
+    import string
+    if any(character not in string.ascii_letters + string.digits for character in attribute_value):
+        attribute_value = f'"{attribute_value}"'
+
     run_command(
         NCOFunction.EDIT_ATTRIBUTES,
         "-O",
         "-a",
-        f"{attribute_name},{variable_name},{mode.value},{attribute_type.value},{attribute_value}",
+        f"{attribute_name},{variable_name},{mode.value},{attribute_type.code},{attribute_value}",
         input_file,
         output_file
     )

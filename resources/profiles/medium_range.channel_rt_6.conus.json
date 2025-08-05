@@ -113,6 +113,7 @@
                             "{mask_path}/m*rfc.nc",
                             "{mask_path}/lmrfc.nc",
                             "{mask_path}/n*rfc.nc",
+                            "{mask_path}/ohrfc.nc",
                             "{mask_path}/serfc.nc",
                             "{mask_path}/wgrfc.nc"
                         ],
