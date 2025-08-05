@@ -63,6 +63,21 @@ NWM_FILENAME_PATTERN: re.Pattern = re.compile(
 )
 """A regular expression that matches on an NWM file name and can pull out important variables"""
 
+
+def is_nan_safe(value: typing.Any) -> bool:
+    """
+    Detects if numpy.isnan(value), but handles the TypeError if it's not supported
+
+    :param value: The value to test
+    :returns: True if the value is nan
+    """
+    try:
+        import numpy
+        return numpy.isnan(value)
+    except TypeError:
+        return False
+
+
 def starmap(
     function: typing.Callable[[FunctionParameters], RT],
     args: typing.Iterable[ArgsAndKwargs],
