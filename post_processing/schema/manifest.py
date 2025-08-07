@@ -70,6 +70,8 @@ class InputManifest(BaseModel):
         Make sure that the values are valid
         """
         self.files = sort_nwm_filepaths(filepaths=self.files)
+        if isinstance(self.member, (str, float)):
+            self.member = int(float(self.member))
 
 
 
