@@ -2477,7 +2477,7 @@ def get_profile(
         for profile in load_profiles(profile_path=profile_path)
         if profile.configuration == manifest.configuration
            and profile.region == manifest.region
-           and profile.member == manifest.member
+           and str(profile.member).strip().lower() == str(manifest.member).strip().lower()
            and profile.output_type == manifest.output_type
     ]
 
