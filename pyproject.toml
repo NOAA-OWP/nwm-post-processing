@@ -36,6 +36,7 @@ analysis = [
 
 [project.scripts]
 post-process = "post_processing.__main__:main"
+download-input = "scripts.download_input:main"
 
 [project.urls]
 Homepage = "https://github.com/NOAA-OWP/nwm-post-processing"
@@ -44,4 +45,4 @@ Repository = "https://github.com/NOAA-OWP/nwm-post-processing"
 "Bug Tracker" = "https://github.com/NOAA-OWP/nwm-post-processing/issues"
 
 [tool.setuptools]
-packages = ["post_processing"]
+packages = ["post_processing", "scripts"]

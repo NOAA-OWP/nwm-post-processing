@@ -286,6 +286,15 @@ class Arguments:
             help="A pattern used to constrain what frames to include"
         )
 
+        parser.add_argument(
+            "--member",
+            "-m",
+            dest="member",
+            type=int,
+            default=self.member,
+            help="The member of an ensemble"
+        )
+
         parameters: argparse.Namespace = parser.parse_args(args=args) if args else parser.parse_args()
 
         for key, value in vars(parameters).items():
