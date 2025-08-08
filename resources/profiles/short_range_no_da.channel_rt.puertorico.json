@@ -29,8 +29,21 @@
             "file_name_pattern": "nwm.t{cycle}z.{ModelOutputType}.{Configuration}.{Region}.nc"
         },
         {
+            "operation": "rename",
+            "mapping": {
+                "feature_id": "station_id"
+            }
+        },
+        {
+            "operation": "rename",
+            "rename_variable": false,
+            "mapping": {
+                "feature_id": "station"
+            }
+        },
+        {
             "operation": "extract",
-            "dimension": "feature_id",
+            "dimension": "station_id",
             "mask_coordinate": "station_id",
             "masks": [
                 "{mask_path}/prvi.serfc.nc"
@@ -38,19 +51,6 @@
             "identifier_pattern": "^(?P<region>\\w+(\\.(?P<rfc>[MmAaLlCcNnPpWwOoSsHh][BbPpNnMmAaCcEeWwHhRrGg]([Rr][Ff][Cc]|[Vv][Ii])))?)",
             "output_pattern": "split.nwm.t{cycle}z.{Configuration}.{ModelOutputType}.puertorico.nc",
             "each": [
-                {
-                    "operation": "rename",
-                    "mapping": {
-                        "feature_id": "station_id"
-                    }
-                },
-                {
-                    "operation": "rename",
-                    "rename_variable": false,
-                    "mapping": {
-                        "feature_id": "station"
-                    }
-                },
                 {
                     "operation": "save",
                     "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.puertorico.serfc.nc",

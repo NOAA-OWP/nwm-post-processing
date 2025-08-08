@@ -48,8 +48,21 @@
                 ],
                 "RFC": [
                     {
+                        "operation": "rename",
+                        "mapping": {
+                            "feature_id": "station_id"
+                        }
+                    },
+                    {
+                        "operation": "rename",
+                        "rename_variable": false,
+                        "mapping": {
+                            "feature_id": "station"
+                        }
+                    },
+                    {
                         "operation": "extract",
-                        "dimension": "feature_id",
+                        "dimension": "station_id",
                         "mask_coordinate": "feature_id",
                         "masks": [
                             "{mask_path}/alaska.aprfc.nc"
@@ -57,19 +70,6 @@
                         "identifier_pattern": "^(?P<region>\\w+(\\.(?P<rfc>[MmAaLlCcNnPpWwOoSsHh][BbPpNnMmAaCcEeWwHhRrGg]([Rr][Ff][Cc]|[Vv][Ii])))?)",
                         "output_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}_{member}.{region}.nc",
                         "each": [
-                            {
-                                "operation": "rename",
-                                "mapping": {
-                                    "feature_id": "station_id"
-                                }
-                            },
-                            {
-                                "operation": "rename",
-                                "rename_variable": false,
-                                "mapping": {
-                                    "feature_id": "station"
-                                }
-                            },
                             {
                                 "operation": "save",
                                 "filename_pattern": "{file_name}",

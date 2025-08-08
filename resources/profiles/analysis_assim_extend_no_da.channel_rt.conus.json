@@ -25,8 +25,21 @@
             ]
         },
         {
+            "operation": "rename",
+            "mapping": {
+                "feature_id": "station_id"
+            }
+        },
+        {
+            "operation": "rename",
+            "rename_variable": false,
+            "mapping": {
+                "feature_id": "station"
+            }
+        },
+        {
             "operation": "extract",
-            "dimension": "feature_id",
+            "dimension": "station_id",
             "mask_coordinate": "feature_id",
             "masks": [
                 "{mask_path}/abrfc.nc",
@@ -48,21 +61,6 @@
                     "directory": "{output_path}/"
                 }
             ]
-        },
-        {
-            "operation": "rename",
-            "mapping": {
-                "feature_id": "station"
-            },
-            "in_place": true
-        },
-        {
-            "operation": "rename",
-            "rename_variable": false,
-            "mapping": {
-                "feature_id": "station_id"
-            },
-            "in_place": true
         }
     ],
     "configuration": "analysis_assim_extend_no_da",
