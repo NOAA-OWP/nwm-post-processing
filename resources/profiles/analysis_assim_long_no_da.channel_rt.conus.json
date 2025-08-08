@@ -23,7 +23,7 @@
                     }
                 }
             ]
-        },,
+        },
         {
             "operation": "rename",
             "mapping": {
