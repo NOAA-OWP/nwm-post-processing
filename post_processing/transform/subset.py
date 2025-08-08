@@ -142,6 +142,22 @@ def subset_file_into_file_by_mask(
                     LOGGER.debug(f"Extracting data from '{input_file}' that matches the allowable ids")
                 if coordinate in input_data.indexes:
                     subset_data: xarray.Dataset = input_data.sel(**{coordinate: allowable_ids})
+                elif coordinate in input_data.coords and len(input_data.coords[coordinate].dims) == 1:
+                    # If the coordinate is for a single dimension, we can match it up with its dimension to find the
+                    # actual usable indices
+                    target_dimension: str = input_data.coords[coordinate].dims[0]
+
+                    # Isolate the values from within the coordinate values that are within the allowable ids
+                    matching_values_mask: numpy.ndarray[numpy.bool_] = input_data.coords[coordinate].isin(allowable_ids).values
+
+                    # Identify the indices that are nonzero (i.e. all the `True` values)
+                    indices_that_fit_per_dimension: typing.Tuple[numpy.ndarray, ...] = numpy.nonzero(matching_values_mask)
+
+                    # nonzero breaks up data per dimension. Get only the first, since we're one-dimensional
+                    fitting_indices_for_target_dimension: numpy.ndarray[numpy.integer] = indices_that_fit_per_dimension[0]
+
+                    # Now select the data by index by the dimension that this coordinate represents
+                    subset_data: xarray.DataArray = input_data.isel(**{target_dimension: fitting_indices_for_target_dimension})
                 else:
                     LOGGER.warning(
                         f"'{coordinate}' is not an index in '{input_file.name}' - this might result in a slowdown."

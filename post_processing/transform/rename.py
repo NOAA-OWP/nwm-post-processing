@@ -53,7 +53,7 @@ def rename_variable(
                 )
                 raise
 
-            input_file.set_coords(coordinates_to_assign)
+            input_file = input_file.set_coords(coordinates_to_assign)
             save_netcdf(temporary_output_path, input_file)
 
         output_path.parent.mkdir(parents=True, exist_ok=True)
