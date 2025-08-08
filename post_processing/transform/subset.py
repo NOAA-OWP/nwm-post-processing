@@ -73,10 +73,27 @@ def subset_file_into_file_by_mask(
         temporary_output_path: pathlib.Path = temporary_path / output_path.name
 
         with netcdf.load_netcdf(path=input_file) as input_data:
+            if coordinate not in input_data.variables and coordinate in input_data.sizes:
+                raise ValueError(
+                    f"Cannot subset values based off of '{coordinate}' in '{input_file}' - "
+                    f"it is a dimension, not a variable, and may only provide indices, not values"
+                )
+            if coordinate not in input_data.variables:
+                raise KeyError(f"{coordinate} is not a valid variable to subset on within '{input_file}'")
             if this_is_verbose:
                 LOGGER.debug(f"Loaded '{input_file}' to be masked by '{mask}'")
 
             mask_data: xarray.Dataset = netcdf.load_netcdf(path=mask)
+
+            if mask_coordinate not in mask_data.variables and mask_coordinate in mask_data.sizes:
+                raise ValueError(
+                    f"Cannot subset values based off of '{mask_coordinate}' in the mask at '{mask}' - "
+                    f"it is a dimension, not a variable, and may only provide indices, not values"
+                )
+            if mask_coordinate not in mask_data.variables:
+                raise KeyError(
+                    f"'{mask_coordinate}' is not a valid variable to subset on within the mask at '{input_file}'"
+                )
 
             if this_is_verbose:
                 LOGGER.debug(f"Loaded the mask at '{mask}'")
@@ -94,7 +111,8 @@ def subset_file_into_file_by_mask(
             if this_is_verbose:
                 LOGGER.debug("Finding missing ids")
 
-            missing_ids: numpy.ndarray = numpy.setdiff1d(allowable_ids, available_ids)
+            # NOTE: This will only work on 1D arrays - not grids
+            missing_ids: typing.Union[numpy.ndarray, typing.Set] = numpy.setdiff1d(allowable_ids, available_ids)
 
             if len(missing_ids) > 0:
                 if missing_ids.size > 20:

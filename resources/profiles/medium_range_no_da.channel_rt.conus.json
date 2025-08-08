@@ -29,8 +29,21 @@
             "file_name_pattern": "nwm.t{cycle}z.{ModelOutputType}.{Configuration}.{Region}.nc"
         },
         {
+            "operation": "rename",
+            "mapping": {
+                "feature_id": "station_id"
+            }
+        },
+        {
+            "operation": "rename",
+            "rename_variable": false,
+            "mapping": {
+                "feature_id": "station"
+            }
+        },
+        {
             "operation": "extract",
-            "dimension": "feature_id",
+            "dimension": "station_id",
             "mask_coordinate": "feature_id",
             "masks": [
                 "{mask_path}/abrfc.nc",
@@ -45,19 +58,6 @@
             "identifier_pattern": "^(?P<region>\\w+(\\.(?P<rfc>[MmAaLlCcNnPpWwOoSsHh][BbPpNnMmAaCcEeWwHhRrGg]([Rr][Ff][Cc]|[Vv][Ii])))?)",
             "output_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.{region}.nc",
             "each": [
-                {
-                    "operation": "rename",
-                    "mapping": {
-                        "feature_id": "station"
-                    }
-                },
-                {
-                    "operation": "rename",
-                    "rename_variable": false,
-                    "mapping": {
-                        "feature_id": "station_id"
-                    }
-                },
                 {
                     "operation": "save",
                     "identifier_pattern": "(?P<rfc>[A-Za-z]{2}[Rr][Ff][Cc])",

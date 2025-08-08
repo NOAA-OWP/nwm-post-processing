@@ -48,11 +48,6 @@
             ]
         },
         {
-            "operation": "echo",
-            "message": "Calculated Anomaly, now calculating upstreamflow",
-            "level": "INFO"
-        },
-        {
             "operation": "on_each",
             "comment": "Add upstreamflow to each input file by calling 'post_processing.transform.calculate_upstream_flow.calculate_upstream_flow' on each",
             "on_each": [
@@ -92,20 +87,25 @@
                 ],
                 "RFC": [
                     {
-                        "operation": "echo",
-                        "message": "Dropping 'streamflow' anomaly from: {input_name}"
-                    },
-                    {
                         "operation": "drop",
                         "fields": ["streamflow_anomaly"]
                     },
                     {
-                        "operation": "echo",
-                        "message": "dropped streamflow anomaly from '{input_name}', now extracting data by rfc"
+                        "operation": "rename",
+                        "mapping": {
+                            "feature_id": "station_id"
+                        }
+                    },
+                    {
+                        "operation": "rename",
+                        "rename_variable": false,
+                        "mapping": {
+                            "feature_id": "station"
+                        }
                     },
                     {
                         "operation": "extract",
-                        "dimension": "feature_id",
+                        "dimension": "station_id",
                         "mask_coordinate": "feature_id",
                         "masks": [
                             "{mask_path}/abrfc.nc",
@@ -120,33 +120,6 @@
                         "identifier_pattern": "^(?P<region>\\w+(\\.(?P<rfc>[MmAaLlCcNnPpWwOoSsHh][BbPpNnMmAaCcEeWwHhRrGg]([Rr][Ff][Cc]|[Vv][Ii])))?)",
                         "output_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.{region}.nc",
                         "each": [
-                            {
-                                "operation": "echo",
-                                "message": "Renaming the 'feature_id' variable to 'station' on '{file_name}'"
-                            },
-                            {
-                                "operation": "rename",
-                                "mapping": {
-                                    "feature_id": "station"
-                                },
-                                "inplace": true
-                            },
-                            {
-                                "operation": "echo",
-                                "message": "Renamed the 'feature_id' variable to 'station' on {input_file}. Now renaming the 'feature_id' dimension to 'station_id'"
-                            },
-                            {
-                                "operation": "rename",
-                                "rename_variable": false,
-                                "mapping": {
-                                    "feature_id": "station_id"
-                                },
-                                "inplace": true
-                            },
-                            {
-                                "operation": "echo",
-                                "message": "Renamed the 'feature_id' dimension to 'station_id'. Now Saving '{input_file}'"
-                            },
                             {
                                 "operation": "save",
                                 "filename_pattern": "{file_name}",
