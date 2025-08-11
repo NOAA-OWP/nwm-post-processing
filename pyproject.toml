@@ -11,6 +11,9 @@ dependencies = [
     "dask",
     "pandas",
     "geopandas",
+    "pyproj",
+    "affine",
+    "rasterio"
 ]
 description = "Takes National Water Model data, combines the output, and subsets them based on region in order to make model data easier to work with"
 license = { file = "LICENSE" }

@@ -99,6 +99,10 @@ def load_netcdf(
 
     import xarray
 
+    if isinstance(path, xarray.Dataset):
+        LOGGER.warning("A dataset was passed to 'load_netcdf' instead of a path - this was an unneeded operation")
+        return path
+
     if isinstance(path, typing.Sequence) and len(path) == 1:
         path = path[0]
 
@@ -219,6 +223,8 @@ def peek(
     path: typing.Union[str, pathlib.Path],
     engine: typing.Union[str, typing.Literal["h5netcdf", "netcdf4"]] = settings.default_netcdf_engine,
     max_line_length: int = 150,
+    *,
+    variable_name: str = None,
     **kwargs
 ) -> str:
     """
@@ -227,11 +233,16 @@ def peek(
     :param path: The path to the file
     :param engine: The engine that will load and interpret the data
     :param max_line_length: The maximum width of the display
+    :param variable_name: The name of the variable to peek into instead of the entire file
     :param kwargs: Additional arguments to pass to the engine
     :returns: A human friendly representation of the contents of the file
     """
     import os
     import xarray
+    import numpy
+
+    from datetime import datetime
+
     separator_placeholder: str = "{separator}"
     separator: str = "="
     tab: str = "    "
@@ -240,6 +251,15 @@ def peek(
     lines: typing.List[str] = [
         separator_placeholder,
     ]
+
+    def format_value(value: object) -> str:
+        if isinstance(value, (numpy.number, float, int)):
+            return f"{value:,}"
+        if isinstance(value, numpy.datetime64):
+            value = value.item()
+        if isinstance(value, datetime):
+            return value.strftime(settings.date_format)
+        return str(value)
 
     def format_variable(var: xarray.DataArray) -> typing.Sequence[str]:
         """
@@ -258,16 +278,29 @@ def peek(
 
         attribute_template: str = tab + tab + "{variable_name}::{attribute_name} = {attribute_value}"
 
+        if var.coords:
+            longest_coordinate_name: str = max(map(str, var.coords.keys()), key=len)
+            name_length: int = len(longest_coordinate_name) + 5
+            lines_for_variable.extend([
+                tab + "Coordinates:",
+                *[
+                    tab + tab + f"{str(coordinate_name).ljust(name_length)}: {coordinate.shape}"
+                    for coordinate_name, coordinate in var.coords.items()
+                ]
+            ])
+
         if var.attrs:
+            longest_attr_name: str = max(map(str, var.attrs.keys()), key=len)
+            name_length: int = len(longest_attr_name) + 5
             lines_for_variable.extend([
                 tab + "Attributes:",
                 *[
                     attribute_template.format(
                         variable_name=var.name,
-                        attribute_name=attribute_name,
-                        attribute_value=str(attribute_value)
+                        attribute_name=attr_name.ljust(name_length),
+                        attribute_value=format_value(value=attr_value)
                     )
-                    for attribute_name, attribute_value in var.attrs.items()
+                    for attr_name, attr_value in var.attrs.items()
                 ]
             ])
 
@@ -277,21 +310,26 @@ def peek(
                 *[
                     attribute_template.format(
                         variable_name=var.name,
-                        attribute_name=attribute_name,
-                        attribute_value=str(attribute_value)
+                        attribute_name=attr_name,
+                        attribute_value=format_value(value=attr_value)
                     )
-                    for attribute_name, attribute_value in var.encoding.items()
+                    for attr_name, attr_value in var.encoding.items()
+                    if bool(attr_value)
                 ]
             ])
         return lines_for_variable
 
     with load_netcdf(path=path, engine=engine, chunks='force', **kwargs) as netcdf_file:
+        if variable_name is not None:
+            description: typing.Sequence[str] = format_variable(var=netcdf_file.get(variable_name))
+            return os.linesep.join(description)
+
         longest_dimension_name: str = max(map(str, netcdf_file.sizes.keys()), key=len)
         dimension_name_length: int = len(longest_dimension_name) + 5
         lines.extend([
             "Dimensions:",
             *[
-                f"{tab}{str(dimension).ljust(dimension_name_length)}: {count}"
+                f"{tab}{str(dimension).ljust(dimension_name_length)}: {count:,}"
                 for dimension, count in netcdf_file.sizes.items()
             ],
             separator_placeholder,
@@ -310,7 +348,9 @@ def peek(
             longest_attribute_name: str = max(map(str, netcdf_file.attrs.keys()), key=len)
             attribute_name_length: int = len(longest_attribute_name) + 5
             for attribute_name, attribute_value in netcdf_file.attrs.items():
-                lines.append(f"{indent}{attribute_name.ljust(attribute_name_length)}: {attribute_value}")
+                lines.append(
+                    f"{indent}{attribute_name.ljust(attribute_name_length)}: {format_value(value=attribute_value)}"
+                )
 
     longest_line: int = max(*map(len, lines), 1)
     separator_character_count: int = longest_line + 5

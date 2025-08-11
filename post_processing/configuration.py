@@ -689,7 +689,8 @@ class _Settings(UserDict):
         key: str = self._find_key(key=proposed_key)
 
         if key not in self.keys() or not self.__getitem__(key=key):
-            path: pathlib.Path = self.application_path / "intermediate"
+            import tempfile
+            path: pathlib.Path = pathlib.Path(tempfile.gettempdir())
             path.mkdir(parents=True, exist_ok=True)
             self.__setitem__(key=key, item=path)
         elif isinstance(self.__getitem__(key=key), str):
