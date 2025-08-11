@@ -8,7 +8,10 @@ requests
 shapely
 xarray
 dask
-
 numpy
 geopandas
+pyproj
+affine
+
 beautifulsoup4
+rasterio

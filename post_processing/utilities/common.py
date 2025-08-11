@@ -921,8 +921,7 @@ def condense_exceptions(
     all_exceptions: typing.List[Exception] = [*exceptions, *additional_exceptions]
 
     if len(all_exceptions) == 0:
-        exception: Exception = all_exceptions[0]
-        exception.args = (f"{message}: {exception.args[0]}", *exception.args[1:])
+        exception: Exception = Exception(message)
         return exception
 
     exception_hashes: typing.Dict[int, Exception] = {}
