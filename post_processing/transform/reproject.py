@@ -328,6 +328,15 @@ def reproject_variable(
     if len(source_variable.shape) < 2:
         return source_variable
 
+    has_temporal_dimension: bool = any(
+        "time" in str(dimension_name).lower()
+        for dimension_name in source_variable.dims
+    )
+
+    # If the length is 2 and one of the variables describes time somehow, we know this isn't spatial so we can move on
+    if len(source_variable.shape) == 2 and has_temporal_dimension:
+        return source_variable
+
     if x_variable_name not in source_variable.dims:
         raise KeyError(
             f"Cannot reproject a dataset - the variable for the X-Axis ('{x_variable_name}') is not on the "
