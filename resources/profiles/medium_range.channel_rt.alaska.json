@@ -7,11 +7,11 @@
         },
         {
             "operation": "merge",
-            "file_name_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}_{member}.{Region}.nc"
+            "file_name_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.{Region}.nc"
         },
         {
             "operation": "save",
-            "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}_{member}.{Region}.nc",
+            "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.{Region}.nc",
             "directory": "{output_path}/"
         }
     ],

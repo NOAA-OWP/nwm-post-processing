@@ -132,7 +132,7 @@
             }
         }
     ],
-    "configuration": "medium_range_blend",
+    "configuration": "medium_range_ndfd",
     "output_type": "channel_rt",
     "region": "conus",
     "member": null

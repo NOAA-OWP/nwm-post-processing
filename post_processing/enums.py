@@ -73,6 +73,8 @@ class ModelOutputType(PostProcessingEnumeration):
     ChannelRouting = "channel_rt"
     Forcing = "forcing"
     Land = "land"
+    Reservoir = "reservoir"
+    FullReservoir = "reservoir.full"
 
 
 class Configuration(PostProcessingEnumeration):
@@ -85,7 +87,7 @@ class Configuration(PostProcessingEnumeration):
     MediumRange = "medium_range"
     MediumRangeNoDA = "medium_range_no_da"
     MediumRangeBlend = "medium_range_blend"
-    MediumRangeNFDF = "medium_range_nfdf"
+    MediumRangeNDFD = "medium_range_ndfd"
     AnalysisAssimilation = "analysis_assim"
     AnalysisAssimilationNoDA = "analysis_assim_no_da"
     ExtendedAnalysisAssimilation = "analysis_assim_extend"
