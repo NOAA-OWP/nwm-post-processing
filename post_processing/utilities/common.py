@@ -56,7 +56,7 @@ NWM_FILENAME_PATTERN: re.Pattern = re.compile(
     r"nwm\."
     rf"t(?P<{CYCLE_PATTERN_VARIABLE}>[0-2]\d)z\."
     rf"(?P<{CONFIGURATION_PATTERN_VARIABLE}>[^.]+)\."
-    rf"(?P<{OUTPUT_TYPE_PATTERN_VARIABLE}>channel_rt|land|forcing)(_(?P<{MEMBER_PATTERN_VARIABLE}>\d))?\."
+    rf"(?P<{OUTPUT_TYPE_PATTERN_VARIABLE}>channel_rt|land|forcing|reservoir(\.full)?)(_(?P<{MEMBER_PATTERN_VARIABLE}>\d))?\."
     rf"(f(?P<{FRAME_PATTERN_VARIABLE}>\d+)|tm(?P<{TMINUS_PATTERN_VARIABLE}>\d+))\."
     rf"(?P<{REGION_PATTERN_VARIABLE}>[a-z]+(\.\w\wrfc)?)\."
     r"nc$"
