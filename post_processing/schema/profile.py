@@ -20,7 +20,6 @@ from datetime import datetime
 import xarray
 
 from post_processing import enums
-from post_processing.schema import base as base_schema
 from post_processing.schema.base import BaseModel
 from post_processing.schema.base import member
 from post_processing.schema.base import get_fields
@@ -39,7 +38,6 @@ from post_processing.utilities.common import to_json
 from post_processing.configuration import settings
 
 if typing.TYPE_CHECKING:
-    import numpy
     from post_processing.transform import anomaly
 
 LOGGER: logging.Logger = logging.getLogger(pathlib.Path(__file__).stem)
@@ -120,6 +118,8 @@ class OperationType(enum.StrEnum):
     """Bin values by threshold"""
     PEEK = "peek"
     """Print information about the current set of data to the logs"""
+    REPROJECT = "reproject"
+    """Reproject a grid into another coordinate reference system or size"""
 
 
 @dataclasses.dataclass
@@ -480,6 +480,108 @@ class PathToPathOperation(ProfileOperation[typing.Sequence[pathlib.Path], typing
         metadata: typing.Dict[str, typing.Any]
     ) -> typing.Sequence[pathlib.Path]:
         raise NotImplementedError(f"Cannot execute a plain {self.__class__.__qualname__}")
+
+
+@dataclasses.dataclass(unsafe_hash=True)
+class ReprojectionOperation(PathToPathOperation, FileOutputMixin):
+    """
+    Describes how to reproject data into a different coordinate reference system
+    """
+    @classmethod
+    def operation(cls) -> OperationType:
+        return OperationType.REPROJECT
+
+    def __call__(
+        self,
+        profile: "Profile",
+        process_identifier: str,
+        work_directory: pathlib.Path,
+        data: typing.Sequence[pathlib.Path],
+        previous_operations: typing.List[ProfileOperation],
+        metadata: typing.Dict[str, typing.Any]
+    ) -> typing.Sequence[pathlib.Path]:
+        """
+        Reproject one or more netcdf files into a new coordinate reference system
+
+        :param profile: The profile that has defined this activity
+        :param process_identifier: The unique identifier tying together this entire line of work
+        :param work_directory: Where intermediate data for this operation may be saved
+        :param data: The data to reproject
+        :param previous_operations: Operations for this project that have already been performed
+        :param metadata: Metadata available for reference
+        :returns: Paths to updated data
+        """
+        import xarray
+        from post_processing.transform import reproject
+        from post_processing.utilities import netcdf
+        updated_paths: typing.List[pathlib.Path] = []
+
+        with netcdf.load_netcdf(self.reference_dataset_path) as reference_file:  # type: xarray.Dataset
+            for input_path_index, input_path in enumerate(data):  # type: int, pathlib.Path
+                try:
+                    with netcdf.load_netcdf(input_path_index) as netcdf_file:  # type: xarray.Dataset
+                        reprojected_data: xarray.Dataset = reproject.reproject_data(
+                            dataset=netcdf_file,
+                            reprojection_dataset=reference_file,
+                            crs_variable_name=self.crs_variable,
+                            reprojection_crs_variable_name=self.reference_crs_variable,
+                            projection_string_attribute=self.crs_string_attribute,
+                            x_coordinate_name=self.x_variable,
+                            y_coordinate_name=self.y_variable,
+                            reprojection_x_coordinate_name=self.reference_x_variable,
+                            reprojection_y_coordinate_name=self.reference_y_variable,
+                        )
+
+                    target_path: pathlib.Path = self.get_output_path(
+                        work_directory=work_directory,
+                        input_path=input_path,
+                        **metadata
+                    )
+                    netcdf.save_netcdf(
+                        path=target_path,
+                        dataset=reprojected_data
+                    )
+                    updated_paths.append(target_path)
+                except Exception as exception:
+                    LOGGER.error(
+                        f"[{input_path_index} files reprojected out of {len(data)}] Failed to reproject {input_path} to match "
+                        f"{self.reference_dataset_path} on {self.x_variable}={self.reference_x_variable} and "
+                        f"{self.y_variable}={self.reference_y_variable}, from the CRS described in "
+                        f"{input_path.name}::{self.crs_variable}::{self.crs_string_attribute} to the CRS described in "
+                        f"{self.reference_dataset_path.name}::{self.reference_crs_variable}::{self.reference_crs_string_attribute} "
+                        f"due to {exception}"
+                    )
+                    raise
+
+        return updated_paths
+
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        if isinstance(self.reference_dataset_path, str):
+            self.reference_dataset_path = pathlib.Path(self.reference_dataset_path)
+
+        self.reference_dataset_path = self.reference_dataset_path.resolve()
+
+        if not self.reference_dataset_path.exists():
+            raise FileNotFoundError(
+                f"Cannot use '{self.reference_dataset_path} as a reference to reproject a coordinate reference system "
+                f"- there isn't a file there"
+            )
+        if not self.reference_dataset_path.is_file():
+            raise FileNotFoundError(
+                f"Cannot use '{self.reference_dataset_path} as a reference to reproject a coordinate reference system "
+                f"- it is a directory, not a file"
+            )
+
+    reference_dataset_path: typing.Union[pathlib.Path, str]
+    crs_variable: str = dataclasses.field(default="crs")
+    crs_string_attribute: str = dataclasses.field(default="esri_pe_string")
+    x_variable: str = dataclasses.field(default="x")
+    y_variable: str = dataclasses.field(default="y")
+    reference_crs_variable: str = dataclasses.field(default="crs")
+    reference_crs_string_attribute: str = dataclasses.field(default="esri_pe_string")
+    reference_x_variable: str = dataclasses.field(default="x")
+    reference_y_variable: str = dataclasses.field(default="y")
 
 @dataclasses.dataclass
 class ExtractOperation(PathToPathOperation):

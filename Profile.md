@@ -450,3 +450,61 @@ strings like "abrfc", "alaska.aprfc", "puertorico.serfc", "prvi.serfc", etc. By 
 used in the `"output_pattern"`, which, here, is `"nwm.t{cycle}z.{Configuration}.{ModelOutputType}.{region}.nc"`. `cycle`
 is defined at the start of the application run, informed by your input. Let's say we gave the application a filename like
 "nwm.t00z.short_range.channel_rt.f001.conus.nc"
+
+### ReprojectionOperation
+
+```mermaid
+classDiagram
+    class PathToPathOperation~Path[], Path[]~ {
+        <<abstract>>
+        +Optional~str~ comment
+        +Optional~str~ operation_id
+        +bool disable = False
+    }
+    
+    class FileOutputMixin { 
+        +Optional~str~ output_pattern
+        +get_output_path(Path, Path, **kwargs) Path
+    }
+    
+    class ReprojectionOperation {
+        +Path reference_dataset_path
+        +str crs_variable = "crs"
+        +str crs_string_attribute = "esri_pe_string"
+        +str x_variable = "x"
+        +str y_variable = "y"
+        +str reference_crs_variable = "crs"
+        +str reference_crs_string_attribute = "esri_pe_string"
+        +str reference_x_variable = "x"
+        +str reference_y_variable = "y"
+        @classmethod operation() "reproject"
+    }
+    
+    PathToPathOperation <|-- ReprojectionOperation
+    FileOutputMixin <|-- ReprojectionOperation
+```
+
+The `ReprojectionOperation`, dictated by `"operation": "reproject"`, will reproject gridded, spatial data into a 
+new projection defined within `"reference_dataset_path"`. 
+
+The only configuration strictly required, aside from the `"operation": "reproject"` label, is the 
+`"reference_dataset_path"`. The crs, spatial reference string attribute, x, and y variable names are all standardized, 
+so you should _only_ have to give the extra settings if you're operating on novel data, such as a homegrown reference 
+dataset that has `lat` and `lon` instead of `x` and `y`, for example. 
+
+#### Requirements:
+
+1. There must be some sort of CRS variable on the input data that has an attribute that dictates the data's 2D projection
+2. There must be both an X-Axis and Y-Axis on the input data, typically denoted as X and Y or Lat and Lon or Latitude and Longitude
+3. There must be a NetCDF file that dictates the desired coordinate reference system
+4. The reference NetCDF must have some sort of CRS variable that has an attribute that dictates the data's 2D projection
+5. The reference NetCDF must have both an X-Axis and Y-Axis, typically denoted as X and Y or Lat and Lon or Latitude and Longitude
+
+#### Example
+
+```json
+{
+    "operation": "reproject",
+    "reference_dataset_path": "{resource_path}/wgs84_mercator.nc"
+}
+```
