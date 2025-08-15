@@ -8,6 +8,8 @@ import pathlib
 import os
 import subprocess
 
+from datetime import datetime
+
 LOGGER: logging.Logger = logging.getLogger(pathlib.Path(__file__).stem)
 
 from post_processing.utilities.common import starmap
@@ -117,6 +119,7 @@ def run_command(command: str, *positional_args, prevent_history: bool = True) ->
     if positional_args:
         command = f"{command} {' '.join(map(str, positional_args))}"
 
+    start: datetime = datetime.now()
     command_result: subprocess.CompletedProcess = subprocess.run(
         command,
         capture_output=True,
@@ -134,6 +137,8 @@ def run_command(command: str, *positional_args, prevent_history: bool = True) ->
             f"{command_result.stdout}{os.linesep}"
             f""
         )
+
+    LOGGER.debug(f"Ran the following command in {datetime.now() - start}: {command}")
 
     return command_result.stdout.strip(), command_result.stderr.strip()
 

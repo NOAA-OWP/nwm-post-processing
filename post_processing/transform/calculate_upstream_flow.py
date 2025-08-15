@@ -88,6 +88,7 @@ def calculate_upstream_flow(
     try:
         from post_processing.utilities.netcdf import load_netcdf
         from post_processing.utilities.netcdf import save_netcdf
+        from post_processing.utilities.netcdf import load_variable
     except ImportError:
         from functools import partial
         load_netcdf = partial(
@@ -95,6 +96,12 @@ def calculate_upstream_flow(
             chunks={} if LAZY_LOAD else None,
             engine=NETCDF_ENGINE,
         )
+        def load_variable(path: pathlib.Path, variable_name: str) -> xarray.DataArray:
+            with xarray.open_dataset(path, engine=NETCDF_ENGINE, chunks={} if LAZY_LOAD else None) as dataset:
+                if variable_name not in dataset:
+                    raise KeyError(f"'{variable_name}' is not a variable within '{path}'")
+                return dataset[variable_name].compute()
+
         def save_netcdf(path: typing.Union[str, pathlib.Path], dataset: xarray.Dataset):
             dataset.to_netcdf(
                 path=path,
@@ -116,13 +123,12 @@ def calculate_upstream_flow(
                 from_values = routelink[routelink_from_variable]
                 to_values = routelink[routelink_to_variable]
             elif routelink_format == RoutelinkFormat.CSV:
-                routelink = pandas.read_csv(input_path)
+                routelink: pandas.DataFrame = pandas.read_csv(input_path)
                 from_values = routelink[routelink_from_variable]
                 to_values = routelink[routelink_to_variable]
             elif routelink_format == RoutelinkFormat.NETCDF:
-                routelink = load_netcdf(routelink_path)
-                from_values = routelink[routelink_from_variable].values
-                to_values = routelink[routelink_to_variable].values
+                from_values = load_variable(path=routelink_path, variable_name=routelink_from_variable).values
+                to_values = load_variable(path=routelink_path, variable_name=routelink_to_variable).values
             else:
                 raise ValueError(
                     f"Cannot load the routelink needed to calculate upstream flow - "

@@ -5,7 +5,9 @@ import typing
 import logging
 import pathlib
 from threading import RLock
+import collections.abc as generic
 
+from post_processing import enums
 from post_processing.configuration import settings
 from post_processing.utilities.simple_cache import simple_cache
 from post_processing.utilities.simple_cache import CacheEntry
@@ -23,6 +25,9 @@ A list of files that have been saved. This will indicate if there are frequent r
 """
 SAVED_FILE_LOCK: RLock = RLock()
 """A lock to ensure that SAVED_FILES is only acted upon by one thread at a time"""
+
+OPEN_LOCK: RLock = RLock()
+"""Lock to help secure file opening"""
 
 
 def record_saved_file(path: pathlib.Path):
@@ -72,7 +77,31 @@ def _invalidate_netcdf_cache(cache_entry: CacheEntry["xarray.Dataset"]) -> bool:
     return last_modified <= last_cache_access
 
 
-@simple_cache(invalidator_function=_invalidate_netcdf_cache, max_size=settings.netcdf_cache_size)
+@simple_cache()
+def load_variable(
+    path: pathlib.Path | str | generic.Sequence[pathlib.Path | str],
+    variable_name: str,
+    engine: str | typing.Literal['h5netcdf', "netcdf4"] = settings.default_netcdf_engine,
+    chunks: generic.Mapping[str, typing.Any] | typing.Literal['auto'] = "auto",
+    **kwargs
+) -> "xarray.DataArray":
+    """
+
+    """
+    if chunks is None:
+        raise ValueError(f"Individual Netcdf Variables cannot be loaded without chunking")
+
+    import xarray
+    with OPEN_LOCK:
+        with xarray.open_dataset(filename_or_obj=path, engine=engine, chunks=chunks, **kwargs) as dataset:
+            if variable_name not in dataset:
+                raise KeyError(f"There is no '{variable_name}' variable in {path}")
+
+            variable: xarray.DataArray = dataset[variable_name].compute()
+            return variable
+
+
+#@simple_cache(invalidator_function=_invalidate_netcdf_cache, max_size=settings.netcdf_cache_size)
 def load_netcdf(
     path: typing.Union[pathlib.Path, str, typing.Sequence[typing.Union[pathlib.Path, str]]],
     engine: typing.Union[str, typing.Literal["h5netcdf", "zarr", "netcdf4"]] = settings.default_netcdf_engine,
@@ -106,6 +135,7 @@ def load_netcdf(
     if isinstance(path, typing.Sequence) and len(path) == 1:
         path = path[0]
 
+    import time
     if isinstance(path, (pathlib.Path, str)):
         maximum_retries: int = 5
         attempts: int = 0
@@ -113,14 +143,29 @@ def load_netcdf(
         last_exception: typing.Optional[Exception] = None
         while attempts < maximum_retries and dataset is None:
             try:
+                if settings.verbosity >= enums.Verbosity.LOUD:
+                    LOGGER.debug(f"Loading '{path}'", stack_info=True)
+                else:
+                    LOGGER.debug(f"Loading '{path}'")
                 dataset: xarray.Dataset = xarray.open_dataset(path, engine=engine, chunks=chunks, **kwargs)
+
+                # TODO: This would be more correct, however it comes at a great performance cost in terms of seconds per file
+                #if not settings.lazy_load_netcdf:
+                #    LOGGER.debug(f"Loading all data from '{path}' into memory")
+                #    from datetime import datetime
+                #    start = datetime.now()
+                #    dataset = dataset.load()
+                #    dataset.close()
+                #    LOGGER.debug(f"Closed '{path}' after reading everything in after {datetime.now() - start}")
                 break
             except Exception as e:
                 last_exception = e
                 last_exception.args = (f"Could not load data at '{path}'. {e.args[0]}", *e.args[1:])
             attempts += 1
-            LOGGER.error(f"Failed to load {path}. Waiting and trying again...")
-            import time
+            LOGGER.error(
+                f"Failed to load {path}{' due to ' + str(last_exception) if last_exception else ''}. "
+                f"Waiting and trying again..."
+            )
             time.sleep(1)
         if dataset is None:
             raise (last_exception or RuntimeError(f"Could not load '{path}'"))
@@ -152,22 +197,25 @@ def load_metadata(
     :param engine: The engine that will load and interpret the data
     :returns: A dictionary containing all the attributes in it and on its variables. Variable attributes will be prefixed by the variable name
     """
+    import xarray
+
     if isinstance(path, pathlib.Path):
         path = [path]
 
     metadata: typing.Dict[str, typing.Any] = {}
     for input_path in path:
-        source: xarray.Dataset = load_netcdf(path=input_path, engine=engine)
-        metadata.update({
-            str(key): format_attribute_value(value)
-            for key, value in source.attrs.items()
-        })
+        with OPEN_LOCK:
+            with xarray.open_dataset(filename_or_obj=input_path, engine=engine, chunks="auto") as source:
+                metadata.update({
+                    str(key): format_attribute_value(value)
+                    for key, value in source.attrs.items()
+                })
 
-        for coordinate_name, coordinate_data in source.coords.items():
-            metadata.update(_get_variable_metadata(variable=coordinate_data))
+                for coordinate_name, coordinate_data in source.coords.items():
+                    metadata.update(_get_variable_metadata(variable=coordinate_data))
 
-        for variable_name, variable_data in source.data_vars.items():
-            metadata.update(_get_variable_metadata(variable=variable_data))
+                for variable_name, variable_data in source.data_vars.items():
+                    metadata.update(_get_variable_metadata(variable=variable_data))
 
     return metadata
 
@@ -219,6 +267,141 @@ def format_attribute_value(value: typing.Any) -> typing.Any:
     return value
 
 
+def format_value(value: object) -> str:
+    import numpy
+    from datetime import datetime
+    if isinstance(value, (numpy.number, float, int)):
+        return f"{value:,}"
+    if isinstance(value, numpy.datetime64):
+        value = value.item()
+    if isinstance(value, datetime):
+        return value.strftime(settings.date_format)
+    return str(value)
+
+
+def format_variable(var: "xarray.DataArray") -> typing.Sequence[str]:
+    """
+    Format a block of text describing a variable
+
+    :param var: The variable to format
+    :returns: Lines of text describing the variable
+    """
+    tab: str = "    "
+
+    variable_definition_template: str = "{dtype} {variable_name}({dimensions}):"
+    lines_for_variable: typing.List[str] = [
+        variable_definition_template.format(
+            dtype=str(var.dtype),
+            variable_name=var.name,
+            dimensions=", ".join(map(lambda kv: f"{kv[0]}={kv[1]}", var.sizes.items()))
+        ),
+    ]
+
+    attribute_template: str = tab + tab + "{variable_name}::{attribute_name} = {attribute_value}"
+
+    if var.coords:
+        longest_coordinate_name: str = max(map(str, var.coords.keys()), key=len)
+        name_length: int = len(longest_coordinate_name) + 5
+        lines_for_variable.extend([
+            tab + "Coordinates:",
+            *[
+                tab + tab + f"{str(coordinate_name).ljust(name_length)}: {coordinate.shape}"
+                for coordinate_name, coordinate in var.coords.items()
+            ]
+        ])
+
+    if var.attrs:
+        longest_attr_name: str = max(map(str, var.attrs.keys()), key=len)
+        name_length: int = len(longest_attr_name) + 5
+        lines_for_variable.extend([
+            tab + "Attributes:",
+            *[
+                attribute_template.format(
+                    variable_name=var.name,
+                    attribute_name=attr_name.ljust(name_length),
+                    attribute_value=format_value(value=attr_value)
+                )
+                for attr_name, attr_value in var.attrs.items()
+            ]
+        ])
+
+    if var.encoding:
+        lines_for_variable.extend([
+            tab + "Encoding:",
+            *[
+                attribute_template.format(
+                    variable_name=var.name,
+                    attribute_name=attr_name,
+                    attribute_value=format_value(value=attr_value)
+                )
+                for attr_name, attr_value in var.encoding.items()
+                if bool(attr_value)
+            ]
+        ])
+    return lines_for_variable
+
+
+def describe_netcdf(
+    netcdf_file: "xarray.Dataset",
+    variable_name: str = None,
+    max_line_length: int = None
+) -> str:
+    import os
+
+    separator_placeholder: str = "{separator}"
+    separator: str = "="
+    tab: str = "    "
+
+    lines: typing.List[str] = [
+        separator_placeholder,
+    ]
+    if variable_name is not None:
+        description: typing.Sequence[str] = format_variable(var=netcdf_file.get(variable_name))
+        return os.linesep.join(description)
+
+    longest_dimension_name: str = max(map(str, netcdf_file.sizes.keys()), key=len)
+    dimension_name_length: int = len(longest_dimension_name) + 5
+    lines.extend([
+        "Dimensions:",
+        *[
+            f"{tab}{str(dimension).ljust(dimension_name_length)}: {count:,}"
+            for dimension, count in netcdf_file.sizes.items()
+        ],
+        separator_placeholder,
+        "Variables:",
+    ])
+
+    for variable in [*list(netcdf_file.data_vars.values()), *list(netcdf_file.coords.values())]:
+        variable_lines: typing.Iterable[str] = map(lambda line: tab + line, format_variable(var=variable))
+        lines.extend(variable_lines)
+
+    lines.append(separator_placeholder)
+
+    if netcdf_file.attrs:
+        lines.append(f"{tab}Attributes:")
+        indent: str = tab * 2
+        longest_attribute_name: str = max(map(str, netcdf_file.attrs.keys()), key=len)
+        attribute_name_length: int = len(longest_attribute_name) + 5
+        for attribute_name, attribute_value in netcdf_file.attrs.items():
+            lines.append(
+                f"{indent}{attribute_name.ljust(attribute_name_length)}: {format_value(value=attribute_value)}"
+            )
+
+    longest_line: int = max(*map(len, lines), 1)
+    separator_character_count: int = longest_line + 5
+    lines = [
+        separator * separator_character_count if line == separator_placeholder else line
+        for line in lines
+    ]
+    if max_line_length is not None and max_line_length > 0:
+        lines = [
+            line[:max_line_length]
+            for line in lines
+        ]
+    return os.linesep.join(lines)
+
+
+@simple_cache()
 def peek(
     path: typing.Union[str, pathlib.Path],
     engine: typing.Union[str, typing.Literal["h5netcdf", "netcdf4"]] = settings.default_netcdf_engine,
@@ -237,132 +420,14 @@ def peek(
     :param kwargs: Additional arguments to pass to the engine
     :returns: A human friendly representation of the contents of the file
     """
-    import os
     import xarray
-    import numpy
-
-    from datetime import datetime
-
-    separator_placeholder: str = "{separator}"
-    separator: str = "="
-    tab: str = "    "
-
-    variable_definition_template: str = "{dtype} {variable_name}({dimensions}):"
-    lines: typing.List[str] = [
-        separator_placeholder,
-    ]
-
-    def format_value(value: object) -> str:
-        if isinstance(value, (numpy.number, float, int)):
-            return f"{value:,}"
-        if isinstance(value, numpy.datetime64):
-            value = value.item()
-        if isinstance(value, datetime):
-            return value.strftime(settings.date_format)
-        return str(value)
-
-    def format_variable(var: xarray.DataArray) -> typing.Sequence[str]:
-        """
-        Format a block of text describing a variable
-
-        :param var: The variable to format
-        :returns: Lines of text describing the variable
-        """
-        lines_for_variable: typing.List[str] = [
-            variable_definition_template.format(
-                dtype=str(var.dtype),
-                variable_name=var.name,
-                dimensions=", ".join(map(lambda kv: f"{kv[0]}={kv[1]}", var.sizes.items()))
-            ),
-        ]
-
-        attribute_template: str = tab + tab + "{variable_name}::{attribute_name} = {attribute_value}"
-
-        if var.coords:
-            longest_coordinate_name: str = max(map(str, var.coords.keys()), key=len)
-            name_length: int = len(longest_coordinate_name) + 5
-            lines_for_variable.extend([
-                tab + "Coordinates:",
-                *[
-                    tab + tab + f"{str(coordinate_name).ljust(name_length)}: {coordinate.shape}"
-                    for coordinate_name, coordinate in var.coords.items()
-                ]
-            ])
-
-        if var.attrs:
-            longest_attr_name: str = max(map(str, var.attrs.keys()), key=len)
-            name_length: int = len(longest_attr_name) + 5
-            lines_for_variable.extend([
-                tab + "Attributes:",
-                *[
-                    attribute_template.format(
-                        variable_name=var.name,
-                        attribute_name=attr_name.ljust(name_length),
-                        attribute_value=format_value(value=attr_value)
-                    )
-                    for attr_name, attr_value in var.attrs.items()
-                ]
-            ])
-
-        if var.encoding:
-            lines_for_variable.extend([
-                tab + "Encoding:",
-                *[
-                    attribute_template.format(
-                        variable_name=var.name,
-                        attribute_name=attr_name,
-                        attribute_value=format_value(value=attr_value)
-                    )
-                    for attr_name, attr_value in var.encoding.items()
-                    if bool(attr_value)
-                ]
-            ])
-        return lines_for_variable
-
-    with load_netcdf(path=path, engine=engine, chunks='force', **kwargs) as netcdf_file:
-        if variable_name is not None:
-            description: typing.Sequence[str] = format_variable(var=netcdf_file.get(variable_name))
-            return os.linesep.join(description)
-
-        longest_dimension_name: str = max(map(str, netcdf_file.sizes.keys()), key=len)
-        dimension_name_length: int = len(longest_dimension_name) + 5
-        lines.extend([
-            "Dimensions:",
-            *[
-                f"{tab}{str(dimension).ljust(dimension_name_length)}: {count:,}"
-                for dimension, count in netcdf_file.sizes.items()
-            ],
-            separator_placeholder,
-            "Variables:",
-        ])
-
-        for variable in [*list(netcdf_file.data_vars.values()), *list(netcdf_file.coords.values())]:
-            variable_lines: typing.Iterable[str] = map(lambda line: tab + line, format_variable(var=variable))
-            lines.extend(variable_lines)
-
-        lines.append(separator_placeholder)
-
-        if netcdf_file.attrs:
-            lines.append(f"{tab}Attributes:")
-            indent: str = tab * 2
-            longest_attribute_name: str = max(map(str, netcdf_file.attrs.keys()), key=len)
-            attribute_name_length: int = len(longest_attribute_name) + 5
-            for attribute_name, attribute_value in netcdf_file.attrs.items():
-                lines.append(
-                    f"{indent}{attribute_name.ljust(attribute_name_length)}: {format_value(value=attribute_value)}"
-                )
-
-    longest_line: int = max(*map(len, lines), 1)
-    separator_character_count: int = longest_line + 5
-    lines = [
-        separator * separator_character_count if line == separator_placeholder else line
-        for line in lines
-    ]
-    lines = [
-        line[:max_line_length]
-        for line in lines
-    ]
-    return os.linesep.join(lines)
+    with OPEN_LOCK:
+        with xarray.open_dataset(filename_or_obj=path, engine=engine, chunks={}, **kwargs) as netcdf_file:
+            return describe_netcdf(
+                netcdf_file=netcdf_file,
+                variable_name=variable_name,
+                max_line_length=max_line_length
+            )
 
 def save_netcdf(
     path: typing.Union[str, pathlib.Path],
@@ -396,4 +461,10 @@ def save_netcdf(
     if settings.verbosity >= Verbosity.LOUD:
         LOGGER.debug(f"Saved netcdf data to: {path}")
     record_saved_file(path=path)
+
+    if hasattr(peek, "add"):
+        description: str = describe_netcdf(netcdf_file=dataset)
+        peek.add(args=(path,), result=description)
+        peek.add(kwargs={"path": path}, result=description)
+
     return path.is_file()
