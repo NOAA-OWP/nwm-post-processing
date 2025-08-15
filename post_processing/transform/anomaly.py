@@ -7,6 +7,9 @@ import logging
 import pathlib
 import dataclasses
 
+from threading import RLock
+from collections import abc as generic
+
 from post_processing.configuration import settings
 from post_processing.schema.base import member
 
@@ -27,6 +30,12 @@ class ThresholdDefinition:
     variable: str
     time_coordinate: str = dataclasses.field(default='time')
     _data: typing.Dict[int, "xarray.DataArray"] = member(default_factory=dict)
+    _lock: RLock = member(default_factory=RLock)
+
+    def update_stats(self, day_of_year: int, stats: "xarray.DataArray"):
+        with self._lock:
+            LOGGER.debug(f"Updating the statistics for day {day_of_year} of {self.data_path.name}")
+            self._data[day_of_year] = stats
 
     def to_dict(self) -> typing.Mapping[str, typing.Any]:
         """
@@ -83,26 +92,28 @@ class ThresholdDefinition:
         """
         Get statistical value from a netcdf file based on the day of the year
         """
-        if day_of_year in self._data:
-            return self._data[day_of_year]
+        with self._lock:
+            if day_of_year in self._data:
+                return self._data[day_of_year]
 
-        import xarray
-        from post_processing.utilities.netcdf import load_netcdf
+            import xarray
+            from post_processing.utilities.netcdf import load_netcdf
 
-        file_path: pathlib.Path = pathlib.Path(str(self.data_path).format(**path_metadata))
+            file_path: pathlib.Path = pathlib.Path(str(self.data_path).format(**path_metadata))
 
-        with load_netcdf(path=file_path) as dataset:
-            if self.variable not in dataset.variables:
-                raise KeyError(
-                    f"The file at '{file_path}' does not contain variable '{self.variable}'"
-                )
-            variable: xarray.DataArray = dataset[self.variable]
-            specific_statistics: xarray.DataArray = variable.sel(
-                **{self.time_coordinate: day_of_year}
-            ).compute()
+            with load_netcdf(path=file_path) as dataset:
+                if self.variable not in dataset.variables:
+                    raise KeyError(
+                        f"The file at '{file_path}' does not contain variable '{self.variable}'"
+                    )
+                variable: xarray.DataArray = dataset[self.variable]
+                specific_statistics: xarray.DataArray = variable.sel(
+                    **{self.time_coordinate: day_of_year}
+                ).compute()
 
-        self._data[day_of_year] = specific_statistics
-        return specific_statistics
+            import numpy
+            self._data[day_of_year] = specific_statistics.astype(numpy.float32)
+            return specific_statistics
 
 
 def make_apply_thresholds(
@@ -146,7 +157,7 @@ def make_apply_thresholds(
             raise ValueError(f"Cannot apply thresholds - scores are not in ascending order: {scores}")
 
         output_array: numpy.ndarray = numpy.full(variable.shape, default_score, dtype=numpy.result_type(*scores))
-        incorrect_lengths: typing.List[int] = []
+        incorrect_lengths: list[int] = []
         LOGGER.debug("Now applying bins")
         for score_index, threshold in enumerate(thresholds):
             if variable.size != threshold.size:
@@ -186,9 +197,9 @@ def calculate_anomaly(
     time_variable: str = 'time',
     dimension_names: typing.Union[str, typing.Iterable[str]] = 'feature_id',
     output_variable_name: str = "streamflow_anomaly",
-    field_metadata: typing.Dict[str, typing.Any] = None,
-    encoding: typing.Dict[str, typing.Any] = None,
-    operational_metadata: typing.Dict[str, typing.Any] = None,
+    field_metadata: dict[str, typing.Any] = None,
+    encoding: dict[str, typing.Any] = None,
+    operational_metadata: dict[str, typing.Any] = None,
 ) -> "pathlib.Path":
     import xarray
     import numpy
@@ -228,7 +239,7 @@ def calculate_anomaly(
         field_metadata['long_name'] = long_name.title()
 
     if encoding is None:
-        encoding: typing.Dict[str, typing.Any] = {
+        encoding: dict[str, typing.Any] = {
             "chunksizes": (396677, 2),
             "fletcher32": False,
             "shuffle": True,
@@ -243,8 +254,8 @@ def calculate_anomaly(
 
     minimum_id = variable[dimension_names].min()
     variable_size: int = variable.size
-    threshold_arrays: typing.List[numpy.ndarray] = []
-    scores: typing.List[numpy.floating] = []
+    threshold_arrays: list[numpy.ndarray] = []
+    scores: list[numpy.floating] = []
 
     # TODO: Initial threshold processing can probably be multithreaded
     #   NOTE: Multithreading will likely lead to segfaults based on how data is loaded. Expect this refactor to be complicated
@@ -252,7 +263,6 @@ def calculate_anomaly(
     day_of_year: int = get_day_of_year(dataset=dataset, variable=time_variable)
 
     for threshold in thresholds:
-        LOGGER.debug(f"Processing {threshold} for binning")
         daily_values: xarray.DataArray = threshold.get_stats(day_of_year=day_of_year, **operational_metadata)
         daily_values = daily_values.where(daily_values[dimension_names] >= minimum_id, drop=True)
 
@@ -267,6 +277,7 @@ def calculate_anomaly(
                         daily_values.dims[0]: variable[variable.dims[0]]
                     }
                 )
+                threshold.update_stats(day_of_year=day_of_year, stats=daily_values)
             except Exception as e:
                 if "index has duplicate values" in str(e):
                     unique_variable_index_values, count = numpy.unique(variable[variable.dims[0]].values.ravel(), return_counts=True)
@@ -281,6 +292,7 @@ def calculate_anomaly(
                         LOGGER.error(
                             f"Could not reindex the daily statistics - the statistics had duplicate ids:\n{duplicate_threshold_indices}"
                         )
+                LOGGER.error(f"Failed to reindex the {threshold} for {input_path}: {e}")
                 raise
         threshold_arrays.append(daily_values.values)
         scores.append(threshold.level)
@@ -325,6 +337,11 @@ def calculate_anomaly(
         )
         raise
 
+    if 'stage' in (operational_metadata or {}):
+        updated_dataset.attrs["process_step"] = operational_metadata["stage"]
+    elif 'stage' in (field_metadata or {}):
+        updated_dataset.attrs['process_step'] = field_metadata["stage"]
+
     try:
         from post_processing.utilities.netcdf import save_netcdf
         save_netcdf(path=output_path, dataset=updated_dataset)
@@ -344,8 +361,8 @@ def assign_anomaly(
     time_variable: str = 'time',
     dimension_names: typing.Union[str, typing.Iterable[str]] = 'feature_id',
     output_variable_name: str = "streamflow_anomaly",
-    field_metadata: typing.Dict[str, typing.Any] = None,
-    encoding: typing.Dict[str, typing.Any] = None
+    field_metadata: dict[str, typing.Any] = None,
+    encoding: dict[str, typing.Any] = None
 ) -> pathlib.Path:
     """
     Open a netcdf file, use data from other netcdf files to flag anomalies,
@@ -385,7 +402,7 @@ def assign_anomaly(
         )
         raise
 
-    return output_path
+    return written_path
 
 
 def main() -> int:

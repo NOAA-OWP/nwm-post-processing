@@ -61,8 +61,8 @@ class OperationHandler(typing.Protocol[InputType, OutputType]):
         process_identifier: str,
         work_directory: pathlib.Path,
         data: InputType,
-        previous_operations: typing.List["ProfileOperation"],
-        metadata: typing.Dict[str, typing.Any]
+        previous_operations: list["ProfileOperation"],
+        metadata: dict[str, typing.Any]
     ) -> OutputType: ...
 
 @typing.runtime_checkable
@@ -76,8 +76,8 @@ class PythonHandler(typing.Protocol[InputType, OutputType]):
         process_identifier: str,
         work_directory: pathlib.Path,
         data: InputType,
-        previous_operations: typing.List["ProfileOperation"],
-        metadata: typing.Dict[str, typing.Any],
+        previous_operations: list["ProfileOperation"],
+        metadata: dict[str, typing.Any],
         **kwargs
     ) -> OutputType: ...
 
@@ -88,6 +88,8 @@ class OperationType(enum.StrEnum):
     """
     EXTRACT = "extract"
     """Extract data from netcdf files and process subset each separately"""
+    SUBSET = "subset"
+    """Subset input data into smaller chunks and operate on each resultant piece"""
     MERGE = "merge"
     """Combine multiple netcdf files into one"""
     DROP = "drop"
@@ -172,12 +174,12 @@ class FileOutputMixin:
         if self.output_pattern is None:
             return f"{input_file}.nc"
 
-        template_arguments: typing.Dict[str, typing.Optional[str]] = {
+        template_arguments: dict[str, typing.Optional[str]] = {
             variable_name: None
             for variable_name in self.output_pattern_variables
         }
 
-        missing_arguments: typing.List[str] = []
+        missing_arguments: list[str] = []
 
         for key in template_arguments:
             if key in context:
@@ -190,7 +192,7 @@ class FileOutputMixin:
                 missing_arguments.append(key)
 
         if missing_arguments:
-            available_values: typing.List[str] = [
+            available_values: list[str] = [
                 f"{key}: {value}"
                 for key, value in context.items()
             ]
@@ -226,7 +228,7 @@ class ProfileOperation(BaseModel, OperationHandler[InputType, OutputType], abc.A
         elif parent_id.endswith("."):
             self.operation_id = f"{parent_id}1"
         elif '.' in parent_id:
-            split_ids: typing.List[str] = parent_id.split(".")
+            split_ids: list[str] = parent_id.split(".")
             final_id: int = int(float(split_ids[-1]))
             split_ids[-1] = str(final_id + 1)
             self.operation_id = ".".join(split_ids)
@@ -271,7 +273,7 @@ class ProfileOperation(BaseModel, OperationHandler[InputType, OutputType], abc.A
         """Get the type of operation the ProfileOperation fulfills"""
 
     def to_dict(self) -> typing.Mapping[str, typing.Any]:
-        dictionary_representation: typing.Dict[str, typing.Any] = dict(super().to_dict())
+        dictionary_representation: dict[str, typing.Any] = dict(super().to_dict())
         if 'operation' not in dictionary_representation:
             dictionary_representation['operation'] = self.operation()
         return dictionary_representation
@@ -280,7 +282,7 @@ class ProfileOperation(BaseModel, OperationHandler[InputType, OutputType], abc.A
         return f"{self.operation_id + ': ' if self.operation_id else ''}{self.operation().replace('_', ' ').title()}"
 
     def __hash__(self):
-        values_to_hash: typing.Tuple[str, ...] = (self.__class__.__name__, to_json(self))
+        values_to_hash: tuple[str, ...] = (self.__class__.__name__, to_json(self))
         return hash(values_to_hash)
 
     def visit(
@@ -318,8 +320,8 @@ class ProfileOperation(BaseModel, OperationHandler[InputType, OutputType], abc.A
         process_identifier: str,
         work_directory: pathlib.Path,
         data: InputType,
-        previous_operations: typing.List["ProfileOperation"],
-        metadata: typing.Dict[str, typing.Any]
+        previous_operations: list["ProfileOperation"],
+        metadata: dict[str, typing.Any]
     ) -> OutputType:
         """
         Split each received NWMFile into other files based on the collection of masks. There should be len(masks) * len(files) returned files
@@ -349,14 +351,14 @@ class EchoOperation(ProfileOperation[InputType, InputType]):
         process_identifier: str,
         work_directory: pathlib.Path,
         data: InputType,
-        previous_operations: typing.List["ProfileOperation"],
-        metadata: typing.Dict[str, typing.Any]
+        previous_operations: list["ProfileOperation"],
+        metadata: dict[str, typing.Any]
     ) -> InputType:
         # If this execution has a verbosity less than the verbosity of this message, skip the output and pass through
         if settings.verbosity < self.verbosity:
             return data
 
-        message_metadata: typing.Dict[str, typing.Any] = {
+        message_metadata: dict[str, typing.Any] = {
             "profile": (
                 f"Profile for {profile.configuration.describe()} executions for {profile.output_type.describe()} "
                 f"data over {profile.region.describe()}"
@@ -444,10 +446,10 @@ class RaiseOperation(ProfileOperation[InputType, InputType]):
         process_identifier: str,
         work_directory: pathlib.Path,
         data: InputType,
-        previous_operations: typing.List["ProfileOperation"],
-        metadata: typing.Dict[str, typing.Any]
+        previous_operations: list["ProfileOperation"],
+        metadata: dict[str, typing.Any]
     ) -> InputType:
-        message_metadata: typing.Dict[str, typing.Any] = {
+        message_metadata: dict[str, typing.Any] = {
             "profile": str(profile),
             "process_identifier": process_identifier,
             "work_directory": str(work_directory),
@@ -476,8 +478,8 @@ class PathToPathOperation(ProfileOperation[typing.Sequence[pathlib.Path], typing
         process_identifier: str,
         work_directory: pathlib.Path,
         data: typing.Sequence[pathlib.Path],
-        previous_operations: typing.List["ProfileOperation"],
-        metadata: typing.Dict[str, typing.Any]
+        previous_operations: list["ProfileOperation"],
+        metadata: dict[str, typing.Any]
     ) -> typing.Sequence[pathlib.Path]:
         raise NotImplementedError(f"Cannot execute a plain {self.__class__.__qualname__}")
 
@@ -497,8 +499,8 @@ class ReprojectionOperation(PathToPathOperation, FileOutputMixin):
         process_identifier: str,
         work_directory: pathlib.Path,
         data: typing.Sequence[pathlib.Path],
-        previous_operations: typing.List[ProfileOperation],
-        metadata: typing.Dict[str, typing.Any]
+        previous_operations: list[ProfileOperation],
+        metadata: dict[str, typing.Any]
     ) -> typing.Sequence[pathlib.Path]:
         """
         Reproject one or more netcdf files into a new coordinate reference system
@@ -514,12 +516,12 @@ class ReprojectionOperation(PathToPathOperation, FileOutputMixin):
         import xarray
         from post_processing.transform import reproject
         from post_processing.utilities import netcdf
-        updated_paths: typing.List[pathlib.Path] = []
+        updated_paths: list[pathlib.Path] = []
 
         with netcdf.load_netcdf(self.reference_dataset_path) as reference_file:  # type: xarray.Dataset
             for input_path_index, input_path in enumerate(data):  # type: int, pathlib.Path
                 try:
-                    with netcdf.load_netcdf(input_path_index) as netcdf_file:  # type: xarray.Dataset
+                    with netcdf.load_netcdf(input_path) as netcdf_file:  # type: xarray.Dataset
                         reprojected_data: xarray.Dataset = reproject.reproject_data(
                             dataset=netcdf_file,
                             reprojection_dataset=reference_file,
@@ -584,14 +586,14 @@ class ReprojectionOperation(PathToPathOperation, FileOutputMixin):
     reference_y_variable: str = dataclasses.field(default="y")
 
 @dataclasses.dataclass
-class ExtractOperation(PathToPathOperation):
+class SubsetOperation(PathToPathOperation):
     """
-    Describes how to extract and operate on individual pieces of data
+    Describes how to slice a netcdf file and operate on individual pieces of data
     """
 
     @classmethod
     def operation(cls) -> OperationType:
-        return OperationType.EXTRACT
+        return OperationType.SUBSET
 
     def __call__(
         self,
@@ -599,8 +601,8 @@ class ExtractOperation(PathToPathOperation):
         process_identifier: str,
         work_directory: pathlib.Path,
         data: typing.Sequence[pathlib.Path],
-        previous_operations: typing.List[ProfileOperation],
-        metadata: typing.Dict[str, typing.Any]
+        previous_operations: list[ProfileOperation],
+        metadata: dict[str, typing.Any]
     ) -> typing.Sequence[pathlib.Path]:
         """
         Split each received NWMFile into other files based on the collection of masks. There should be len(masks) * len(files) returned files
@@ -621,34 +623,36 @@ class ExtractOperation(PathToPathOperation):
                 return ""
 
             from post_processing.enums import RFC
-            subset_arguments: typing.List[typing.Dict[str, typing.Any]] = [
+
+            subset_arguments: list[dict[str, typing.Any]] = [
                 {
                     "input_file": input_file,
-                    "mask": mask,
-                    "coordinate": self.dimension,
+                    "mask_path": self.mask,
                     "work_directory": work_directory,
-                    "mask_coordinate": self.mask_coordinate,
+                    "mask_variables": self.mask_names,
                     "identifiers": {
                         **metadata,
-                        "mask_name": mask.stem,
+                        "mask_name": self.mask.stem,
+                        "input_path": input_file.name,
                         "input_name": input_file.stem,
                         "frame": get_frame_identifier(input_file.name),
-                        "RFC": RFC.from_string(mask.stem, strict=False),
-                        **identifiers
+                        "RFC": RFC.from_string(self.mask.stem, strict=False),
+                        **(self._mask_identifiers or {})
                     },
                     "output_pattern": self.output_pattern,
                 }
-                for input_file, (mask, identifiers) in itertools.product(data, self._identifier_mapping.items())
+                for input_file in data
             ]
 
-            from post_processing.transform import subset_file_into_file_by_mask
+            from post_processing.transform.subset import subset_gridded_file_into_file_by_mask
             subset_paths: typing.Sequence[pathlib.Path] = starmap(
-                function=subset_file_into_file_by_mask,
+                function=subset_gridded_file_into_file_by_mask,
                 args=subset_arguments,
                 thread_count=settings.maximum_additional_threads
             )
 
-            arguments_for_each: typing.List[typing.Dict[str, typing.Any]] = [
+            # TODO: Should these be callbacks for the subset operation above?
+            arguments_for_each: list[dict[str, typing.Any]] = [
                 {
                     "operations": self.each,
                     "profile": profile,
@@ -679,11 +683,231 @@ class ExtractOperation(PathToPathOperation):
         return [path for inner_results in results for path in inner_results]
 
     def __post_init__(self):
-        errors: typing.List[Exception] = []
+        errors: list[Exception] = []
         from post_processing.utilities.common import expand_paths
         from post_processing.utilities.common import find_candidate_paths
 
-        expanded_paths: typing.List[pathlib.Path] = expand_paths(self.masks)
+        expanded_paths: list[pathlib.Path] = expand_paths([self.mask])
+
+        if len(expanded_paths) == 0:
+            candidate_paths: typing.Sequence[pathlib.Path] = find_candidate_paths([self.mask])
+
+            template_pattern: re.Pattern = re.compile(r"\{[^}]+}")
+
+            message: str = f"Could not find any files based off of {self.mask}"
+
+            if len(candidate_paths) == 0:
+                if template_pattern.search(str(self.mask)):
+                    message += os.linesep
+                    message += "Available Metadata for the templates:" + os.linesep
+                    message += to_json(settings.to_dict())
+            else:
+                message += os.linesep + (
+                    f"The following files were found. Were one of these the ones you were looking for?{os.linesep}"
+                    f"    - {(os.linesep + '    - ').join(map(str, candidate_paths))}{os.linesep}"
+                )
+            errors.append(FileNotFoundError(message))
+        elif len(expanded_paths) > 1:
+            error = ValueError(
+                f"'{self.__class__.__qualname__}' operations on many masks within one file, "
+                f"but received information on multiple files. Use the '{ExtractOperation.__qualname__}' "
+                f"operation for that."
+            )
+            errors.append(error)
+
+        self.mask = expanded_paths[0]
+
+        if self.identifier_pattern:
+            try:
+                self._pattern = re.compile(self.identifier_pattern)
+            except Exception as e:
+                error = ValueError(f"Cannot use '{self.identifier_pattern}' to find identifiers in masks: {e}")
+                errors.append(error)
+
+            if not self._pattern.groupindex:
+                error = ValueError(
+                    f"'{self.identifier_pattern}' is not a valid pattern for finding identifiers in mask files - "
+                    f"it has not parameter groups. "
+                    f"Please define parameter groups via strings like '(?P<variable_name>pattern)'"
+                )
+                errors.append(error)
+
+            identifier_match: typing.Optional[re.Match] = self._pattern.search(self.mask.name)
+
+            if identifier_match:
+                self._mask_identifiers = {
+                    key: '' if value is None else value
+                    for key, value in identifier_match.groupdict().items()
+                }
+            else:
+                LOGGER.debug(
+                    f"The regular expression '{self.identifier_pattern}' did not match anything from '{self.mask.name}'"
+                )
+
+        if self.each:
+            for operation_index, operation in enumerate(self.each):
+                try:
+                    if isinstance(operation, typing.Mapping):
+                        operation = load_operation(specification=operation)
+                        self.each[operation_index] = operation
+                    elif not isinstance(operation, ProfileOperation):
+                        error = ValueError(
+                            f"Encountered an invalid sub-operation for a {self.__class__.__qualname__} - item "
+                            f"{operation_index} holds a '{type(operation)}', which cannot be converted into a "
+                            f"{ProfileOperation.__qualname__}"
+                        )
+                        errors.append(error)
+                except Exception as exception:
+                    errors.append(exception)
+        else:
+            error = ValueError(f"There must be at least one operation to perform on split data")
+            errors.append(error)
+
+        if len(errors) == 1:
+            raise errors[0]
+        elif errors:
+            raise ExceptionGroup(f"Encountered an invalid {self.__class__.__qualname__}", errors)
+
+    def __hash__(self):
+        try:
+            parent_hash: int = super().__hash__()
+        except:
+            parent_hash = 0
+
+        return hash((
+            parent_hash,
+            self.mask,
+            *self.mask_names,
+            self.identifier_pattern,
+            self.output_pattern,
+            *self.each,
+        ))
+
+    def __str__(self):
+        return (
+            f"{self.operation_id + ': ' if self.operation_id else ''}"
+            f"Subset a file by data within the following variables in {self.mask}:{os.linesep}"
+            f"    - {(os.linesep + '    - ').join(map(str, self.mask_names))}{os.linesep}"
+            f"And perform {len(self.each)} operations on all resulting datasets"
+        )
+
+    mask: pathlib.Path
+    """Where to find a single file that contains all the mask data needed"""
+    mask_names: list[str]
+    """The names of each mask to use"""
+    each: list[ProfileOperation]
+    """Operations to perform upon each subsetted chunk of data"""
+    output_pattern: typing.Optional[str] = dataclasses.field(default=None)
+    """A pattern used to describe how output filenames should look"""
+    identifier_pattern: typing.Optional[str] = dataclasses.field(default=None)
+    """A pattern used to extract metadata from the mask filename"""
+    _pattern: typing.Optional[re.Pattern] = member(default=None)
+    """The generated pattern that may be used to pull identifiers from """
+    _mask_identifiers: dict[str, str] = member(default_factory=dict)
+    """Identifiers that were lifted from the mask filename"""
+
+@dataclasses.dataclass
+class ExtractOperation(PathToPathOperation):
+    """
+    Describes how to extract and operate on individual pieces of data
+    """
+
+    @classmethod
+    def operation(cls) -> OperationType:
+        return OperationType.EXTRACT
+
+    def __call__(
+        self,
+        profile: "Profile",
+        process_identifier: str,
+        work_directory: pathlib.Path,
+        data: typing.Sequence[pathlib.Path],
+        previous_operations: list[ProfileOperation],
+        metadata: dict[str, typing.Any]
+    ) -> typing.Sequence[pathlib.Path]:
+        """
+        Split each received NWMFile into other files based on the collection of masks. There should be len(masks) * len(files) returned files
+
+        :param profile: The profile that called for this operation
+        :param process_identifier: An identifier tying together other output for this post-processing task
+        :param work_directory: Where intermediate products may be saved
+        :param data: The files to operate on
+        :param metadata: Metadata provided from previous operations that may be used as helpful hints
+        :returns: The given paths
+        """
+        try:
+            frame_pattern: re.Pattern = re.compile(r"(?<=\.)(tm|f)\d+(?=\.)")
+            def get_frame_identifier(filename: str) -> str:
+                match: typing.Optional[re.Match] = frame_pattern.search(filename)
+                if match:
+                    return match.group(0)
+                return ""
+
+            from post_processing.enums import RFC
+
+            subset_arguments: list[dict[str, typing.Any]] = [
+                {
+                    "input_file": input_file,
+                    "mask": mask,
+                    "coordinate": self.dimension,
+                    "work_directory": work_directory,
+                    "mask_coordinate": self.mask_coordinate,
+                    "identifiers": {
+                        **metadata,
+                        "mask_name": mask.stem,
+                        "input_name": input_file.stem,
+                        "frame": get_frame_identifier(input_file.name),
+                        "RFC": RFC.from_string(mask.stem, strict=False),
+                        **identifiers
+                    },
+                    "output_pattern": self.output_pattern,
+                }
+                for input_file, (mask, identifiers) in itertools.product(data, self._identifier_mapping.items())
+            ]
+
+            from post_processing.transform.subset import subset_vector_file_into_file_by_value
+            subset_paths: typing.Sequence[pathlib.Path] = starmap(
+                function=subset_vector_file_into_file_by_value,
+                args=subset_arguments,
+                thread_count=settings.maximum_additional_threads
+            )
+
+            arguments_for_each: list[dict[str, typing.Any]] = [
+                {
+                    "operations": self.each,
+                    "profile": profile,
+                    "process_identifier": process_identifier,
+                    "work_directory": work_directory,
+                    "data": [subset_path],
+                    "previous_operations": list(previous_operations),
+                    "metadata": {
+                        **metadata,
+                        "file_name": subset_path.stem,
+                        "frame": get_frame_identifier(subset_path.name),
+                        "RFC": RFC.from_string(subset_path.stem, strict=False)
+                    }
+                }
+                for subset_path in subset_paths
+            ]
+
+            results: typing.Sequence[typing.Sequence[typing.Union[pathlib.Path]]] = starmap(
+                function=call_operations,
+                args=arguments_for_each,
+                thread_count=settings.maximum_additional_threads
+            )
+        except Exception as exception:
+            if 'failure in' not in str(exception).lower():
+                exception.args = (f"Failure in:{os.linesep}{self}{os.linesep}{exception.args[0]}", *exception.args[1:])
+            raise exception
+
+        return [path for inner_results in results for path in inner_results]
+
+    def __post_init__(self):
+        errors: list[Exception] = []
+        from post_processing.utilities.common import expand_paths
+        from post_processing.utilities.common import find_candidate_paths
+
+        expanded_paths: list[pathlib.Path] = expand_paths(self.masks)
 
         if len(expanded_paths) == 0:
             candidate_paths: typing.Sequence[pathlib.Path] = find_candidate_paths(self.masks)
@@ -706,7 +930,7 @@ class ExtractOperation(PathToPathOperation):
         else:
             self.masks = expanded_paths
 
-            missing_masks: typing.List[pathlib.Path] = [path for path in self.masks if not path.is_file()]
+            missing_masks: list[pathlib.Path] = [path for path in self.masks if not path.is_file()]
 
             if self.masks and missing_masks:
                 errors.append(
@@ -715,8 +939,8 @@ class ExtractOperation(PathToPathOperation):
 
         try:
             self._pattern = re.compile(self.identifier_pattern)
-        except BaseException as e:
-            error = ValueError(f"Cannot use '{self.identifier_pattern}' to find identifiers in masks")
+        except Exception as e:
+            error = ValueError(f"Cannot use '{self.identifier_pattern}' to find identifiers in masks: {e}")
             errors.append(error)
 
         if not self._pattern.groupindex:
@@ -727,7 +951,7 @@ class ExtractOperation(PathToPathOperation):
             )
             errors.append(error)
 
-        masks_without_identifiers: typing.List[pathlib.Path] = []
+        masks_without_identifiers: list[pathlib.Path] = []
 
         for mask in self.masks:
             mask_name: str = mask.stem
@@ -797,15 +1021,15 @@ class ExtractOperation(PathToPathOperation):
             f"And save the results to files named like: {self.output_pattern}"
         )
 
-    masks: typing.List[pathlib.Path]
+    masks: list[pathlib.Path]
     identifier_pattern: str = dataclasses.field()
     """A pattern used to extract metadata from the mask filename"""
     output_pattern: str = dataclasses.field()
-    each: typing.List[typing.Union[ProfileOperation]]
+    each: list[typing.Union[ProfileOperation]]
     dimension: str = dataclasses.field(default="feature_id")
     mask_coordinate: typing.Optional[str] = dataclasses.field(default=None)
     _pattern: typing.Optional[re.Pattern] = member(default=None)
-    _identifier_mapping: typing.Dict[pathlib.Path, typing.Dict[str, str]] = member(default_factory=dict)
+    _identifier_mapping: dict[pathlib.Path, dict[str, str]] = member(default_factory=dict)
 
 @dataclasses.dataclass(unsafe_hash=True)
 class MergeOperation(PathToPathOperation):
@@ -826,8 +1050,8 @@ class MergeOperation(PathToPathOperation):
         process_identifier: str,
         work_directory: pathlib.Path,
         data: typing.Sequence[pathlib.Path],
-        previous_operations: typing.List[ProfileOperation],
-        metadata: typing.Dict[str, typing.Any]
+        previous_operations: list[ProfileOperation],
+        metadata: dict[str, typing.Any]
     ) -> typing.Sequence[pathlib.Path]:
         """
         Combine all received files into one
@@ -842,7 +1066,7 @@ class MergeOperation(PathToPathOperation):
         from post_processing.utilities.netcdf import load_metadata
 
         try:
-            operation_metadata: typing.Dict[str, typing.Any] = load_metadata(path=data)
+            operation_metadata: dict[str, typing.Any] = load_metadata(path=data)
             operation_metadata.update(metadata)
             filename: str = self.file_name_pattern.format_map(operation_metadata)
             output_path: pathlib.Path = work_directory / filename
@@ -889,8 +1113,8 @@ class Peek(PathToPathOperation):
         process_identifier: str,
         work_directory: pathlib.Path,
         data: typing.Sequence[pathlib.Path],
-        previous_operations: typing.List[ProfileOperation],
-        metadata: typing.Dict[str, typing.Any]
+        previous_operations: list[ProfileOperation],
+        metadata: dict[str, typing.Any]
     ) -> typing.Sequence[pathlib.Path]:
         from post_processing.utilities.netcdf import peek
         LOGGER.warning(f"Peeking into operations. Do not do this in production!")
@@ -954,8 +1178,8 @@ class DropOperation(PathToPathOperation, FileOutputMixin):
         process_identifier: str,
         work_directory: pathlib.Path,
         data: typing.Sequence[pathlib.Path],
-        previous_operations: typing.List[ProfileOperation],
-        metadata: typing.Dict[str, typing.Any]
+        previous_operations: list[ProfileOperation],
+        metadata: dict[str, typing.Any]
     ) -> typing.Sequence[pathlib.Path]:
         """
         Remove variables from netcdf files
@@ -983,7 +1207,7 @@ class DropOperation(PathToPathOperation, FileOutputMixin):
             for file in data
         }
 
-        arguments: typing.List[typing.Dict[str, typing.Any]] = [
+        arguments: list[dict[str, typing.Any]] = [
             {
                 "input_file": input_path,
                 "output_file": output_path,
@@ -995,16 +1219,17 @@ class DropOperation(PathToPathOperation, FileOutputMixin):
         try:
             updated_files: typing.Sequence[pathlib.Path] = starmap(
                 function=drop_function,
-                args=arguments
+                args=arguments,
+                thread_count=settings.maximum_additional_threads
             )
         except Exception as exception:
             if "failure in" not in str(exception):
                 exception.args = (f"Failure in:{os.linesep}{self}{os.linesep}{exception.args[0]}", *exception.args[1:])
             raise exception
 
-        return list(input_output_mapping.values())
+        return updated_files
 
-    fields: typing.List[str] = dataclasses.field()
+    fields: list[str] = dataclasses.field()
     exclude: bool = dataclasses.field(default=False)
 
 @dataclasses.dataclass
@@ -1031,8 +1256,8 @@ class RenameOperation(PathToPathOperation, FileOutputMixin):
         process_identifier: str,
         work_directory: pathlib.Path,
         data: typing.Sequence[pathlib.Path],
-        previous_operations: typing.List[ProfileOperation],
-        metadata: typing.Dict[str, typing.Any]
+        previous_operations: list[ProfileOperation],
+        metadata: dict[str, typing.Any]
     ) -> typing.Sequence[pathlib.Path]:
         """
         Rename variables from netcdf files
@@ -1044,7 +1269,7 @@ class RenameOperation(PathToPathOperation, FileOutputMixin):
         :param metadata: Metadata provided from previous operations that may be used as helpful hints
         :returns: The Paths for each created object
         """
-        arguments: typing.List[typing.Dict[str, typing.Any]] = [
+        arguments: list[dict[str, typing.Any]] = [
             {
                 "input_path": file,
                 "output_path": self.get_output_path(
@@ -1076,7 +1301,7 @@ class RenameOperation(PathToPathOperation, FileOutputMixin):
     def __hash__(self) -> int:
         return hash((self.operation(), *[pair for pair in self.mapping.items()]))
 
-    mapping: typing.Dict[str, str] = dataclasses.field()
+    mapping: dict[str, str] = dataclasses.field()
     rename_variable: bool = dataclasses.field(default=True)
 
 @dataclasses.dataclass(unsafe_hash=True)
@@ -1110,8 +1335,8 @@ class AttributeOperation(PathToPathOperation, FileOutputMixin):
         process_identifier: str,
         work_directory: pathlib.Path,
         data: typing.Sequence[pathlib.Path],
-        previous_operations: typing.List[ProfileOperation],
-        metadata: typing.Dict[str, typing.Any]
+        previous_operations: list[ProfileOperation],
+        metadata: dict[str, typing.Any]
     ) -> typing.Sequence[pathlib.Path]:
         """
         Add, update, or remove attributes on variables or globally
@@ -1123,7 +1348,7 @@ class AttributeOperation(PathToPathOperation, FileOutputMixin):
         :param metadata: Metadata provided from previous operations that may be used as helpful hints
         :returns: The Paths for each created object
         """
-        arguments: typing.List[typing.Dict[str, typing.Union[str, pathlib.Path]]] = [
+        arguments: list[dict[str, typing.Union[str, pathlib.Path]]] = [
             {
                 "input_file": file,
                 "attribute_name": self.attribute_name,
@@ -1145,7 +1370,7 @@ class AttributeOperation(PathToPathOperation, FileOutputMixin):
             new_paths: typing.Sequence[pathlib.Path] = starmap(
                 function=nco.add_or_modify_attribute,
                 args=arguments,
-                thread_count=True
+                thread_count=settings.maximum_additional_threads
             )
         except Exception as exception:
             if 'failure in' not in str(exception):
@@ -1155,7 +1380,7 @@ class AttributeOperation(PathToPathOperation, FileOutputMixin):
         return new_paths
 
     def __post_init__(self):
-        errors: typing.List[Exception] = []
+        errors: list[Exception] = []
         if not isinstance(self.attribute_type, nco.NetcdfType):
             try:
                 if isinstance(self.attribute_type, str):
@@ -1204,7 +1429,7 @@ class SaveOperation(PathToPathOperation):
         )
 
     def __post_init__(self):
-        errors: typing.List[Exception] = []
+        errors: list[Exception] = []
         if self.identifier_pattern:
             try:
                 compiled_pattern: re.Pattern = re.compile(self.identifier_pattern)
@@ -1230,8 +1455,8 @@ class SaveOperation(PathToPathOperation):
         process_identifier: str,
         work_directory: pathlib.Path,
         data: typing.Sequence[pathlib.Path],
-        previous_operations: typing.List[ProfileOperation],
-        metadata: typing.Dict[str, typing.Any]
+        previous_operations: list[ProfileOperation],
+        metadata: dict[str, typing.Any]
     ) -> typing.Sequence[pathlib.Path]:
         """
         Save the given files in another location
@@ -1249,10 +1474,10 @@ class SaveOperation(PathToPathOperation):
         from post_processing.utilities.netcdf import load_metadata
         from post_processing.utilities.common import NWM_FILENAME_PATTERN
 
-        saved_files: typing.List[pathlib.Path] = []
+        saved_files: list[pathlib.Path] = []
         try:
             for file in data:
-                file_specific_metadata: typing.Dict[str, typing.Any] = {}
+                file_specific_metadata: dict[str, typing.Any] = {}
                 file_name_match: typing.Optional[re.Match] = NWM_FILENAME_PATTERN.search(file.name)
 
                 if file_name_match:
@@ -1341,7 +1566,7 @@ class SaveOperation(PathToPathOperation):
                 exception.args = (f"Failure in:{os.linesep}{self}{os.linesep}{exception.args[0]}", *exception.args[1:])
             raise exception
 
-        missing_files: typing.List[pathlib.Path] = [
+        missing_files: list[pathlib.Path] = [
             saved_path
             for saved_path in saved_files
             if not saved_path.exists()
@@ -1370,7 +1595,7 @@ class BranchOperation(ProfileOperation[InputType, typing.Sequence[pathlib.Path]]
     """
     An operation that lets you feed input data through multiple mutually exclusive operations
     """
-    branches: typing.Dict[str, typing.List[ProfileOperation]] = dataclasses.field()
+    branches: dict[str, list[ProfileOperation]] = dataclasses.field()
 
     def __hash__(self):
         try:
@@ -1378,7 +1603,7 @@ class BranchOperation(ProfileOperation[InputType, typing.Sequence[pathlib.Path]]
         except:
             parent_hash = 0
 
-        hash_values: typing.List[typing.Hashable] = [parent_hash]
+        hash_values: list[typing.Hashable] = [parent_hash]
 
         for branch_name, branch_logic in self.branches.items():
             for logic_entry in branch_logic:
@@ -1410,7 +1635,7 @@ class BranchOperation(ProfileOperation[InputType, typing.Sequence[pathlib.Path]]
         return OperationType.BRANCH
 
     def __post_init__(self):
-        errors: typing.List[Exception] = []
+        errors: list[Exception] = []
 
         for branch_name, branch_logic in self.branches.items():
             if len(branch_logic) == 0:
@@ -1433,7 +1658,7 @@ class BranchOperation(ProfileOperation[InputType, typing.Sequence[pathlib.Path]]
                 except Exception as e:
                     errors.append(e)
 
-        invalid_ends_names: typing.List[str] = []
+        invalid_ends_names: list[str] = []
         for branch_name, branch_logic in self.branches.items():
             if len(branch_logic) == 0:
                 invalid_ends_names.append(branch_name)
@@ -1459,8 +1684,8 @@ class BranchOperation(ProfileOperation[InputType, typing.Sequence[pathlib.Path]]
         process_identifier: str,
         work_directory: pathlib.Path,
         data: InputType,
-        previous_operations: typing.List[ProfileOperation],
-        metadata: typing.Dict[str, typing.Any]
+        previous_operations: list[ProfileOperation],
+        metadata: dict[str, typing.Any]
     ) -> OutputType:
         """
         Feed input parameters into different branches of logic across multiple threads
@@ -1474,7 +1699,7 @@ class BranchOperation(ProfileOperation[InputType, typing.Sequence[pathlib.Path]]
         :returns: The Paths for each created object
         """
         import concurrent.futures
-        future_results: typing.Dict[str, concurrent.futures.Future[typing.Sequence[pathlib.Path]]] = {}
+        future_results: dict[str, concurrent.futures.Future[typing.Sequence[pathlib.Path]]] = {}
 
         try:
             with concurrent.futures.ThreadPoolExecutor() as executor:
@@ -1547,8 +1772,8 @@ class BranchOperation(ProfileOperation[InputType, typing.Sequence[pathlib.Path]]
         process_identifier: str,
         work_directory: pathlib.Path,
         data: InputType,
-        previous_operations: typing.List[ProfileOperation],
-        metadata: typing.Dict[str, typing.Any]
+        previous_operations: list[ProfileOperation],
+        metadata: dict[str, typing.Any]
     ) -> typing.Sequence[pathlib.Path]:
         """
         Feed input parameters into different branches of logic without threading
@@ -1561,7 +1786,7 @@ class BranchOperation(ProfileOperation[InputType, typing.Sequence[pathlib.Path]]
         :param previous_operations: Operations that have already been performed
         :returns: The Paths for each created object
         """
-        results: typing.List[pathlib.Path] = []
+        results: list[pathlib.Path] = []
 
         try:
             for branch_name, branch_logic in self.branches.items():
@@ -1575,7 +1800,7 @@ class BranchOperation(ProfileOperation[InputType, typing.Sequence[pathlib.Path]]
                     metadata=metadata.copy()
                 )
 
-                recurring_paths: typing.List[pathlib.Path] = list(filter(
+                recurring_paths: list[pathlib.Path] = list(filter(
                     lambda path: path in results,
                     branch_results
                 ))
@@ -1606,8 +1831,8 @@ class BranchOperation(ProfileOperation[InputType, typing.Sequence[pathlib.Path]]
         process_identifier: str,
         work_directory: pathlib.Path,
         data: InputType,
-        previous_operations: typing.List[ProfileOperation],
-        metadata: typing.Dict[str, typing.Any]
+        previous_operations: list[ProfileOperation],
+        metadata: dict[str, typing.Any]
     ) -> typing.Sequence[pathlib.Path]:
         """
         Feed input parameters into different branches of logic
@@ -1636,7 +1861,7 @@ class LoadOperation(ProfileOperation[typing.Sequence[pathlib.Path], typing.Itera
     """
     An operation that loads data within paths into a single xarray dataset
     """
-    load_arguments: typing.Dict[str, typing.Any] = dataclasses.field(default_factory=dict)
+    load_arguments: dict[str, typing.Any] = dataclasses.field(default_factory=dict)
 
     @classmethod
     def operation(cls) -> OperationType:
@@ -1652,8 +1877,8 @@ class LoadOperation(ProfileOperation[typing.Sequence[pathlib.Path], typing.Itera
         process_identifier: str,
         work_directory: pathlib.Path,
         data: typing.Sequence[pathlib.Path],
-        previous_operations: typing.List[ProfileOperation],
-        metadata: typing.Dict[str, typing.Any]
+        previous_operations: list[ProfileOperation],
+        metadata: dict[str, typing.Any]
     ) -> xarray.Dataset:
         if not data:
             raise ValueError(f"No files were given to load within a load operation in '{profile}'")
@@ -1686,7 +1911,7 @@ class OnEachOperation(
         return OperationType.ON_EACH
 
     def __post_init__(self):
-        errors: typing.List[Exception] = []
+        errors: list[Exception] = []
         if len(self.on_each) == 0:
             errors.append(
                 ValueError(
@@ -1718,8 +1943,8 @@ class OnEachOperation(
         process_identifier: str,
         work_directory: pathlib.Path,
         data: typing.Union[typing.Iterator[InputType], typing.Iterable[InputType]],
-        previous_operations: typing.List["ProfileOperation"],
-        metadata: typing.Dict[str, typing.Any]
+        previous_operations: list["ProfileOperation"],
+        metadata: dict[str, typing.Any]
     ) -> typing.Union[typing.Iterator[OutputType], typing.Iterable[OutputType]]:
         try:
             results: typing.Sequence[OutputType] = fan_out_operations(
@@ -1764,7 +1989,7 @@ class OnEachOperation(
             f"{os.linesep.join(operation_descriptions)}"
         )
 
-    on_each: typing.List[ProfileOperation] = dataclasses.field(default_factory=list)
+    on_each: list[ProfileOperation] = dataclasses.field(default_factory=list)
     thread_count: int = dataclasses.field(default_factory=lambda: settings.maximum_additional_threads)
 
 
@@ -1774,14 +1999,14 @@ class AnomalyOperation(PathToPathOperation):
     Attaches anomaly variables to netcdf files based on thresholds
     """
     variable_name: str
-    thresholds: typing.List["anomaly.ThresholdDefinition"]
+    thresholds: list["anomaly.ThresholdDefinition"]
     default_score: int
     output_pattern: str
     time_variable: str = dataclasses.field(default="time")
     dimension_names: typing.Union[str, typing.Sequence[str]] = dataclasses.field(default='feature_id')
     output_variable_name: str = dataclasses.field(default="streamflow_anomaly")
-    anomaly_metadata: typing.Dict[str, typing.Any] = dataclasses.field(default_factory=dict)
-    encoding: typing.Dict[str, typing.Any] = dataclasses.field(default_factory=dict)
+    anomaly_metadata: dict[str, typing.Any] = dataclasses.field(default_factory=dict)
+    encoding: dict[str, typing.Any] = dataclasses.field(default_factory=dict)
 
     def __str__(self):
         prefix: str = f"{self.operation_id}: " if self.operation_id else ''
@@ -1810,7 +2035,7 @@ class AnomalyOperation(PathToPathOperation):
         return OperationType.ANOMALY
 
     def __post_init__(self):
-        errors: typing.List[Exception] = []
+        errors: list[Exception] = []
 
         if len(self.thresholds) == 0:
             raise ValueError(
@@ -1843,14 +2068,14 @@ class AnomalyOperation(PathToPathOperation):
         process_identifier: str,
         work_directory: pathlib.Path,
         data: typing.Sequence[pathlib.Path],
-        previous_operations: typing.List["ProfileOperation"],
-        metadata: typing.Dict[str, typing.Any]
+        previous_operations: list["ProfileOperation"],
+        metadata: dict[str, typing.Any]
     ) -> typing.Sequence[pathlib.Path]:
         """
 
         """
         from post_processing.transform import anomaly
-        output_paths: typing.List[pathlib.Path] = []
+        output_paths: list[pathlib.Path] = []
         frame_pattern: re.Pattern = re.compile(
             r"(?P<model>[a-zA-Z]+)\."
             r"(?P<configuration>\w+)\."
@@ -1861,7 +2086,7 @@ class AnomalyOperation(PathToPathOperation):
         )
         try:
             for input_path in data:
-                file_specific_metadata: typing.Dict[str, typing.Any] = {
+                file_specific_metadata: dict[str, typing.Any] = {
                     **metadata
                 }
                 identification_match: typing.Optional[re.Match] = frame_pattern.search(input_path.name)
@@ -1903,8 +2128,8 @@ class FunctionOperation(ProfileOperation[InputType, OutputType]):
         return OperationType.FUNCTION
 
     function_name: str
-    kwargs: typing.Dict[str, typing.Any] = dataclasses.field(default_factory=dict)
-    argument_mapping: typing.Dict[str, str] = dataclasses.field(default_factory=dict)
+    kwargs: dict[str, typing.Any] = dataclasses.field(default_factory=dict)
+    argument_mapping: dict[str, str] = dataclasses.field(default_factory=dict)
     _function: PythonHandler[InputType, OutputType] = member(default=None)
 
     def __hash__(self):
@@ -1913,7 +2138,7 @@ class FunctionOperation(ProfileOperation[InputType, OutputType]):
         except:
             parent_hash = 0
 
-        values_to_hash: typing.Tuple[typing.Hashable, ...] = tuple([
+        values_to_hash: tuple[typing.Hashable, ...] = tuple([
             parent_hash,
             *[(key, value) for key, value in self.argument_mapping.items()],
             *[(key, value) for key, value in self.kwargs.items()]
@@ -1943,12 +2168,12 @@ class FunctionOperation(ProfileOperation[InputType, OutputType]):
         process_identifier: str,
         work_directory: pathlib.Path,
         data: InputType,
-        previous_operations: typing.List[ProfileOperation],
-        metadata: typing.Dict[str, typing.Any],
+        previous_operations: list[ProfileOperation],
+        metadata: dict[str, typing.Any],
     ) -> OutputType:
         from post_processing.utilities.common import get_property_values
 
-        mapping_source: typing.Dict[str, typing.Any] = {
+        mapping_source: dict[str, typing.Any] = {
             **get_property_values(settings),
             **metadata,
             'profile': profile,
@@ -1962,7 +2187,7 @@ class FunctionOperation(ProfileOperation[InputType, OutputType]):
             mapping_source['input_stem'] = data.stem
             mapping_source['input_suffix'] = data.suffix
 
-        kwargs: typing.Dict[str, typing.Any] = {}
+        kwargs: dict[str, typing.Any] = {}
 
         for key, value in self.kwargs.items():
             if isinstance(value, str):
@@ -1981,7 +2206,7 @@ class FunctionOperation(ProfileOperation[InputType, OutputType]):
                     raise
             kwargs[key] = value
 
-        args: typing.Dict[str, typing.Any] = {}
+        args: dict[str, typing.Any] = {}
 
         for target_variable_name, available_variable_name in self.argument_mapping.items():
             if available_variable_name in mapping_source.keys():
@@ -2023,7 +2248,7 @@ class Profile(BaseModel):
     configuration: Configuration = dataclasses.field()
     output_type: ModelOutputType = dataclasses.field()
     region: Region = dataclasses.field()
-    operations: typing.List[ProfileOperation] = dataclasses.field()
+    operations: list[ProfileOperation] = dataclasses.field()
     output_file_pattern: str = dataclasses.field(default="nwm.t{date}{cycle}z.{configuration}.{output_type}.{region}.nc")
     member: typing.Optional[typing.Union[str, int]] = dataclasses.field(default=None)
     date_format: str = dataclasses.field(default="%Y%m%d")
@@ -2063,7 +2288,7 @@ class Profile(BaseModel):
             initial_id += 1
 
     def __post_init__(self):
-        errors: typing.List[Exception] = []
+        errors: list[Exception] = []
 
         if not isinstance(self.configuration, Configuration):
             try:
@@ -2157,8 +2382,8 @@ class Profile(BaseModel):
         :returns: The list of resultant files
         """
         from post_processing.utilities.netcdf import load_metadata
-        input_metadata: typing.Dict[str, typing.Any] = load_metadata(path=files)
-        metadata: typing.Dict[str, typing.Any] = {
+        input_metadata: dict[str, typing.Any] = load_metadata(path=files)
+        metadata: dict[str, typing.Any] = {
             **settings.to_dict(),
             **additional_metadata,
             self.output_type.__class__.__name__: str(self.output_type.value),
@@ -2184,7 +2409,7 @@ class Profile(BaseModel):
         safe_to_remove_intermediate_output: bool = True
 
         try:
-            previous_operations: typing.List[ProfileOperation] = []
+            previous_operations: list[ProfileOperation] = []
             output: typing.Union[typing.Sequence[pathlib.Path], xarray.Dataset] = call_operations(
                 operations=self.operations,
                 profile=self,
@@ -2265,7 +2490,7 @@ class Profile(BaseModel):
         if isinstance(cycle, int):
             cycle = str(cycle).zfill(2)
 
-        replacement_parameters: typing.Dict[str, typing.Any] = {**kwargs, "cycle": cycle, "date": date}
+        replacement_parameters: dict[str, typing.Any] = {**kwargs, "cycle": cycle, "date": date}
 
         replacement_parameters.setdefault('configuration', str(self.configuration.value))
         replacement_parameters.setdefault('output_type', str(self.output_type.value))
@@ -2288,8 +2513,8 @@ def load_profiles(profile_path: typing.Union[str, pathlib.Path] = settings.profi
     if not isinstance(profile_path, pathlib.Path):
         profile_path = pathlib.Path(profile_path)
 
-    profiles: typing.List[Profile] = []
-    unreadable_profiles: typing.List[pathlib.Path] = []
+    profiles: list[Profile] = []
+    unreadable_profiles: list[pathlib.Path] = []
 
     for directory_member in profile_path.iterdir():
         if not directory_member.is_file():
@@ -2334,7 +2559,7 @@ def load_profiles(profile_path: typing.Union[str, pathlib.Path] = settings.profi
 
 def get_function_by_name(
     function_name: str,
-    context: typing.Dict[str, typing.Any] = None
+    context: dict[str, typing.Any] = None
 ) -> typing.Callable:
     """
     Get a function by its qualified name
@@ -2360,7 +2585,7 @@ def get_function_by_name(
     if context is None:
         context = globals()
 
-    function_parts: typing.List[str] = [word for word in function_name.split(".") if word]
+    function_parts: list[str] = [word for word in function_name.split(".") if word]
 
     if not function_parts:
         raise ValueError(f"'{function_name}' is not a name for a function")
@@ -2416,8 +2641,8 @@ def fan_out_operations(
     process_identifier: str,
     work_directory: pathlib.Path,
     data: typing.Union[typing.Iterator[InputType], typing.Iterable[InputType]],
-    previous_operations: typing.List[ProfileOperation],
-    metadata: typing.Dict[str, typing.Any],
+    previous_operations: list[ProfileOperation],
+    metadata: dict[str, typing.Any],
     thread_count: int = 0
 ) -> typing.Sequence[OutputType]:
     """
@@ -2458,8 +2683,8 @@ def call_generic_operations(
     process_identifier: str,
     work_directory: pathlib.Path,
     data: InputType,
-    previous_operations: typing.List[ProfileOperation],
-    metadata: typing.Dict[str, typing.Any]
+    previous_operations: list[ProfileOperation],
+    metadata: dict[str, typing.Any]
 ) -> OutputType:
     current_data = data
 
@@ -2474,17 +2699,17 @@ def call_generic_operations(
             metadata=metadata
         )
 
-        if isinstance(current_data, typing.Sequence):
-            for entry in filter(lambda value: isinstance(value, pathlib.Path), current_data):
-                try:
-                    assign_stage(entry, operation.operation_id)
-                except Exception as e:
-                    LOGGER.warning(f"Could not assign the profile stage to '{entry}': {e}")
-        elif isinstance(current_data, pathlib.Path):
-            try:
-                assign_stage(current_data, operation.operation_id)
-            except Exception as e:
-                LOGGER.warning(f"Could not assign the profile stage to '{current_data}': {e}")
+        #if isinstance(current_data, typing.Sequence):
+        #    for entry in filter(lambda value: isinstance(value, pathlib.Path), current_data):
+        #        try:
+        #            assign_stage(entry, operation.operation_id)
+        #        except Exception as e:
+        #            LOGGER.warning(f"Could not assign the profile stage to '{entry}': {e}")
+        #elif isinstance(current_data, pathlib.Path):
+        #    try:
+        #        assign_stage(current_data, operation.operation_id)
+        #    except Exception as e:
+        #        LOGGER.warning(f"Could not assign the profile stage to '{current_data}': {e}")
 
         if not any(op.operation_id == operation.operation_id for op in previous_operations):
             previous_operations.append(operation)
@@ -2503,8 +2728,8 @@ def call_operations(
     process_identifier: str,
     work_directory: pathlib.Path,
     data: typing.Sequence[pathlib.Path],
-    previous_operations: typing.List[ProfileOperation],
-    metadata: typing.Dict[str, typing.Any]
+    previous_operations: list[ProfileOperation],
+    metadata: dict[str, typing.Any]
 ) -> typing.Union[typing.Sequence[pathlib.Path], xarray.Dataset]:
     """
     Perform post-processing operations based on parameters defined within a profile
@@ -2533,18 +2758,6 @@ def call_operations(
             previous_operations=previous_operations,
             metadata=metadata
         )
-
-        if not isinstance(operation, BranchOperation) and isinstance(current_data, typing.Sequence):
-            for entry in filter(lambda value: isinstance(value, pathlib.Path), current_data):
-                try:
-                    assign_stage(entry, operation.operation_id)
-                except Exception as e:
-                    LOGGER.warning(f"Could not assign the profile stage to '{entry}': {e}")
-        elif not isinstance(operation, BranchOperation) and isinstance(current_data, pathlib.Path):
-            try:
-                assign_stage(current_data, operation.operation_id)
-            except Exception as e:
-                LOGGER.warning(f"Could not assign the profile stage to '{current_data}': {e}")
 
         if not any(op.operation_id == operation.operation_id for op in previous_operations):
             previous_operations.append(operation)
@@ -2584,7 +2797,7 @@ def get_profile(
     if isinstance(profile_path, str):
         profile_path = pathlib.Path(profile_path)
 
-    profiles: typing.List[Profile] = [
+    profiles: list[Profile] = [
         profile
         for profile in load_profiles(profile_path=profile_path)
         if profile.configuration == manifest.configuration
@@ -2600,7 +2813,7 @@ def get_profile(
 
 
 @functools.cache
-def load_profile(source: typing.Union[pathlib.Path, str, typing.Dict[str, typing.Any]]) -> Profile:
+def load_profile(source: typing.Union[pathlib.Path, str, dict[str, typing.Any]]) -> Profile:
     """
     Deserialize a Profile
 
@@ -2623,13 +2836,13 @@ def load_profile(source: typing.Union[pathlib.Path, str, typing.Dict[str, typing
 
     profile_fields = get_fields(Profile)
 
-    required_fields: typing.List[dataclasses.Field] = [
+    required_fields: list[dataclasses.Field] = [
         field
         for field in profile_fields
         if field.default == dataclasses.MISSING and field.default_factory == dataclasses.MISSING
     ]
 
-    missing_field_descriptions: typing.List[str] = [
+    missing_field_descriptions: list[str] = [
         f"{field.name}: {field.type}"
         for field in required_fields
         if field.name not in source
@@ -2641,7 +2854,7 @@ def load_profile(source: typing.Union[pathlib.Path, str, typing.Dict[str, typing
             f"{', '.join(missing_field_descriptions)}"
         )
 
-    constructor_parameters: typing.Dict[str, typing.Any] = {
+    constructor_parameters: dict[str, typing.Any] = {
         field.name: source[field.name]
         for field in profile_fields
         if field.name in source
@@ -2658,7 +2871,7 @@ def load_operation(specification: typing.Mapping[str, typing.Any]) -> ProfileOpe
     :param specification: A dictionary containing the variables required to create a ProfileOperation
     :returns: A ProfileOperation object deserialized from the given specification
     """
-    operation_types: typing.Dict[OperationType, typing.Type[ProfileOperation]] = get_profile_operation_types()
+    operation_types: dict[OperationType, typing.Type[ProfileOperation]] = get_profile_operation_types()
 
     if OPERATION_KEY in specification:
         operation_type: OperationType = OperationType(specification[OPERATION_KEY])
@@ -2674,7 +2887,7 @@ def load_operation(specification: typing.Mapping[str, typing.Any]) -> ProfileOpe
         fields
     )
 
-    missing_fields: typing.List[str] = [
+    missing_fields: list[str] = [
         field.name
         for field in required_fields
         if field.name not in specification
@@ -2687,7 +2900,7 @@ def load_operation(specification: typing.Mapping[str, typing.Any]) -> ProfileOpe
             f"keys are missing: {', '.join(missing_fields)}"
         )
 
-    extra_fields: typing.List[str] = [
+    extra_fields: list[str] = [
         f"{key}: {type(specification[key])}"
         for key in specification.keys()
         if key != 'operation' and
@@ -2702,7 +2915,7 @@ def load_operation(specification: typing.Mapping[str, typing.Any]) -> ProfileOpe
         if settings.verbosity >= enums.Verbosity.LOUD:
             LOGGER.debug(message)
 
-    constructor_arguments: typing.Dict[str, typing.Any] = {
+    constructor_arguments: dict[str, typing.Any] = {
         field.name: specification[field.name]
         for field in fields
         if field.name in specification
@@ -2714,14 +2927,14 @@ def load_operation(specification: typing.Mapping[str, typing.Any]) -> ProfileOpe
 @functools.cache
 def get_profile_operation_types(
     root: typing.Type[ProfileOperation] = ProfileOperation
-) -> typing.Dict[OperationType, typing.Type[ProfileOperation]]:
+) -> dict[OperationType, typing.Type[ProfileOperation]]:
     """
     Get all the concrete operation types
 
     :param root: The base object whose concrete subclasses to look for
     :returns: All non-abstract implementations of the root ProfileOperation
     """
-    subclasses: typing.Dict[typing.Optional[OperationType], typing.Type[ProfileOperation]] = {
+    subclasses: dict[typing.Optional[OperationType], typing.Type[ProfileOperation]] = {
         subclass.operation(): subclass
         for subclass in root.__subclasses__()
     }
@@ -2729,8 +2942,8 @@ def get_profile_operation_types(
     immediate_subclasses: typing.Sequence[typing.Type[ProfileOperation]] = list(subclasses.values())
 
     for subclass in immediate_subclasses:
-        sub_subclasses: typing.Dict[OperationType, typing.Type[ProfileOperation]] = get_profile_operation_types(subclass)
-        preexisting_operations: typing.List[typing.Tuple[OperationType, typing.Type[ProfileOperation], typing.Type[ProfileOperation]]] = []
+        sub_subclasses: dict[OperationType, typing.Type[ProfileOperation]] = get_profile_operation_types(subclass)
+        preexisting_operations: list[tuple[OperationType, typing.Type[ProfileOperation], typing.Type[ProfileOperation]]] = []
 
         for operation_type, operation_class in sub_subclasses.items():
             conflicting_operation: typing.Type[ProfileOperation] = subclasses.get(operation_type)
@@ -2738,7 +2951,7 @@ def get_profile_operation_types(
                 preexisting_operations.append((operation_type, operation_class, conflicting_operation))
 
         if preexisting_operations:
-            conflicting_type_messages: typing.List[str] = [
+            conflicting_type_messages: list[str] = [
                 f"{operation_type}: {conflicting_type.__qualname__} vs {preexisting_type.__qualname__}"
                 for operation_type, conflicting_type, preexisting_type in preexisting_operations
             ]

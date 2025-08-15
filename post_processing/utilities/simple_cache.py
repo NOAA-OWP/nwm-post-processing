@@ -28,6 +28,20 @@ class KeyTuple:
 
         return self.args == other.args and self.kwargs == other.kwargs
 
+    def __str__(self):
+        representation: str = ""
+
+        if self.args:
+            representation += ", ".join(map(str, self.args))
+
+        if self.kwargs:
+            if self.args:
+                representation += ", "
+
+            representation += ", ".join(map(lambda x: "%s=%s" % x, self.kwargs.items()))
+
+        return representation
+
 
 
 class CacheEntry(typing.Generic[VT]):
@@ -117,18 +131,14 @@ class SimpleCache(typing.Generic[VT]):
             self.__values.remove(entry)
             entry.release()
 
-    def __call__(self, *args, **kwargs) -> VT:
-        preexisting_entry: typing.Optional[CacheEntry[VT]] = self.search(*args, **kwargs)
+    def add(self, result: VT, args: tuple = None, kwargs: typing.Mapping[str, typing.Any] = None) -> None:
+        if args is None:
+            args = tuple()
 
-        if preexisting_entry is not None and not self.__should_invalidate(preexisting_entry):
-            return preexisting_entry.value
-        elif preexisting_entry is not None:
-            self.evict(preexisting_entry)
+        if kwargs is None:
+            kwargs = {}
 
         key: KeyTuple = KeyTuple(args=args, kwargs=kwargs)
-
-        result: VT = self.__function(*args, **kwargs)
-
         new_entry: CacheEntry[VT] = CacheEntry(cache_lock=self.__lock, key=key, value=result)
 
         with self.__lock:
@@ -137,6 +147,18 @@ class SimpleCache(typing.Generic[VT]):
 
         if 0 < self.__max_size < len(self.__values):
             self.evict()
+
+    def __call__(self, *args, **kwargs) -> VT:
+        preexisting_entry: typing.Optional[CacheEntry[VT]] = self.search(*args, **kwargs)
+
+        if preexisting_entry is not None and not self.__should_invalidate(preexisting_entry):
+            return preexisting_entry.value
+        elif preexisting_entry is not None:
+            self.evict(preexisting_entry)
+
+        result: VT = self.__function(*args, **kwargs)
+
+        self.add(args=args, kwargs=kwargs, result=result)
 
         return result
 

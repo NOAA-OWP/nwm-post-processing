@@ -185,6 +185,13 @@ class _Settings(UserDict):
             base_path = pathlib.Path(base_path)
             self.__setitem__(key=key, item=base_path)
 
+        if "'" in str(base_path) or '"' in str(base_path):
+            string_representation: str = str(base_path)
+            string_representation = string_representation.replace('"', '')
+            string_representation = string_representation.replace("'", "")
+            base_path = pathlib.Path(string_representation)
+            self.__setitem__(key=key, item=base_path)
+
         return base_path
 
     @base_path.setter
@@ -545,6 +552,13 @@ class _Settings(UserDict):
 
         path = self.__getitem__(key=key)
 
+        if "'" in str(path) or '"' in str(path):
+            string_representation: str = str(path)
+            string_representation = string_representation.replace('"', '')
+            string_representation = string_representation.replace("'", "")
+            path = pathlib.Path(string_representation)
+            self.__setitem__(key=key, item=path)
+
         if not isinstance(path, pathlib.Path):
             raise TypeError(
                 "Could not retrieve the resource path - its value is not a path: {path} (type={path_type})".format(
@@ -575,6 +589,13 @@ class _Settings(UserDict):
             mask_path: pathlib.Path = pathlib.Path(mask_path)
             self.__setitem__(key=key, item=mask_path)
 
+        if "'" in str(mask_path) or '"' in str(mask_path):
+            string_representation: str = str(mask_path)
+            string_representation = string_representation.replace('"', '')
+            string_representation = string_representation.replace("'", "")
+            mask_path = pathlib.Path(string_representation)
+            self.__setitem__(key=key, item=mask_path)
+
         return mask_path
 
     @property
@@ -594,6 +615,13 @@ class _Settings(UserDict):
         if not isinstance(routelink_path, pathlib.Path):
             routelink_path: pathlib.Path = pathlib.Path(routelink_path)
             self.__setitem__(key=key, item=routelink_path)
+
+        if "'" in str(routelink_path) or '"' in str(routelink_path):
+            string_representation: str = str(routelink_path)
+            string_representation = string_representation.replace('"', '')
+            string_representation = string_representation.replace("'", "")
+            mask_path = pathlib.Path(string_representation)
+            self.__setitem__(key=key, item=mask_path)
 
         return routelink_path
 
@@ -622,6 +650,13 @@ class _Settings(UserDict):
             )
 
         path = self.__getitem__(key=key)
+
+        if "'" in str(path) or '"' in str(path):
+            string_representation: str = str(path)
+            string_representation = string_representation.replace('"', '')
+            string_representation = string_representation.replace("'", "")
+            path = pathlib.Path(string_representation)
+            self.__setitem__(key=key, item=path)
 
         if not isinstance(path, pathlib.Path):
             raise TypeError(
@@ -664,6 +699,13 @@ class _Settings(UserDict):
         if not isinstance(logging_config_path, pathlib.Path):
             logging_config_path: pathlib.Path = pathlib.Path(logging_config_path)
             self.__setitem__(key=key, item=logging_config_path)
+
+        if "'" in str(logging_config_path) or '"' in str(logging_config_path):
+            string_representation: str = str(logging_config_path)
+            string_representation = string_representation.replace('"', '')
+            string_representation = string_representation.replace("'", "")
+            logging_config_path = pathlib.Path(string_representation)
+            self.__setitem__(key=key, item=logging_config_path)
         
         return logging_config_path
 
@@ -704,7 +746,16 @@ class _Settings(UserDict):
                 )
             )
 
-        return self.__getitem__(key=key)
+        directory: pathlib.Path = self.__getitem__(key=key)
+
+        if "'" in str(directory) or '"' in str(directory):
+            string_representation: str = str(directory)
+            string_representation = string_representation.replace('"', '')
+            string_representation = string_representation.replace("'", "")
+            directory = pathlib.Path(string_representation)
+            self.__setitem__(key=key, item=directory)
+
+        return directory
 
     @intermediate_directory.setter
     def intermediate_directory(self, value: pathlib.Path):
@@ -735,6 +786,13 @@ class _Settings(UserDict):
             path = pathlib.Path(path)
             self.__setitem__(key=key, item=path)
 
+        if "'" in str(path) or '"' in str(path):
+            string_representation: str = str(path)
+            string_representation = string_representation.replace('"', '')
+            string_representation = string_representation.replace("'", "")
+            path = pathlib.Path(string_representation)
+            self.__setitem__(key=key, item=path)
+
         path.mkdir(parents=True, exist_ok=True)
         return path
 
@@ -747,6 +805,39 @@ class _Settings(UserDict):
             raise NotADirectoryError(f"Cannot set the profile path to '{value}' - it is not a directory")
         proposed_key: str = "{prefix}_profile_path".format(prefix=self.prefix).lower()
         key: str = self._find_key(key=proposed_key)
+        self.__setitem__(key=key, item=value)
+
+    @property
+    def record_timing(self) -> bool:
+        """
+        Whether to log timing information for timed functions
+        """
+        proposed_key: str = f"{self.prefix}_record_timing"
+        key: str = self._find_key(key=proposed_key)
+
+        if key not in self.keys():
+            self.__setitem__(key=key, item=False)
+
+        value: typing.Optional[str, bool] = self.__getitem__(key=key)
+        if not isinstance(value, bool):
+            if isinstance(value, str):
+                value = value.lower() in ('true', 't', 'yes', 'y', '1', 'on')
+            else:
+                value = bool(value)
+            self.__setitem__(key=key, item=value)
+        return value
+
+    @record_timing.setter
+    def record_timing(self, value: bool):
+        proposed_key: str = f"{self.prefix}_record_timing"
+        key: str = self._find_key(key=proposed_key)
+
+        if not isinstance(value, bool):
+            if isinstance(value, str):
+                value = value.lower() in ('true', 't', 'yes', 'y', '1', 'on')
+            else:
+                value = bool(value)
+
         self.__setitem__(key=key, item=value)
 
     @property

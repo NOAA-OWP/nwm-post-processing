@@ -41,7 +41,7 @@
         "stderr": {
             "class": "logging.StreamHandler",
             "level": "ERROR",
-            "formatter": "detailed",
+            "formatter": "level_based",
             "stream": "ext://sys.stderr",
             "filters": [
                 "only_errors"
@@ -50,7 +50,7 @@
         "log_file": {
             "class": "logging.handlers.RotatingFileHandler",
             "level": "DEBUG",
-            "formatter": "detailed",
+            "formatter": "level_based",
             "filename": "pp_info.log",
             "maxBytes": 5000000,
             "backupCount": 5,
@@ -61,7 +61,7 @@
         "error_file": {
             "class": "logging.handlers.RotatingFileHandler",
             "level": "ERROR",
-            "formatter": "detailed",
+            "formatter": "level_based",
             "filename": "pp_error.log",
             "maxBytes": 5000000,
             "backupCount": 5,

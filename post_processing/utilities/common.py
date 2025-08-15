@@ -945,6 +945,91 @@ def condense_exceptions(
     return ExceptionGroup(message, unique_exceptions)
 
 
+def is_array_like(value: object) -> bool:
+    """
+    Detects if something is a collection like a somewhat classical array, i.e. a series of independent values
+
+    :param value: The object to check
+    :returns: True if the value is a series of independent values
+    """
+    if isinstance(value, (str, bytes, typing.Mapping)):
+        return False
+
+    return isinstance(value, typing.Sequence)
+
+
+def timed_function(
+    logger: typing.Optional[logging.Logger] = None,
+    level: typing.Optional[int] = None
+) -> typing.Callable[[typing.Callable[FunctionParameters, RT]], typing.Callable[FunctionParameters, RT]]:
+    """
+    Logs a function timing duration if timing recording is enabled and the given log level is allowable by the logger
+
+    :param logger: The logger to use. Defaults to the logger for the file that defines this decorator
+    :param level: A custom log level to record this timing at. Defaults to the system setting 'log_level'
+    :returns: A function that records the time it takes to execute this function if timing is enabled, just the function otherwise
+    """
+    from post_processing.configuration import settings
+    _logger = logger or LOGGER
+    _level = _logger.getEffectiveLevel() if level is None else level
+
+    def decorator(func: typing.Callable[FunctionParameters, RT]) -> typing.Callable[FunctionParameters, RT]:
+        """
+        Decorate the function with wrapper logic
+
+        :param func: The function to decorate
+        :returns: A version of the function where timing is recorded if timing is enabled, the given function otherwise
+        """
+        # If timing is disabled or the given log level is below that of the level of the logger, just return the
+        # function in order to remove any overhead cost
+        if not settings.record_timing or not _logger.isEnabledFor(_level):
+            return func
+
+        import functools
+        @functools.wraps(func)
+        def wrapper(*args: FunctionParameters.args, **kwargs: FunctionParameters.kwargs) -> RT:
+            """
+            Calls the input function with its given arguments and logs its runtime in ISO8601 duration format
+            """
+            import time
+
+            start: float = time.perf_counter()
+            successful: bool = False
+            try:
+                result: RT = func(*args, **kwargs)
+                successful = True
+                return result
+            finally:
+                seconds: float = time.perf_counter() - start
+
+                duration_description: str = "P"
+                days, seconds = divmod(seconds, 24.0 * 60.0 * 60.0)
+                hours, seconds = divmod(seconds, 60.0 * 60.0)
+                minutes, seconds = divmod(seconds, 60.0)
+
+                if days:
+                    duration_description += str(int(days)) + "D"
+
+                duration_description += "T"
+
+                if hours:
+                    duration_description += str(int(hours)) + "H"
+
+                if minutes:
+                    duration_description += str(int(minutes)) + "M"
+
+                if seconds:
+                    duration_description += f"{seconds:.2f}S"
+
+                _logger.log(
+                    _level,
+                    f"{func.__name__} executed{', but failed,' if not successful else ''} in: {duration_description}"
+                )
+
+        return wrapper
+    return decorator
+
+
 class RecursiveEncoder(json.JSONEncoder):
     """
     A custom encoder that will recurse through objects and serialize based on behavior from:
