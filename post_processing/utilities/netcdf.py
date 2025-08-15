@@ -101,7 +101,7 @@ def load_variable(
             return variable
 
 
-#@simple_cache(invalidator_function=_invalidate_netcdf_cache, max_size=settings.netcdf_cache_size)
+# NOTE: The SimpleCache is no longer used here due to memory bloat and stagnation; most files will only be loaded once
 def load_netcdf(
     path: typing.Union[pathlib.Path, str, typing.Sequence[typing.Union[pathlib.Path, str]]],
     engine: typing.Union[str, typing.Literal["h5netcdf", "zarr", "netcdf4"]] = settings.default_netcdf_engine,
@@ -149,14 +149,8 @@ def load_netcdf(
                     LOGGER.debug(f"Loading '{path}'")
                 dataset: xarray.Dataset = xarray.open_dataset(path, engine=engine, chunks=chunks, **kwargs)
 
-                # TODO: This would be more correct, however it comes at a great performance cost in terms of seconds per file
-                #if not settings.lazy_load_netcdf:
-                #    LOGGER.debug(f"Loading all data from '{path}' into memory")
-                #    from datetime import datetime
-                #    start = datetime.now()
-                #    dataset = dataset.load()
-                #    dataset.close()
-                #    LOGGER.debug(f"Closed '{path}' after reading everything in after {datetime.now() - start}")
+                # NOTE: It would be safer to load everything in full and move on, but that adds a significant
+                # performance cost. For now, full loads won't be performed by default.
                 break
             except Exception as e:
                 last_exception = e
@@ -207,7 +201,7 @@ def load_metadata(
         with OPEN_LOCK:
             with xarray.open_dataset(filename_or_obj=input_path, engine=engine, chunks="auto") as source:
                 metadata.update({
-                    str(key): format_attribute_value(value)
+                    str(key): format_value(value)
                     for key, value in source.attrs.items()
                 })
 
@@ -229,7 +223,7 @@ def _get_variable_metadata(variable: "xarray.DataArray") -> typing.Dict[str, typ
     """
     import numpy
     metadata = {
-        f"{variable.name}.{attribute_name}": format_attribute_value(attribute_value)
+        f"{variable.name}.{attribute_name}": format_value(attribute_value)
         for attribute_name, attribute_value in variable.attrs.items()
     }
     if variable.shape == (1,):
@@ -253,29 +247,33 @@ def _get_variable_metadata(variable: "xarray.DataArray") -> typing.Dict[str, typ
     return metadata
 
 
-def format_attribute_value(value: typing.Any) -> typing.Any:
+def format_value(value: object) -> str:
+    """
+    Format values so that they are a little more friendly for presentation
+
+    :param value: The value to format
+    :returns: The value formatted in a way that's easy to see in a log or terminal
+    """
     import numpy
+    from post_processing.configuration import settings
+    from datetime import datetime
     if isinstance(value, numpy.datetime64):
         value = value.astype('datetime64[ms]').item()
     elif isinstance(value, numpy.ndarray):
-        value = value.tolist()
+        value = list(map(format_value, value.tolist()))
     elif hasattr(value, "item"):
         try:
             value = value.item()
         except:
-            value = str(value)
-    return value
+            pass
 
+    if isinstance(value, (numpy.floating, float)):
+        value = f"{float(value):,.2f}"
+    elif isinstance(value, (int, numpy.integer)):
+        value = f"{int(value):,}"
+    elif isinstance(value, datetime):
+        value = value.strftime(settings.date_format)
 
-def format_value(value: object) -> str:
-    import numpy
-    from datetime import datetime
-    if isinstance(value, (numpy.number, float, int)):
-        return f"{value:,}"
-    if isinstance(value, numpy.datetime64):
-        value = value.item()
-    if isinstance(value, datetime):
-        return value.strftime(settings.date_format)
     return str(value)
 
 
@@ -346,6 +344,14 @@ def describe_netcdf(
     variable_name: str = None,
     max_line_length: int = None
 ) -> str:
+    """
+    Create a detailed string representation of the netcdf and its data
+
+    :param netcdf_file: An already opened netcdf file
+    :param variable_name: The optional name of a variable to describe
+    :param max_line_length: A limit on the length of text to render
+    :returns: A detailed description of what is in the given netcdf dataset
+    """
     import os
 
     separator_placeholder: str = "{separator}"
