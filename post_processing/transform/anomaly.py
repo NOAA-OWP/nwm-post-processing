@@ -29,7 +29,7 @@ class ThresholdDefinition:
     level: typing.Union[int, float, "numpy.float32"]
     variable: str
     time_coordinate: str = dataclasses.field(default='time')
-    _data: typing.Dict[int, "xarray.DataArray"] = member(default_factory=dict)
+    _data: dict[int, "xarray.DataArray"] = member(default_factory=dict)
     _lock: RLock = member(default_factory=RLock)
 
     def update_stats(self, day_of_year: int, stats: "xarray.DataArray"):
@@ -41,7 +41,7 @@ class ThresholdDefinition:
         """
         Convert the definition to a dictionary in pure python types and avoiding private data
         """
-        representation: typing.Dict[str, typing.Any] = {
+        representation: dict[str, typing.Any] = {
             "data_path": str(self.data_path),
             "level": self.level if isinstance(self.level, (int, float)) else float(str(self.level)),
             "variable": self.variable,

@@ -9,6 +9,8 @@ import re
 import dataclasses
 import json
 
+import collections.abc as generic
+
 from datetime import datetime
 
 LOGGER: logging.Logger = logging.getLogger(pathlib.Path(__file__).stem)
@@ -34,9 +36,9 @@ RT = typing.TypeVar("RT")
 FunctionParameters = typing.ParamSpec("FunctionParameters")
 
 ArgsAndKwargs = typing.Union[
-    typing.Sequence[typing.Any],
-    typing.Mapping[str, typing.Any],
-    typing.Tuple[typing.Sequence[typing.Any], typing.Mapping[str, typing.Any]]
+    generic.Sequence[typing.Any],
+    generic.Mapping[str, typing.Any],
+    tuple[generic.Sequence[typing.Any], generic.Mapping[str, typing.Any]]
 ]
 """
 Either a series of positional arguments, a dictionary of keyword arguments, 
@@ -79,10 +81,10 @@ def is_nan_safe(value: typing.Any) -> bool:
 
 
 def starmap(
-    function: typing.Callable[[FunctionParameters], RT],
-    args: typing.Iterable[ArgsAndKwargs],
+    function: generic.Callable[[FunctionParameters], RT],
+    args: generic.Iterable[ArgsAndKwargs],
     thread_count: int = 0
-) -> typing.Sequence[RT]:
+) -> generic.Sequence[RT]:
     """
     Call the given function with each of sequence of positional arguments
 
@@ -91,12 +93,12 @@ def starmap(
     :param thread_count: If true, process each item in its own thread
     :returns: The result of each function call
     """
-    results: typing.List[RT] = []
+    results: list[RT] = []
 
     from post_processing.configuration import settings
     from post_processing.enums import Verbosity
 
-    if not isinstance(args, typing.Iterable) or isinstance(args, (str, bytes)):
+    if not isinstance(args, generic.Iterable) or isinstance(args, (str, bytes)):
         raise TypeError(f"Arguments for starmap must be an iterable collection. Received '{args}' (type={type(args)})")
 
     if settings.allow_threading and thread_count is not None and thread_count > 0:
@@ -107,11 +109,11 @@ def starmap(
         for argument_index, arg in enumerate(args):
             if settings.verbosity >= Verbosity.ALL:
                 LOGGER.debug(f"Running through iteration {argument_index + 1} of {function}")
-            if isinstance(arg, typing.Mapping):
+            if isinstance(arg, generic.Mapping):
                 result: RT = function(**arg)
-            elif isinstance(arg, typing.Sequence) and len(arg) == 2 and isinstance(args[0], typing.Sequence) and isinstance(args[1], typing.Mapping):
+            elif isinstance(arg, generic.Sequence) and len(arg) == 2 and isinstance(args[0], generic.Sequence) and isinstance(args[1], generic.Mapping):
                 result: RT = function(*arg[0], **arg[1])
-            elif isinstance(arg, typing.Sequence) and not isinstance(arg, str):
+            elif isinstance(arg, generic.Sequence) and not isinstance(arg, str):
                 result: RT = function(*arg)
             else:
                 result: RT = function(arg)
@@ -122,7 +124,7 @@ def starmap(
     return results
 
 
-def expand_path(path: typing.Union[str, pathlib.Path], strict: bool = True) -> typing.Sequence[pathlib.Path]:
+def expand_path(path: typing.Union[str, pathlib.Path], strict: bool = True) -> generic.Sequence[pathlib.Path]:
     """
     Expand the given path to ensure that it catches everything if it contains a glob
 
@@ -152,7 +154,7 @@ def expand_path(path: typing.Union[str, pathlib.Path], strict: bool = True) -> t
     path_prefix: pathlib.Path = pathlib.Path(*path.parts[:glob_index])
     glob: str = str(pathlib.Path(*path.parts[glob_index:]))
 
-    matching_paths: typing.List[pathlib.Path] = [
+    matching_paths: list[pathlib.Path] = [
         found_path
         for found_path in path_prefix.glob(glob)
         if found_path.is_file()
@@ -162,15 +164,15 @@ def expand_path(path: typing.Union[str, pathlib.Path], strict: bool = True) -> t
 
 
 def expand_paths(
-    paths: typing.Iterable[typing.Union[str, pathlib.Path]],
+    paths: generic.Iterable[str | pathlib.Path],
     base_path: pathlib.Path = None,
     strict: bool = True
-) -> typing.List[pathlib.Path]:
+) -> list[pathlib.Path]:
     """
     Expand a series of paths into more paths if given paths contain glob strings
 
     Example:
-        >>> example_paths: typing.Sequence[typing.Union[pathlib.Path]] = [
+        >>> example_paths: generic.Sequence[typing.Union[pathlib.Path]] = [
         ...     "resources/*/*.dbf",
         ...      pathlib.Path("non-existent.log"),
         ...      pathlib.Path("/path/to/app/resources/*/nwm.*/*.nc")
@@ -200,10 +202,10 @@ def expand_paths(
     if base_path is None:
         base_path = settings.base_path
 
-    template_variables: typing.Dict[str, str] = {key: str(value) for key, value in settings.to_dict().items()}
+    template_variables: dict[str, str] = {key: str(value) for key, value in settings.to_dict().items()}
 
     try:
-        templated_paths: typing.List[pathlib.Path] = list(map(
+        templated_paths: list[pathlib.Path] = list(map(
             lambda given_path: pathlib.Path(str(given_path).format(**template_variables)),
             paths
         ))
@@ -213,10 +215,10 @@ def expand_paths(
             for path in templated_paths
         ]
 
-        expanded_paths: typing.List[pathlib.Path] = []
+        expanded_paths: list[pathlib.Path] = []
 
         for path in templated_paths:
-            found_paths: typing.Sequence[pathlib.Path] = expand_path(path=path, strict=strict)
+            found_paths: generic.Sequence[pathlib.Path] = expand_path(path=path, strict=strict)
             expanded_paths.extend(found_paths)
 
         if not expanded_paths:
@@ -238,9 +240,9 @@ def expand_paths(
 
 
 def find_candidate_paths(
-    paths: typing.Iterable[pathlib.Path],
+    paths: generic.Iterable[pathlib.Path],
     base_path: pathlib.Path = None
-) -> typing.Sequence[pathlib.Path]:
+) -> generic.Sequence[pathlib.Path]:
     """
     Finds the paths to all files that seem to be like the ones on off from the paths
 
@@ -266,12 +268,12 @@ def find_candidate_paths(
     """
     paths = list(map(pathlib.Path, paths))
 
-    generalized_paths: typing.List[pathlib.Path] = [
+    generalized_paths: list[pathlib.Path] = [
         path.parent / f"*.{path.suffix}"
         for path in paths
     ]
 
-    possible_paths: typing.List[pathlib.Path] = expand_paths(paths=generalized_paths, base_path=base_path)
+    possible_paths: list[pathlib.Path] = expand_paths(paths=generalized_paths, base_path=base_path)
 
     if not possible_paths:
         LOGGER.error(
@@ -282,10 +284,10 @@ def find_candidate_paths(
 
 
 def starmap_threaded(
-    function: typing.Callable[[FunctionParameters], RT],
-    args: typing.Iterable[ArgsAndKwargs],
+    function: generic.Callable[[FunctionParameters], RT],
+    args: generic.Iterable[ArgsAndKwargs],
     thread_count: int = None,
-) -> typing.Sequence[RT]:
+) -> generic.Sequence[RT]:
     """
     Call the given function with each of sequence of positional arguments
 
@@ -303,18 +305,18 @@ def starmap_threaded(
     if thread_count is None:
         thread_count = settings.maximum_additional_threads
 
-    results: typing.List[RT] = []
+    results: list[RT] = []
     import concurrent.futures
     with concurrent.futures.ThreadPoolExecutor(max_workers=thread_count) as executor:
-        future_results: typing.List[concurrent.futures.Future[RT]] = []
+        future_results: list[concurrent.futures.Future[RT]] = []
         for arg in args:
-            arguments_are_keyword: bool = isinstance(arg, typing.Mapping)
-            arguments_are_positional: bool = isinstance(arg, typing.Sequence) and not isinstance(arg, str)
+            arguments_are_keyword: bool = isinstance(arg, generic.Mapping)
+            arguments_are_positional: bool = isinstance(arg, generic.Sequence) and not isinstance(arg, str)
             arguments_are_positional_and_keyword: bool = (
-                isinstance(arg, typing.Sequence)
+                isinstance(arg, generic.Sequence)
                     and len(arg) == 2
-                    and isinstance(arg[0], typing.Sequence) and not isinstance(arg[0], str)
-                    and isinstance(arg[1], typing.Mapping)
+                    and isinstance(arg[0], generic.Sequence) and not isinstance(arg[0], str)
+                    and isinstance(arg[1], generic.Mapping)
             )
             if arguments_are_keyword:
                 future_result: concurrent.futures.Future[RT] = executor.submit(
@@ -354,9 +356,9 @@ def starmap_threaded(
 
 
 def partition(
-    condition: typing.Callable[[T], bool],
-    collection: typing.Iterable[T]
-) -> typing.Tuple[typing.Sequence[T], typing.Sequence[T]]:
+    condition: generic.Callable[[T], bool],
+    collection: generic.Iterable[T]
+) -> tuple[generic.Sequence[T], generic.Sequence[T]]:
     """
     Split the collection into a collection that follows the condition and a collection that doesn't
 
@@ -364,8 +366,8 @@ def partition(
     :param collection: The collection to split
     :returns: The collection that follows the condition and the collection of values that don't
     """
-    passing: typing.List[T] = []
-    failing: typing.List[T] = []
+    passing: list[T] = []
+    failing: list[T] = []
 
     for item in collection:
         if condition(item):
@@ -377,9 +379,9 @@ def partition(
 
 
 def first(
-    collection: typing.Union[typing.Mapping[T, VT], typing.Iterable[T]],
-    condition: typing.Union[typing.Callable[[T], bool], typing.Callable[[T, VT], bool]] = None
-) -> typing.Optional[typing.Union[T, VT]]:
+    collection: generic.Mapping[T, VT] | generic.Iterable[T],
+    condition: generic.Callable[[T], bool] | generic.Callable[[T, VT], bool] = None
+) -> typing.Optional[T | VT]:
     """
     Return the first element of the given collection that matches the given condition.
     Returns only the first item if there is no condition
@@ -388,23 +390,23 @@ def first(
     :param collection: The collection to check
     :returns: The first element of the given collection that matches the given condition or None
     """
-    if callable(condition) and isinstance(collection, typing.Mapping):
-        collection: typing.Iterator[VT] = (
+    if callable(condition) and isinstance(collection, generic.Mapping):
+        collection: generic.Iterator[VT] = (
             value
             for key, value in collection.items()
             if condition(key, value)
         )
-    elif isinstance(collection, typing.Mapping):
+    elif isinstance(collection, generic.Mapping):
         collection = iter(collection.values())
     elif callable(condition):
-        collection: typing.Iterator[T] = filter(condition, collection)
-    elif not isinstance(collection, typing.Iterator):
-        collection: typing.Iterator[T] = iter(collection)
+        collection: generic.Iterator[T] = filter(condition, collection)
+    elif not isinstance(collection, generic.Iterator):
+        collection: generic.Iterator[T] = iter(collection)
     return next(collection, None)
 
 def last(
-    collection: typing.Union[typing.Mapping[T, VT], typing.Iterable[T]],
-    condition: typing.Union[typing.Callable[[T], bool], typing.Callable[[T, VT], bool]] = None
+    collection: typing.Union[generic.Mapping[T, VT], generic.Iterable[T]],
+    condition: typing.Union[generic.Callable[[T], bool], generic.Callable[[T, VT], bool]] = None
 ) -> typing.Optional[typing.Union[T, VT]]:
     """
     Finds the last item in the collection that matches the given condition.
@@ -414,50 +416,50 @@ def last(
     :param condition: The function to that determines if the item encountered is the one we want
     :returns: The last value that matches the given condition or None
     """
-    if callable(condition) and isinstance(collection, typing.Mapping):
-        collection: typing.Sequence[VT] = [
+    if callable(condition) and isinstance(collection, generic.Mapping):
+        collection: generic.Sequence[VT] = [
             value
             for key, value in collection.items()
             if condition(key, value)
         ]
-    elif isinstance(collection, typing.Mapping):
+    elif isinstance(collection, generic.Mapping):
         collection = list(collection.values())
     elif callable(condition):
-        collection: typing.Sequence[T] = [value for value in collection if condition(value)]
+        collection: generic.Sequence[T] = [value for value in collection if condition(value)]
 
     return collection[-1] if collection else None
 
 
 @typing.overload
 def cycle_future_list(
-    values: typing.List["Future[T]"],
+    values: list["Future[T]"],
     *,
     block_seconds: float = 1.0,
     backoff_seconds: float = 1.0,
-    exception_handler: typing.Callable[[Exception], Exception] = None,
-) -> typing.Tuple[typing.Union[typing.Sequence[T], typing.Sequence[VT]], typing.Sequence[Exception]]:
+    exception_handler: generic.Callable[[Exception], Exception] = None,
+) -> tuple[typing.Union[generic.Sequence[T], generic.Sequence[VT]], generic.Sequence[Exception]]:
     ...
 
 @typing.overload
 def cycle_future_list(
-    futures: typing.Sequence["Future[T]"],
+    futures: generic.Sequence["Future[T]"],
     *,
-    transform: typing.Callable[[T, typing.Sequence[T]], VT],
+    transform: generic.Callable[[T, generic.Sequence[T]], VT],
     block_seconds: float = 1.0,
     backoff_seconds: float = 1.0,
-    exception_handler: typing.Callable[[Exception], Exception] = None,
-) -> typing.Tuple[typing.Union[typing.Sequence[T], typing.Sequence[VT]], typing.Sequence[Exception]]:
+    exception_handler: generic.Callable[[Exception], Exception] = None,
+) -> tuple[typing.Union[generic.Sequence[T], generic.Sequence[VT]], generic.Sequence[Exception]]:
     ...
 
 
 def cycle_future_list(
-    futures: typing.Iterable["Future[T]"],
+    futures: generic.Iterable["Future[T]"],
     *,
-    transform: typing.Callable[[T, typing.Sequence[T]], VT] = None,
+    transform: generic.Callable[[T, generic.Sequence[T]], VT] = None,
     block_seconds: float = 1.0,
     backoff_seconds: float = 1.0,
-    exception_handler: typing.Callable[[Exception], Exception] = None,
-) -> typing.Tuple[typing.Union[typing.Sequence[T], typing.Sequence[VT]], typing.Sequence[Exception]]:
+    exception_handler: generic.Callable[[Exception], Exception] = None,
+) -> tuple[typing.Union[generic.Sequence[T], generic.Sequence[VT]], generic.Sequence[Exception]]:
     """
     Cycle through the list of values and apply and transforms as the contents are generated
 
@@ -481,11 +483,11 @@ def cycle_future_list(
     elif not callable(exception_handler):
         raise ValueError(f"{exception_handler} (type={type(exception_handler)}) is not callable")
 
-    current_values: typing.List[Future[T]] = list(futures)
+    current_values: list[Future[T]] = list(futures)
 
-    results: typing.List[VT] = []
+    results: list[VT] = []
     last_item_id: typing.Optional[int] = None
-    exceptions: typing.List[Exception] = []
+    exceptions: list[Exception] = []
 
     while current_values:
         value: Future[T] = current_values.pop(0)
@@ -508,33 +510,33 @@ def cycle_future_list(
 
 @typing.overload
 def cycle_future_mapping(
-    futures: typing.Mapping[KT, "Future[T]"],
+    futures: generic.Mapping[KT, "Future[T]"],
     *,
     block_seconds: float = 1.0,
     backoff_seconds: int = 1.0,
-    exception_handler: typing.Callable[[Exception], Exception] = None,
-) -> typing.Tuple[typing.Union[typing.Sequence[T], typing.Sequence[VT]], typing.Sequence[Exception]]:
+    exception_handler: generic.Callable[[Exception], Exception] = None,
+) -> tuple[typing.Union[generic.Sequence[T], generic.Sequence[VT]], generic.Sequence[Exception]]:
     ...
 
 @typing.overload
 def cycle_future_mapping(
-    futures: typing.Mapping[KT, "Future[T]"],
+    futures: generic.Mapping[KT, "Future[T]"],
     *,
-    transform: typing.Callable[[KT, T, typing.Sequence[T]], VT],
+    transform: generic.Callable[[KT, T, generic.Sequence[T]], VT],
     block_seconds: float = 1.0,
     backoff_seconds: int = 1.0,
-    exception_handler: typing.Callable[[Exception], Exception] = None,
-) -> typing.Tuple[typing.Union[typing.Sequence[T], typing.Sequence[VT]], typing.Sequence[Exception]]:
+    exception_handler: generic.Callable[[Exception], Exception] = None,
+) -> tuple[typing.Union[generic.Sequence[T], generic.Sequence[VT]], generic.Sequence[Exception]]:
     ...
 
 def cycle_future_mapping(
-    futures: typing.Mapping[KT, "Future[T]"],
+    futures: generic.Mapping[KT, "Future[T]"],
     *,
-    transform: typing.Callable[[KT, T, typing.Sequence[T]], VT] = None,
+    transform: generic.Callable[[KT, T, generic.Sequence[T]], VT] = None,
     block_seconds: float = 1.0,
     backoff_seconds: float = 1.0,
-    exception_handler: typing.Callable[[Exception], Exception] = None,
-) -> typing.Tuple[typing.Union[typing.Sequence[T], typing.Sequence[VT]], typing.Sequence[Exception]]:
+    exception_handler: generic.Callable[[Exception], Exception] = None,
+) -> tuple[typing.Union[generic.Sequence[T], generic.Sequence[VT]], generic.Sequence[Exception]]:
     """
     Cycle through the list of values and apply and transforms as the contents are generated
 
@@ -558,11 +560,11 @@ def cycle_future_mapping(
     elif not callable(exception_handler):
         raise ValueError(f"{exception_handler} (type={type(exception_handler)}) is not callable")
 
-    current_values: typing.Dict[KT, Future[T]] = dict(**futures)
+    current_values: dict[KT, Future[T]] = dict(**futures)
 
-    results: typing.List[VT] = []
+    results: list[VT] = []
     last_item_id: typing.Optional[int] = None
-    exceptions: typing.List[Exception] = []
+    exceptions: list[Exception] = []
 
     while current_values:
         key, future = current_values.popitem()
@@ -586,53 +588,53 @@ def cycle_future_mapping(
 
 @typing.overload
 def cycle_futures(
-    futures: typing.Sequence["Future[T]"],
+    futures: generic.Sequence["Future[T]"],
     *,
     block_seconds: float = 1.0,
     backoff_seconds: float = 1.0
-) -> typing.Tuple[typing.Sequence[T], typing.Sequence[Exception]]:
+) -> tuple[generic.Sequence[T], generic.Sequence[Exception]]:
     ...
 
 @typing.overload
 def cycle_futures(
-    futures: typing.Sequence["Future[T]"],
+    futures: generic.Sequence["Future[T]"],
     *,
-    transform: typing.Callable[[T, typing.Sequence[T]], VT],
+    transform: generic.Callable[[T, generic.Sequence[T]], VT],
     block_seconds: float = 1.0,
     backoff_seconds: float = 1.0
-) -> typing.Tuple[typing.Sequence[VT], typing.Sequence[Exception]]:
+) -> tuple[generic.Sequence[VT], generic.Sequence[Exception]]:
     ...
 
 @typing.overload
 def cycle_futures(
-    futures: typing.Mapping[KT, "Future[T]"],
+    futures: generic.Mapping[KT, "Future[T]"],
     *,
     block_seconds: float = 1.0,
     backoff_seconds: int = 1.0,
-    exception_handler: typing.Callable[[Exception], Exception] = None,
-) -> typing.Tuple[typing.Sequence[T], typing.Sequence[Exception]]:
+    exception_handler: generic.Callable[[Exception], Exception] = None,
+) -> tuple[generic.Sequence[T], generic.Sequence[Exception]]:
     ...
 
 @typing.overload
 def cycle_futures(
-    futures: typing.Mapping[KT, "Future[T]"],
+    futures: generic.Mapping[KT, "Future[T]"],
     *,
-    transform: typing.Callable[[KT, T, typing.Sequence[T]], VT],
+    transform: generic.Callable[[KT, T, generic.Sequence[T]], VT],
     block_seconds: float = 1.0,
     backoff_seconds: int = 1.0,
-    exception_handler: typing.Callable[[Exception], Exception] = None,
-) -> typing.Tuple[typing.Sequence[VT], typing.Sequence[Exception]]:
+    exception_handler: generic.Callable[[Exception], Exception] = None,
+) -> tuple[generic.Sequence[VT], generic.Sequence[Exception]]:
     ...
 
 
 def cycle_futures(
-    futures: typing.Union[typing.Mapping[KT, "Future[T]"], typing.Sequence["Future[T]"]],
+    futures: typing.Union[generic.Mapping[KT, "Future[T]"], generic.Sequence["Future[T]"]],
     *,
-    transform: typing.Union[typing.Callable[[KT, T, typing.Sequence[T]], VT], typing.Callable[[T, typing.Sequence[T]], VT]] = None,
+    transform: typing.Union[generic.Callable[[KT, T, generic.Sequence[T]], VT], generic.Callable[[T, generic.Sequence[T]], VT]] = None,
     block_seconds: float = 1.0,
     backoff_seconds: float = 1.0,
-    exception_handler: typing.Callable[[Exception], Exception] = None,
-) -> typing.Tuple[typing.Union[typing.Sequence[VT], typing.Sequence[T]], typing.Sequence[Exception]]:
+    exception_handler: generic.Callable[[Exception], Exception] = None,
+) -> tuple[typing.Union[generic.Sequence[VT], generic.Sequence[T]], generic.Sequence[Exception]]:
     """
     Step through a collection of futures, trying to process and act on them as soon as possible rather than
     waiting for each to finish
@@ -646,7 +648,7 @@ def cycle_futures(
     :param exception_handler: An optional handler for any exceptions thrown
     :returns: The results from all the futures along with all encountered exceptions
     """
-    cycler: typing.Callable = cycle_future_mapping if isinstance(futures, typing.Mapping) else cycle_future_list
+    cycler: generic.Callable = cycle_future_mapping if isinstance(futures, generic.Mapping) else cycle_future_list
 
     results, exceptions = cycler(
         futures=futures,
@@ -656,12 +658,12 @@ def cycle_futures(
         exception_handler=exception_handler,
     )
 
-    assert isinstance(results, typing.Sequence)
-    assert isinstance(exceptions, typing.Sequence)
+    assert isinstance(results, generic.Sequence)
+    assert isinstance(exceptions, generic.Sequence)
     return results, exceptions
 
 
-def get_property_values(obj: object) -> typing.Dict[str, typing.Any]:
+def get_property_values(obj: object) -> dict[str, typing.Any]:
     """
     Get the values of properties on an object
 
@@ -675,7 +677,7 @@ def get_property_values(obj: object) -> typing.Dict[str, typing.Any]:
         raise ValueError("Cannot get property values from 'None'. Pass a non-null object")
 
     import inspect
-    properties: typing.Dict[str, typing.Any] = {
+    properties: dict[str, generic.Any] = {
         name: prop.fget(obj)
         for name, prop in inspect.getmembers(obj.__class__, lambda member: isinstance(member, property))
         if not name.startswith("_")
@@ -684,10 +686,10 @@ def get_property_values(obj: object) -> typing.Dict[str, typing.Any]:
 
 
 def flatten_iterable(
-    iterable: typing.Iterable[typing.Iterable[T]],
-    condition: typing.Callable[[T], bool] = None,
+    iterable: generic.Iterable[generic.Iterable[T]],
+    condition: generic.Callable[[T], bool] = None,
     return_unique: bool = False,
-) -> typing.Sequence[T]:
+) -> generic.Sequence[T]:
     """
     Flatten a collections of collections into a single list.
 
@@ -703,7 +705,7 @@ def flatten_iterable(
         condition = lambda item: True
 
     if return_unique:
-        flattened_collections: typing.Set[T] = set()
+        flattened_collections: set[T] = set()
 
         for collection in iterable:
             flattened_collections.update(filter(condition, collection))
@@ -712,7 +714,7 @@ def flatten_iterable(
     return [value for inner_collection in iterable for value in inner_collection]
 
 
-def get_template_variables(template: str) -> typing.Sequence[str]:
+def get_template_variables(template: str) -> generic.Sequence[str]:
     """
     Get all keyed template variables from a formatting string
 
@@ -725,15 +727,15 @@ def get_template_variables(template: str) -> typing.Sequence[str]:
     """
     template_pattern: re.Pattern = re.compile(r"\{(?P<name>[a-zA-Z_]\w*)(:[^}]*)?}")
 
-    matches: typing.Iterable[typing.Iterable[str]] = [
+    matches: generic.Iterable[generic.Iterable[str]] = [
         match.groupdict().values()
         for match in template_pattern.finditer(template)
     ]
 
-    variables: typing.Sequence[str] = flatten_iterable(iterable=matches)
+    variables: generic.Sequence[str] = flatten_iterable(iterable=matches)
     return variables
 
-def get_cycle_files(filepath: pathlib.Path, expected_count: int = None) -> typing.Sequence[pathlib.Path]:
+def get_cycle_files(filepath: pathlib.Path, expected_count: int = None) -> generic.Sequence[pathlib.Path]:
     """
     Get all files that match the patten of the given file path for a single cycle
 
@@ -749,7 +751,7 @@ def get_cycle_files(filepath: pathlib.Path, expected_count: int = None) -> typin
     if regex_result is None:
         raise FileNotFoundError(f"{filepath} is not a valid NWM file")
 
-    extracted_values: typing.Dict[str, str] = regex_result.groupdict()
+    extracted_values: dict[str, str] = regex_result.groupdict()
 
     raw_pattern_for_this_cycle: str = f"^nwm\.t{extracted_values['cycle']}z\.{extracted_values['configuration']}\."
     raw_pattern_for_this_cycle += f"{extracted_values['output_type']}"
@@ -763,7 +765,7 @@ def get_cycle_files(filepath: pathlib.Path, expected_count: int = None) -> typin
 
     pattern_for_this_cycle: re.Pattern = re.compile(raw_pattern_for_this_cycle)
 
-    cycle_files: typing.List[pathlib.Path] = [
+    cycle_files: list[pathlib.Path] = [
         path
         for path in filepath.parent.iterdir()
         if path.is_file()
@@ -846,7 +848,7 @@ def get_datetime64_resolution(numpy_date: "numpy.datetime64") -> str:
     return resolution
 
 
-def get_time_from_nwm_file(path: pathlib.Path, variable_name: str = 'time') -> typing.Tuple[pathlib.Path, "numpy.datetime64"]:
+def get_time_from_nwm_file(path: pathlib.Path, variable_name: str = 'time') -> tuple[pathlib.Path, "numpy.datetime64"]:
     """
 
     """
@@ -867,7 +869,7 @@ def get_time_from_nwm_file(path: pathlib.Path, variable_name: str = 'time') -> t
         )
     return path, time_values[0]
 
-def sort_nwm_filepaths(filepaths: typing.Sequence[pathlib.Path]) -> typing.Sequence[pathlib.Path]:
+def sort_nwm_filepaths(filepaths: generic.Sequence[pathlib.Path]) -> generic.Sequence[pathlib.Path]:
     """
     Sort all nwm files by their time variable
 
@@ -878,17 +880,17 @@ def sort_nwm_filepaths(filepaths: typing.Sequence[pathlib.Path]) -> typing.Seque
     import numpy
 
     with concurrent.futures.ProcessPoolExecutor() as executor:
-        paths_and_times: typing.List[typing.Tuple[pathlib.Path, numpy.datetime64]] = list(
+        paths_and_times: list[tuple[pathlib.Path, numpy.datetime64]] = list(
                 executor.map(
                 get_time_from_nwm_file,
                 filepaths
             )
         )
-    sorted_paths_and_times: typing.List[typing.Tuple[pathlib.Path, numpy.datetime64]] = sorted(
+    sorted_paths_and_times: list[tuple[pathlib.Path, numpy.datetime64]] = sorted(
         paths_and_times,
         key=lambda pair: pair[1]
     )
-    sorted_paths: typing.List[pathlib.Path] = [path for path, time in sorted_paths_and_times]
+    sorted_paths: list[pathlib.Path] = [path for path, time in sorted_paths_and_times]
     return sorted_paths
 
 def program_exists(program_name: str) -> bool:
@@ -911,23 +913,23 @@ def program_exists(program_name: str) -> bool:
 
 def condense_exceptions(
     message: str,
-    exceptions: typing.Iterable[Exception],
+    exceptions: generic.Iterable[Exception],
     *additional_exceptions: Exception
 ) -> typing.Union[Exception, ExceptionGroup]:
     """
     Condenses multiple exceptions into a single exception group containing unique errors or just a single error if it becomes one
     """
     import traceback
-    all_exceptions: typing.List[Exception] = [*exceptions, *additional_exceptions]
+    all_exceptions: list[Exception] = [*exceptions, *additional_exceptions]
 
     if len(all_exceptions) == 0:
         exception: Exception = Exception(message)
         return exception
 
-    exception_hashes: typing.Dict[int, Exception] = {}
+    exception_hashes: dict[int, Exception] = {}
 
     for exception in all_exceptions:
-        stack_hashes: typing.Tuple[int, ...] = tuple(
+        stack_hashes: tuple[int, ...] = tuple(
             hash((frame.filename, frame.line, frame.lineno)) for frame in
             traceback.extract_tb(exception.__traceback__)
         )
@@ -941,7 +943,7 @@ def condense_exceptions(
         exception.args = (f"{message}: {exception.args[0]}", *exception.args[1:])
         return exception
 
-    unique_exceptions: typing.List[Exception] = list(exception_hashes.values())
+    unique_exceptions: list[Exception] = list(exception_hashes.values())
     return ExceptionGroup(message, unique_exceptions)
 
 
@@ -952,16 +954,16 @@ def is_array_like(value: object) -> bool:
     :param value: The object to check
     :returns: True if the value is a series of independent values
     """
-    if isinstance(value, (str, bytes, typing.Mapping)):
+    if isinstance(value, (str, bytes, generic.Mapping)):
         return False
 
-    return isinstance(value, typing.Sequence)
+    return isinstance(value, generic.Sequence)
 
 
 def timed_function(
     logger: typing.Optional[logging.Logger] = None,
     level: typing.Optional[int] = None
-) -> typing.Callable[[typing.Callable[FunctionParameters, RT]], typing.Callable[FunctionParameters, RT]]:
+) -> generic.Callable[[generic.Callable[FunctionParameters, RT]], generic.Callable[FunctionParameters, RT]]:
     """
     Logs a function timing duration if timing recording is enabled and the given log level is allowable by the logger
 
@@ -973,7 +975,7 @@ def timed_function(
     _logger = logger or logging.getLogger('TIMING')
     _level = _logger.getEffectiveLevel() if level is None else level
 
-    def decorator(func: typing.Callable[FunctionParameters, RT]) -> typing.Callable[FunctionParameters, RT]:
+    def decorator(func: generic.Callable[FunctionParameters, RT]) -> generic.Callable[FunctionParameters, RT]:
         """
         Decorate the function with wrapper logic
 
@@ -1082,7 +1084,7 @@ class RecursiveEncoder(json.JSONEncoder):
     - dataclasses
     - items with `__dict__`
     - items with `__slots__`
-    - `typing.Mapping`s
+    - `generic.Mapping`s
     - Anything that may be iterated through
     """
     def __init__(self, *args, **kwargs):
@@ -1126,7 +1128,7 @@ class RecursiveEncoder(json.JSONEncoder):
 
         if hasattr(item_to_serialize, "to_dict") and callable(getattr(item_to_serialize, "to_dict")):
             try:
-                converted_item: typing.Dict[str, typing.Any] = item_to_serialize.to_dict()
+                converted_item: dict[str, typing.Any] = item_to_serialize.to_dict()
                 return self.default(converted_item)
             except:
                 pass
@@ -1134,17 +1136,17 @@ class RecursiveEncoder(json.JSONEncoder):
         import inspect
 
         if dataclasses.is_dataclass(item_to_serialize):
-            converted_dataclass: typing.Dict[str, typing.Any] = dataclasses.asdict(item_to_serialize)
+            converted_dataclass: dict[str, typing.Any] = dataclasses.asdict(item_to_serialize)
             return self.default(converted_dataclass)
 
-        if isinstance(item_to_serialize, typing.Mapping):
+        if isinstance(item_to_serialize, generic.Mapping):
             return {
                 str(key): self.default(value)
                 for key, value in item_to_serialize.items()
                 if value != item_to_serialize
             }
 
-        if isinstance(item_to_serialize, (typing.Iterator, typing.Iterable)):
+        if isinstance(item_to_serialize, (generic.Iterator, generic.Iterable)):
             return [
                 self.default(item)
                 for item in item_to_serialize

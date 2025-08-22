@@ -353,19 +353,19 @@ def reproject_variable(
     if resampling_strategy is None:
         resampling_strategy = rasterio.warp.Resampling.nearest
 
-    output_shape: typing.List[int] = []
+    output_shape: list[int] = []
     """
     The shape of the final output
     """
 
-    non_spatial_selectors: typing.List[typing.Tuple[str, int]] = []
+    non_spatial_selectors: list[tuple[str, int]] = []
     """
     A series of keys and sizes describing the dimensions, in order. 
     If the input coordinates are (time=18, x=4608, y=4092), this will result in [('time', 18)].
     We ensure order while maintaining the ability to find the right value
     """
 
-    lat_lon_shape: typing.Tuple[int, int] = (target_y_coordinate.size, target_x_coordinate.size)
+    lat_lon_shape: tuple[int, int] = (target_y_coordinate.size, target_x_coordinate.size)
     """The shape of the output data in spatial terms. Must come in y-axis, x-axis order"""
 
     should_transpose: bool = source_variable.dims.index(x_variable_name) < source_variable.dims.index(y_variable_name)
@@ -403,13 +403,13 @@ def reproject_variable(
     # Form combinations of non-spatial index groupings to select data by
     if non_spatial_selectors:
         from itertools import product
-        index_combinations: typing.Iterable[typing.Tuple[int, ...]] = product(*[
+        index_combinations: typing.Iterable[tuple[int, ...]] = product(*[
             range(size) for _, size in non_spatial_selectors
         ])
     else:
         # If the source was a grid and a grid alone, collect an empty tuple - this will run the loop once and not
         # select specific values
-        index_combinations: typing.Iterable[typing.Tuple[int, ...]] = [tuple()]
+        index_combinations: typing.Iterable[tuple[int, ...]] = [tuple()]
 
     reprojected_slice_buffer: numpy.ndarray = numpy.full(
         shape=lat_lon_shape,
@@ -419,9 +419,9 @@ def reproject_variable(
     """An array that contains a reprojected slice of data"""
 
     # Reproject each spatial slice
-    for index_combination in index_combinations:  # type: typing.Tuple[int, ...]
+    for index_combination in index_combinations:  # type: tuple[int, ...]
         # Select all data for the spatial slice by selecting, by index, on the non-spatial dimensions
-        selection_arguments: typing.Dict[str, int] = dict(zip(
+        selection_arguments: dict[str, int] = dict(zip(
             map(lambda pair: pair[0], non_spatial_selectors),
             index_combination
         ))
@@ -529,7 +529,7 @@ def reproject_data(
     )
     """The desired coordinate reference system to project into"""
 
-    crs_attributes: typing.Dict[str, typing.Any] = reprojection_crs_variable.attrs
+    crs_attributes: dict[str, typing.Any] = reprojection_crs_variable.attrs
     """The attributes that help define the desired coordinate reference system"""
 
     source_transformation: affine.Affine = get_affine_transformation(
@@ -613,7 +613,7 @@ def reproject_data(
 
         return dataset
 
-    new_coordinates: typing.List[xarray.DataArray] = [
+    new_coordinates: list[xarray.DataArray] = [
         reproject_variable(
             source_variable=variable,
             source_transform=source_transformation,
@@ -638,7 +638,7 @@ def reproject_data(
                 new_spatial_ref = crs_attributes.get('esri_pe_string', crs_attributes.get("spatial_ref"))
                 coordinate.attrs[attribute_name] = new_spatial_ref
 
-    new_variables: typing.List[xarray.DataArray] = [
+    new_variables: list[xarray.DataArray] = [
         reproject_variable(
             source_variable=variable,
             source_transform=source_transformation,
@@ -676,7 +676,7 @@ def reproject_data(
         coords=reprojection_crs_variable.coords,
     ))
 
-    new_attributes: typing.Dict[str, typing.Any] = dataset.attrs.copy()
+    new_attributes: dict[str, typing.Any] = dataset.attrs.copy()
 
     # Ensure that any global reference to a spatial reference system references the correct values
     for attribute_name, attribute_value in new_attributes.items():

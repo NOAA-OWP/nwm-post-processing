@@ -196,11 +196,6 @@ def subset_vector_file_into_file_by_value(
             elif this_is_very_verbose:
                 LOGGER.debug("All mask IDs are available")
 
-            original_indices: list[str] = []
-            for index_name, index in input_data.indexes.items():
-                LOGGER.debug(f"'{input_file}' has an index on '{index_name}': {type(index)}")
-                original_indices.append(index_name)
-
             dimensions_to_rename: dict[str, str] = {}
 
             if coordinate not in input_data.indexes and len(input_data.coords[coordinate].dims) == 1:
@@ -213,7 +208,6 @@ def subset_vector_file_into_file_by_value(
                     LOGGER.debug(f"Extracting data from '{input_file}' that matches the allowable ids")
 
                 if drop and coordinate in input_data.indexes:
-                    LOGGER.debug(f"Selecting masked ids based off of a straight 'sel' call")
                     new_coordinates: dict[str, xarray.DataArray] = {
                         str(name): xarray.DataArray(
                             data=select_via_numpy(

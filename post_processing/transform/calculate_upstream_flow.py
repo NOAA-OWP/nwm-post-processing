@@ -139,7 +139,9 @@ def calculate_upstream_flow(
         raise ValueError(
             f"Upstreamflow calculation is not an inplace operation - the input path and output path cannot match"
         )
-    LOGGER.debug(f"Calculating upstream flow on '{input_path}'")
+
+    if settings.verbosity >= Verbosity.VERBOSE:
+        LOGGER.debug(f"Calculating upstream flow on '{input_path}'")
     import xarray
     import pandas
     import numpy
@@ -180,13 +182,13 @@ def calculate_upstream_flow(
 
             # Create a mapping of feature ids to their upstream flow values
             #   * Provides an easier access pattern to the values based off of feature_id - going by Series isn't worth it
-            organized_values: typing.Dict[int, float] = upstream_values.to_dict()
+            organized_values: dict[int, float] = upstream_values.to_dict()
 
             # Create a new array of values, in the order of the 'from' values matching the organized_values.
             # The 'to' values won't be in the order of the 'from' values and there won't be matches for all 'from' values
             #   * numpy.vectorize is used here for a large performance improvement based on the relatively simple operation
             mapped_flow: numpy.ndarray = numpy.vectorize(organized_values.get)(linkage.from_)
-            encoding: typing.Dict[str, typing.Any] = {**data_to_transform[variable].encoding, **encoding}
+            encoding: dict[str, typing.Any] = {**data_to_transform[variable].encoding, **encoding}
 
             # Create the upstreamflow variable and add it to the dataset
             upstreamflow_variable = xarray.Variable(

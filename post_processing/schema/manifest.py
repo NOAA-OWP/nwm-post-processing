@@ -44,11 +44,11 @@ class InputManifest(BaseModel):
         """
         Create a manifest from a set of files
         """
-        nwm_files: typing.List[NWMFile] = list(map(
+        nwm_files: list[NWMFile] = list(map(
             lambda path: NWMFile.parse(path=path),
             files
         ))
-        included_groups: typing.Set[int] = set(map(lambda nwm_file: nwm_file.group_hash, nwm_files))
+        included_groups: set[int] = set(map(lambda nwm_file: nwm_file.group_hash, nwm_files))
         if len(included_groups) > 1:
             raise ValueError(
                 f"Cannot load the following files into a manifest - they represent multiple incompatible groups:{os.linesep}"

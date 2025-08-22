@@ -92,10 +92,9 @@ def load_netcdf(
             try:
                 if settings.verbosity >= enums.Verbosity.LOUD:
                     LOGGER.debug(f"Loading '{path}'", stack_info=True)
-                else:
-                    LOGGER.debug(f"Loading '{path}'")
+
                 dataset: xarray.Dataset = xarray.open_dataset(path, engine=engine, chunks=chunks, **kwargs)
-                LOGGER.debug(f"Data from '{path}' has been loaded")
+
                 # NOTE: It would be safer to load everything in full and move on, but that adds a significant
                 # performance cost. For now, full loads won't be performed by default.
                 break
@@ -123,12 +122,11 @@ def load_netcdf(
     return dataset
 
 
-#@simple_cache(invalidator_function=_invalidate_netcdf_cache)
 @timed_function()
 def load_metadata(
     path: typing.Union[pathlib.Path, str, typing.Sequence[typing.Union[pathlib.Path, str]]],
     engine: typing.Union[str, typing.Literal["h5netcdf", "zarr", "netcdf4"]] = settings.default_netcdf_engine,
-) -> typing.Dict[str, typing.Any]:
+) -> dict[str, typing.Any]:
     """
     Get the metadata attached to a netcdf file and its variables
 
@@ -144,7 +142,7 @@ def load_metadata(
     if isinstance(path, pathlib.Path):
         path = [path]
 
-    metadata: typing.Dict[str, typing.Any] = {}
+    metadata: dict[str, typing.Any] = {}
     for input_path in path:
         with OPEN_LOCK:
             with xarray.open_dataset(filename_or_obj=input_path, engine=engine, chunks="auto") as source:
@@ -162,7 +160,7 @@ def load_metadata(
     return metadata
 
 @timed_function()
-def _get_variable_metadata(variable: "xarray.DataArray") -> typing.Dict[str, typing.Any]:
+def _get_variable_metadata(variable: "xarray.DataArray") -> dict[str, typing.Any]:
     """
     Get the metadata for specific netcdf variable
 
@@ -236,7 +234,7 @@ def format_variable(var: "xarray.DataArray") -> typing.Sequence[str]:
     tab: str = "    "
 
     variable_definition_template: str = "{dtype} {variable_name}({dimensions}):"
-    lines_for_variable: typing.List[str] = [
+    lines_for_variable: list[str] = [
         variable_definition_template.format(
             dtype=str(var.dtype),
             variable_name=var.name,
@@ -308,7 +306,7 @@ def describe_netcdf(
     separator: str = "="
     tab: str = "    "
 
-    lines: typing.List[str] = [
+    lines: list[str] = [
         separator_placeholder,
     ]
     if variable_name is not None:

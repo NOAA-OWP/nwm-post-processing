@@ -44,7 +44,7 @@ def keep_only_variables(
 def remove_variables(
     input_file: typing.Union[str, pathlib.Path],
     output_file: typing.Union[str, pathlib.Path],
-    variables: typing.List[str]
+    variables: list[str]
 ) -> pathlib.Path:
     """
     Remove variables by name

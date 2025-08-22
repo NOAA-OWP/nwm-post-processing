@@ -49,7 +49,7 @@ class NetcdfTypeDetails:
     code: str
     rank: int
     group: AttributeTypeGroup
-    alternate_names: typing.List[str] = dataclasses.field(default_factory=list)
+    alternate_names: list[str] = dataclasses.field(default_factory=list)
     print_unit: bool = dataclasses.field(default=True)
 
     def __hash__(self):
@@ -213,7 +213,7 @@ class NetcdfType(enum.Enum):
         :param other_types: The other types to compare if all are positional
         :returns: The attribute type that can contain the values of all provided types
         """
-        all_types: typing.Set[NetcdfType] = set(other_types)
+        all_types: set[NetcdfType] = set(other_types)
 
         if isinstance(types, NetcdfType):
             all_types.add(types)
@@ -227,7 +227,7 @@ class NetcdfType(enum.Enum):
 
         all_types.difference_update({None})
 
-        invalid_types: typing.List[str] = [
+        invalid_types: list[str] = [
             f"{considered_type} (type={type(considered_type)})"
             for considered_type in all_types
             if not isinstance(considered_type, cls)
@@ -253,7 +253,7 @@ class NetcdfType(enum.Enum):
         :returns: The attribute type
         """
         string = string.strip().lower()
-        mapping: typing.Dict[str, NetcdfType] = {}
+        mapping: dict[str, NetcdfType] = {}
 
         for member in cls:
             value: NetcdfTypeDetails = member.value
@@ -297,7 +297,7 @@ class Attribute:
     def __repr__(self):
         return self.__str__()
 
-    def _detect_unit(self, value: str = None) -> typing.Tuple[str, NetcdfType]:
+    def _detect_unit(self, value: str = None) -> tuple[str, NetcdfType]:
         """
         Determine the proper unit provided by the attribute
         """
@@ -312,7 +312,7 @@ class Attribute:
         # If there is a ', ' at this point, we know we're detailing with an array
         #   We can be sure that this isn't something inside a crs, for example, because that would have been caught above
         if ", " in value:
-            values: typing.List[str] = []
+            values: list[str] = []
             dtype: typing.Optional[NetcdfType] = None
 
             for contained_value in value.split(", "):
@@ -370,9 +370,9 @@ class DataVariable:
     """The name of the variable"""
     type: NetcdfType
     """The type of data contained within this variable"""
-    dimensions: typing.List[str]
+    dimensions: list[str]
     """The names of the dimensions used as coordinates"""
-    attributes: typing.List[Attribute]
+    attributes: list[Attribute]
     """The attributes for the variable"""
 
     def __getitem__(self, item: str) -> typing.Any:
@@ -408,13 +408,13 @@ class NetcdfSummary:
     """
     Contains a parsed header of a netcdf file, showing details of its dimensions and data variables
     """
-    unlimited_dimensions: typing.List[str]
+    unlimited_dimensions: list[str]
     """All dimensions that don't have a limit and may be used as records"""
-    all_dimensions: typing.List[str]
+    all_dimensions: list[str]
     """The names of all dimensions"""
-    data_variables: typing.List[DataVariable]
+    data_variables: list[DataVariable]
     """All variables that contain data (i.e. not coordinates) paired with their dimensions"""
-    attributes: typing.List[Attribute]
+    attributes: list[Attribute]
     """Global level attributes for a netcdf file"""
     path: pathlib.Path
     """The path to the netcdf file that this summary belongs to"""
@@ -458,13 +458,13 @@ class NetcdfSummary:
             for match in variable_definition_pattern.finditer(header)
         ]
 
-        dimension_names: typing.List[str] = [
+        dimension_names: list[str] = [
             group[dimension_name_parameter]
             for group in dimension_matches
         ]
 
-        attributes: typing.Dict[str, typing.List[Attribute]] = {}
-        global_attributes: typing.List[Attribute] = []
+        attributes: dict[str, list[Attribute]] = {}
+        global_attributes: list[Attribute] = []
 
         for line in header.splitlines():
             match: typing.Optional[re.Match] = attribute_pattern.match(line)
@@ -484,13 +484,13 @@ class NetcdfSummary:
                         )
                     )
 
-        unlimited_dimension_names: typing.List[str] = [
+        unlimited_dimension_names: list[str] = [
             group[dimension_name_parameter]
             for group in dimension_matches
             if group[count_parameter] == "UNLIMITED"
         ]
 
-        data_variables: typing.List[DataVariable] = [
+        data_variables: list[DataVariable] = [
             DataVariable(
                 name=group[variable_name_parameter],
                 type=NetcdfType.from_string(group[dtype_parameter]),
@@ -514,5 +514,5 @@ class NetcdfSummary:
         """
         Load a series of netcdf data into summary objects
         """
-        summaries: typing.List[NetcdfSummary] = list(map(NetcdfSummary.load, paths))
+        summaries: list[NetcdfSummary] = list(map(NetcdfSummary.load, paths))
         return summaries
