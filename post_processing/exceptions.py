@@ -8,7 +8,7 @@ class ArgumentValidationException(Exception):
     """Occurs when arguments for an application are not valid"""
     def __init__(self, application_name: str, *message: str, messages: typing.Iterable[str]):
         self.application_name: str = application_name
-        self.messages: typing.List[str] = list(message) + list(messages)
+        self.messages: list[str] = list(message) + list(messages)
         separator: str = f"{os.linesep}    -"
         core_message: str = f"Arguments for {application_name} were invalid:{separator}{separator.join(self.messages)}"
         super().__init__(core_message)

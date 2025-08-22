@@ -19,7 +19,7 @@ def member(
     *,
     default: T = dataclasses.MISSING,
     default_factory: typing.Callable[[], T] = dataclasses.MISSING,
-    metadata: typing.Dict = None,
+    metadata: dict = None,
     kw_only: bool = False,
 ) -> dataclasses.Field:
     """
@@ -86,12 +86,12 @@ class BaseModel:
         :param kwargs: Keyword arguments
         :return: A newly constructed model
         """
-        type_hints: typing.Dict[str, typing.Any] = typing.get_type_hints(cls)
-        initial_values: typing.Dict[str, typing.Any] = {}
+        type_hints: dict[str, typing.Any] = typing.get_type_hints(cls)
+        initial_values: dict[str, typing.Any] = {}
 
         for field in get_fields(cls):  # type: dataclasses.Field
             if field.name in kwargs:
-                value: typing.Union[typing.Dict, typing.Any] = kwargs[field.name]
+                value: typing.Union[dict, typing.Any] = kwargs[field.name]
                 expected_type: typing.Optional[typing.Type] = type_hints.get(field.name)
 
                 if dataclasses.is_dataclass(expected_type) and isinstance(value, dict):
@@ -179,7 +179,7 @@ class BaseModel:
                and not field.name.startswith("_")
         ]
 
-        values: typing.Dict[str, typing.Any] = {}
+        values: dict[str, typing.Any] = {}
 
         for field in fields:
             value: typing.Any = getattr(self, field.name)
@@ -210,7 +210,7 @@ def get_fields(class_or_instance) -> typing.Sequence[dataclasses.Field]:
 
     return fields
 
-def to_dict(obj: typing.Any) -> typing.Union[typing.Dict[str, typing.Any], typing.Any]:
+def to_dict(obj: typing.Any) -> typing.Union[dict[str, typing.Any], typing.Any]:
     """
     Convert a dataclass into a dictionary while excluding member fields
 
@@ -220,7 +220,7 @@ def to_dict(obj: typing.Any) -> typing.Union[typing.Dict[str, typing.Any], typin
     if not dataclasses.is_dataclass(obj=obj):
         return obj
 
-    dictionary: typing.Dict[str, typing.Any] = {
+    dictionary: dict[str, typing.Any] = {
         field.name: getattr(obj, field.name)
         for field in get_fields(obj)
     }

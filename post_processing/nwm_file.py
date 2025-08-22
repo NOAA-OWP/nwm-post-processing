@@ -71,7 +71,7 @@ class NWMFile:
                 f"r'{common.NWM_FILENAME_PATTERN.pattern}'"
             )
 
-        raw_data: typing.Dict[str, str] = match.groupdict()
+        raw_data: dict[str, str] = match.groupdict()
 
         cycle: int = int(raw_data[common.CYCLE_PATTERN_VARIABLE])
 

@@ -81,7 +81,7 @@ def _set_env(key: str, value: typing.Any):
     os.environ[key] = value
 
 
-def _parse_env_file(env_path: pathlib.Path) -> typing.Dict[str, typing.Any]:
+def _parse_env_file(env_path: pathlib.Path) -> dict[str, typing.Any]:
     """
     Parse an .env without involving 3rd party libraries
 
@@ -108,7 +108,7 @@ def _parse_env_file(env_path: pathlib.Path) -> typing.Dict[str, typing.Any]:
 
     file_text: str = env_path.read_text()
 
-    configured_variables: typing.Dict[str, typing.Any] = {}
+    configured_variables: dict[str, typing.Any] = {}
 
     for match in line_pattern.finditer(file_text):
         configured_variables[match.group("variable_name").lower()] = match.group("variable_value")
@@ -149,7 +149,7 @@ class _Settings(UserDict):
         :param key: The name of the environment variable to find
         :returns: The appropriate key
         """
-        matching_keys: typing.List[str] = [
+        matching_keys: list[str] = [
             contained_key
             for contained_key in self.keys()
             if key.lower() == contained_key.lower()
@@ -362,7 +362,7 @@ class _Settings(UserDict):
         entries: typing.Optional[typing.Sequence[str]] = self.get(key)
 
         if entries is None:
-            entries: typing.List[str] = []
+            entries: list[str] = []
             names_from_environment: typing.Optional[str] = os.environ.get(key)
 
             if names_from_environment is not None:
@@ -908,14 +908,14 @@ class _Settings(UserDict):
 
         self.__setitem__(key=key, item=value)
 
-    def to_dict(self) -> typing.Dict[str, typing.Any]:
+    def to_dict(self) -> dict[str, typing.Any]:
         """
         Represent all settings as a dictionary
         """
         import inspect
-        values: typing.Dict[str, typing.Any] = {}
+        values: dict[str, typing.Any] = {}
 
-        properties: typing.List[typing.Tuple[str, property]] = inspect.getmembers(
+        properties: list[tuple[str, property]] = inspect.getmembers(
             self.__class__,
             predicate=lambda member: isinstance(member, property)
         )

@@ -220,7 +220,7 @@ class JSONLogHandler(logging.Handler):
         :return: The record formatted as a json entry ready to be added to the log
         """
         # NOTE: If you want added fields within the json log, add it here
-        entry: typing.Dict[str, typing.Any] = {
+        entry: dict[str, typing.Any] = {
             'timestamp': self.formatter.formatTime(record),
             'message': record.getMessage(),
             'level': record.levelname,
@@ -303,7 +303,7 @@ def override_log_levels(log_level_override_path: pathlib.Path = None):
 
     import json
     try:
-        overrides: typing.Dict[str, typing.Union[str, int]] = json.loads(log_level_override_path.read_text())
+        overrides: dict[str, typing.Union[str, int]] = json.loads(log_level_override_path.read_text())
     except json.decoder.JSONDecodeError as error:
         logging.warning(
             f"Could not deserialize the file at '{log_level_override_path}'. No log levels will be overridden. {error}"
@@ -332,7 +332,7 @@ def setup_logging(log_path: typing.Union[pathlib.Path, str] = None):
 
     if log_path is not None and log_path.is_file():
         import json
-        configuration: typing.Dict = json.loads(log_path.read_text())
+        configuration: dict = json.loads(log_path.read_text())
         logging.config.dictConfig(config=configuration)
 
         if settings.debug:
@@ -370,7 +370,7 @@ def setup_logging(log_path: typing.Union[pathlib.Path, str] = None):
         for handler in logging.root.handlers:
             handler.setLevel(logging.DEBUG)
 
-    file_handlers: typing.List[logging.Handler] = list(filter(
+    file_handlers: list[logging.Handler] = list(filter(
         lambda hndlr: isinstance(hndlr, logging.FileHandler),
         logging.root.handlers
     ))

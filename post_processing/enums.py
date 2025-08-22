@@ -5,7 +5,7 @@ import typing
 import enum
 
 
-_PRINT_REPLACEMENTS: typing.Dict[str, str] = {
+_PRINT_REPLACEMENTS: dict[str, str] = {
     "no_da": "No Data Assimilation",
     "analysis_assim": "Analysis and Assimilation",
     "extend": "Extended",
@@ -51,7 +51,7 @@ class PostProcessingEnumeration(enum.Enum):
 
     def describe(self) -> str:
         from post_processing.utilities.common import format_identifier_to_title
-        value_parts: typing.List[str] = format_identifier_to_title(self.value).split(" ")
+        value_parts: list[str] = format_identifier_to_title(self.value).split(" ")
 
         for part_index, part in enumerate(value_parts):
             for key, replacement in _PRINT_REPLACEMENTS.items():

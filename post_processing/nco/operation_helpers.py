@@ -61,7 +61,7 @@ class EditMode(enum.StrEnum):
     @classmethod
     def from_string(cls, string: str) -> "EditMode":
         string = string.strip().lower()
-        mapping: typing.Dict[str, EditMode] = {
+        mapping: dict[str, EditMode] = {
             "append_if_exists": cls.APPEND_IF_EXISTS
         }
 
@@ -104,7 +104,7 @@ class NCOFunction(enum.StrEnum):
         return all(programs_exist)
 
 
-def run_command(command: str, *positional_args, prevent_history: bool = True) -> typing.Tuple[str, str]:
+def run_command(command: str, *positional_args, prevent_history: bool = True) -> tuple[str, str]:
     """
     A consistent function used to execute the CLI commands for running
 

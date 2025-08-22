@@ -139,13 +139,13 @@ def merge_files(files: typing.Sequence[str | pathlib.Path]) -> xarray.Dataset:
             combined_files[variable_name] = variable.astype(numpy.float32)
             combined_files[variable_name].encoding.update(previous_encoding)
 
-    dimension_groups: typing.Set[typing.Tuple[str, ...]] = {
+    dimension_groups: set[tuple[str, ...]] = {
         tuple(map(str, variable.dims))
         for variable in combined_files.data_vars.values()
         if variable.dims
     }
 
-    new_order: typing.List[str] = [*combined_files.encoding.get("unlimited_dims", [])]
+    new_order: list[str] = [*combined_files.encoding.get("unlimited_dims", [])]
     for dimension_group in dimension_groups:
         for dimension in dimension_group:
             if dimension not in new_order:

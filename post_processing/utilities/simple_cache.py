@@ -19,7 +19,7 @@ SENTINEL = object()
 
 @dataclasses.dataclass
 class KeyTuple:
-    args: typing.Tuple[typing.Any, ...]
+    args: tuple[typing.Any, ...]
     kwargs: typing.Mapping[str, typing.Any]
 
     def __eq__(self, other: typing.Any) -> bool:
@@ -112,11 +112,11 @@ class SimpleCache(typing.Generic[VT]):
         self.__lock: threading.RLock = threading.RLock()
         self.__max_size: int = max_size
         self.__function: typing.Callable[ParamSpec, VT] = function
-        self.__values: typing.List[CacheEntry[VT]] = []
+        self.__values: list[CacheEntry[VT]] = []
         self.__should_invalidate: typing.Callable[[CacheEntry[VT]], bool] = invalidator_function
 
     def search(self, *args, **kwargs) -> typing.Optional[CacheEntry[VT]]:
-        key: typing.Tuple[typing.Tuple[typing.Any, ...], typing.Mapping[str, typing.Any]] = (args, kwargs)
+        key: tuple[tuple[typing.Any, ...], typing.Mapping[str, typing.Any]] = (args, kwargs)
 
         for entry in self.__values:
             if key == entry.key:

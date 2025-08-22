@@ -56,7 +56,7 @@ class Arguments:
         """
         Raise exceptions if arguments are invalid
         """
-        messages: typing.List[str] = []
+        messages: list[str] = []
 
         if self.settings or self.version:
             return
@@ -159,7 +159,7 @@ def show_version():
         version: str = (pathlib.Path(__file__).parent / '__version__.py').read_text().strip()
     elif (settings.application_path / "pyproject.toml").is_file():
         import tomllib
-        pyproject_data: typing.Dict[str, typing.Any] = tomllib.loads((settings.application_path / "pyproject.toml").read_text())
+        pyproject_data: dict[str, typing.Any] = tomllib.loads((settings.application_path / "pyproject.toml").read_text())
 
         if 'project' in pyproject_data and 'version' in pyproject_data['project']:
             version = pyproject_data['project']['version']
@@ -173,7 +173,7 @@ def show_version():
         if parser.has_section("metadata") and parser.has_option("metadata", "version"):
             version = parser.get("metadata", "version")
 
-    versions: typing.List[str] = [
+    versions: list[str] = [
         f"{'Git Commit'.ljust(20)}: {commit}",
         f"{'Application Version'.ljust(20)}: {version}",
     ]
