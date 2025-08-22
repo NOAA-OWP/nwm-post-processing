@@ -138,8 +138,6 @@ def run_command(command: str, *positional_args, prevent_history: bool = True) ->
             f""
         )
 
-    LOGGER.debug(f"Ran the following command in {datetime.now() - start}: {command}")
-
     return command_result.stdout.strip(), command_result.stderr.strip()
 
 

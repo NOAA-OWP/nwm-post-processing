@@ -47,6 +47,7 @@ class Arguments:
         """Print the version rather than run a profile"""
         self.settings: bool = False
         """Print available settings rather than run a profile"""
+        self.analyze: bool = False
 
         self.__parse(args=args)
         self.__validate()
@@ -117,6 +118,12 @@ class Arguments:
             "-p",
             action="store_true",
             help="Print the headers of each produced file"
+        )
+
+        parser.add_argument(
+            "--analyze",
+            action="store_true",
+            help="Measure runtime performance"
         )
 
         parameters: argparse.Namespace = parser.parse_args(args=args) if args else parser.parse_args()
@@ -196,6 +203,13 @@ def main() -> int:
     except ArgumentValidationException as exception:
         LOGGER.critical(str(exception))
         return 2
+
+    profiler = None
+    if arguments.analyze:
+        LOGGER.info("Collecting runtime performance data")
+        import cProfile
+        profiler: typing.Optional[cProfile.Profile] = cProfile.Profile()
+        profiler.enable()
 
     if arguments.settings:
         try:
@@ -296,6 +310,12 @@ def main() -> int:
         LOGGER.critical(f"National Water Model Post Processing could not provide outputs", exc_info=False)
         return 1
     LOGGER.info(f"Operation complete in {datetime.now() - start_time}")
+
+    if profiler is not None:
+        profiler.disable()
+        filename: str = f"{datetime.now().astimezone().strftime('%Y%m%d.%H%M')}_{arguments.source_file.name}.profile"
+        profiler.dump_stats(filename)
+        LOGGER.info(f"Profile results saved to: {filename}")
     return 0
 
 

@@ -9,15 +9,72 @@ import logging
 
 from collections import abc as generic
 
-
 from post_processing.configuration import settings
 from post_processing.utilities.common import timed_function
+
+if typing.TYPE_CHECKING:
+    import numpy
+    import xarray
 
 LOGGER: logging.Logger = logging.getLogger(pathlib.Path(__file__).name)
 
 T = typing.TypeVar("T")
 
-@timed_function(logger=LOGGER)
+class _MaskProvider:
+    def __init__(self):
+        import numpy
+        import threading
+        self.__lock: threading.RLock = threading.RLock()
+        self.__mask_ids: dict[tuple[pathlib.Path, str], numpy.ndarray] = {}
+        self.__sizes: dict[pathlib.Path, dict[str, int]] = {}
+        self.__variables: dict[pathlib.Path, list[str]] = {}
+
+    def __load_mask(self, path: pathlib.Path, variable: str):
+        import numpy
+        import xarray
+        from post_processing.utilities.netcdf import load_netcdf
+
+        with self.__lock:
+            mask_id_key: tuple[pathlib.Path, str] = (path, variable)
+
+            if mask_id_key in self.__mask_ids and path in self.__sizes and path in self.__variables:
+                return
+
+            with load_netcdf(path=path) as mask_source:
+                if variable not in mask_source:
+                    raise KeyError(f"'{variable}' is not a variable within '{path}'. It may not be used as a mask")
+
+                mask_variable: xarray.DataArray = mask_source[variable]
+                mask_values: numpy.ndarray = mask_variable.data
+
+                mask_ids: numpy.ndarray = numpy.unique(mask_values)
+
+                self.__mask_ids[(path, variable)] = mask_ids
+                self.__sizes[path] = {str(name): count for name, count in mask_source.sizes.items()}
+                self.__variables[path] = list(mask_source.variables.keys())
+
+    def get_ids(self, path: pathlib.Path, variable: str) -> "numpy.ndarray":
+        key: tuple[pathlib.Path, str] = (path, variable)
+
+        if key in self.__mask_ids:
+            return self.__mask_ids[key]
+
+        self.__load_mask(path=path, variable=variable)
+        return self.__mask_ids[key]
+
+    def get_variables(self, path: pathlib.Path, variable: str) -> generic.Sequence[str]:
+        if path not in self.__variables:
+            self.__load_mask(path=path, variable=variable)
+        return self.__variables[path]
+
+    def get_sizes(self, path: pathlib.Path, variable: str) -> generic.Mapping[str, int]:
+        if path not in self.__sizes:
+            self.__load_mask(path=path, variable=variable)
+        return self.__sizes[path]
+
+MASK_PROVIDER = _MaskProvider()
+
+@timed_function()
 def subset_vector_file_into_file_by_value(
     input_file: pathlib.Path,
     mask: pathlib.Path,
@@ -89,17 +146,14 @@ def subset_vector_file_into_file_by_value(
                     f"Cannot subset values based off of '{coordinate}' in '{input_file}' - "
                     f"it is a dimension, not a variable, and may only provide indices, not values"
                 )
+
             if coordinate not in input_data.variables:
                 raise KeyError(f"{coordinate} is not a valid variable to subset on within '{input_file}'")
+
             if this_is_verbose:
                 LOGGER.debug(f"Loaded '{input_file}' to be masked by '{mask}'")
 
-            mask_data: xarray.DataArray = netcdf.load_variable(path=mask, variable_name=mask_coordinate)
-
-            if this_is_verbose:
-                LOGGER.debug(f"Loaded the mask at '{mask}'")
-
-            mask_ids: numpy.ndarray = numpy.unique(mask_data.values)
+            mask_ids: numpy.ndarray = MASK_PROVIDER.get_ids(path=mask, variable=mask_coordinate)
 
             if this_is_verbose:
                 LOGGER.debug(f"Loading '{coordinate}' values from the input ({input_file})")
@@ -132,38 +186,74 @@ def subset_vector_file_into_file_by_value(
                     f"be in the output. Missing IDs:"
                     f"{missing_id_line_joiner}{missing_id_line_joiner.join(map(str, missing_mask_ids))}{continue_text}{os.linesep}"
                     f"Samples:{os.linesep}"
-                    f"{mask.name}: {mask_data[mask_coordinate].values[:5]}{os.linesep}"
+                    f"{mask.name}: {MASK_PROVIDER.get_ids(path=mask, variable=mask_coordinate)[:5]}{os.linesep}"
                     f"{input_file.name}: {input_ids[:5]}{os.linesep}"
                     f"Are you using the right variables and/or dimensions?{os.linesep}"
-                    f"Mask Variables: {mask_data.sizes}, {list(mask_data.variables.keys())}{os.linesep}"
+                    f"Mask Variables: {MASK_PROVIDER.get_sizes(path=mask, variable=mask_coordinate)}, {', '.join(MASK_PROVIDER.get_variables(path=mask, variable=mask_coordinate))}{os.linesep}"
                     f"Input Variables: {input_data.sizes}, {list(input_data.variables.keys())}{os.linesep}"
                 )
                 mask_ids = mask_ids[numpy.isin(mask_ids, input_ids)]
             elif this_is_very_verbose:
                 LOGGER.debug("All mask IDs are available")
 
+            original_indices: list[str] = []
+            for index_name, index in input_data.indexes.items():
+                LOGGER.debug(f"'{input_file}' has an index on '{index_name}': {type(index)}")
+                original_indices.append(index_name)
+
+            dimensions_to_rename: dict[str, str] = {}
+
+            if coordinate not in input_data.indexes and len(input_data.coords[coordinate].dims) == 1:
+                target_dimension: str = str(input_data.coords[coordinate].dims[0])
+                input_data = input_data.swap_dims({target_dimension: coordinate})
+                dimensions_to_rename[coordinate] = target_dimension
+
             try:
                 if this_is_verbose:
                     LOGGER.debug(f"Extracting data from '{input_file}' that matches the allowable ids")
 
                 if drop and coordinate in input_data.indexes:
-                    subset_data: xarray.Dataset = input_data.sel(**{coordinate: mask_ids})
-                elif drop and coordinate in input_data.coords and len(input_data.coords[coordinate].dims) == 1:
-                    # If the coordinate is for a single dimension, we can match it up with its dimension to find the
-                    # actual usable indices
-                    target_dimension: str = str(input_data.coords[coordinate].dims[0])
+                    LOGGER.debug(f"Selecting masked ids based off of a straight 'sel' call")
+                    new_coordinates: dict[str, xarray.DataArray] = {
+                        str(name): xarray.DataArray(
+                            data=select_via_numpy(
+                                variable,
+                                {
+                                    coordinate: mask_ids
+                                }
+                            ),
+                            attrs=variable.attrs.copy(),
+                            name=name,
+                            dims=tuple(list(variable.dims))
+                        )
+                        for name, variable in input_data.coords.items()
+                    }
+                    subset_data: xarray.Dataset = xarray.Dataset(
+                        data_vars={
+                            name: xarray.DataArray(
+                                data=select_via_numpy(
+                                    input_data=variable,
+                                    selectors={
+                                        coordinate: mask_ids
+                                    }
+                                ),
+                                name=name,
+                                dims=tuple(list(variable.dims)),
+                                coords=[
+                                    new_coordinates[coordinate]
+                                    for coordinate in variable.coords.keys()
+                                ],
+                                attrs=variable.attrs.copy()
+                            )
+                            for name, variable in input_data.data_vars.items()
+                        },
+                        coords=new_coordinates,
+                        attrs=input_data.attrs.copy(),
+                    )
+                    for variable_name in subset_data.data_vars.keys():
+                        subset_data[variable_name].encoding.update(input_data[variable_name].encoding)
 
-                    # Isolate the values from within the coordinate values that are within the allowable ids
-                    matching_values_mask: numpy.ndarray[numpy.bool_] = input_data.coords[coordinate].isin(mask_ids).values
-
-                    # Identify the indices that are nonzero (i.e. all the `True` values)
-                    indices_that_fit_per_dimension: tuple[numpy.ndarray, ...] = numpy.nonzero(matching_values_mask)
-
-                    # nonzero breaks up data per dimension. Get only the first, since we're one-dimensional
-                    fitting_indices_for_target_dimension: numpy.ndarray[numpy.integer] = indices_that_fit_per_dimension[0]
-
-                    # Now select the data by index by the dimension that this coordinate represents
-                    subset_data: xarray.Dataset = input_data.isel(**{target_dimension: fitting_indices_for_target_dimension})
+                    subset_data.encoding.update(input_data.encoding)
                 else:
                     LOGGER.warning(
                         f"'{coordinate}' is not an index in '{input_file.name}' - this might result in a slowdown."
@@ -172,6 +262,7 @@ def subset_vector_file_into_file_by_value(
                         input_data[coordinate].compute().isin(mask_ids),
                         drop=drop
                     )
+                    LOGGER.debug(f"Selected valid locations based on 'where' statement'")
             except Exception as e:
                 if "not all values found in index" in str(e):
                     input_ids: numpy.typing.NDArray[numpy.integer] = input_data[coordinate].values
@@ -186,23 +277,30 @@ def subset_vector_file_into_file_by_value(
                         f"Cannot subset the input data - missing the following IDs:{os.linesep}"
                         f"    - {(os.linesep + '    - ').join(list(map(str, missing_input_ids)))}{continue_text}{os.linesep}"
                         f"Samples:{os.linesep}"
-                        f"{mask.name}: {mask_data[mask_coordinate].values[:5]}{os.linesep}"
+                        f"{mask.name}: {MASK_PROVIDER.get_ids(path=mask, variable=mask_coordinate)[:5]}{os.linesep}"
                         f"{input_file.name}: {input_ids[:5]}{os.linesep}"
                         f"Are you using the right variables and/or dimensions?{os.linesep}"
-                        f"Mask Variables: {mask_data.sizes}, {list(mask_data.variables.keys())}{os.linesep}"
+                        f"Mask Variables: {MASK_PROVIDER.get_sizes(path=mask, variable=mask_coordinate)}, {', '.join(MASK_PROVIDER.get_variables(path=mask, variable=mask_coordinate))}{os.linesep}"
                         f"Input Variables: {input_data.sizes}, {list(input_data.variables.keys())}{os.linesep}"
                     )
                 raise
+
+            if dimensions_to_rename:
+                LOGGER.debug(
+                    f"Dimensions that were relabeled to aid in selection now need to be switched back: "
+                    f"{dimensions_to_rename}"
+                )
+                subset_data = subset_data.rename_dims(dims_dict=dimensions_to_rename)
 
             if len(subset_data[coordinate].values) == 0:
                 raise Exception(
                     f"The mask at '{mask}' is invalid for the data at '{input_file}' - "
                     f"none of the IDs within '{mask.name}::{mask_coordinate}' are available within {input_file.name}::{coordinate}. {os.linesep}"
                     f"Samples:{os.linesep}"
-                    f"{mask.name}: {mask_data[mask_coordinate].values[:5]}{os.linesep}"
+                    f"{mask.name}: {MASK_PROVIDER.get_ids(path=mask, variable=mask_coordinate)[:5]}{os.linesep}"
                     f"{input_file.name}: {input_ids[:5]}{os.linesep}"
                     f"Are you using the right variables and/or dimensions?{os.linesep}"
-                    f"Mask Variables: {mask_data.sizes}, {list(mask_data.variables.keys())}{os.linesep}"
+                    f"Mask Variables: {MASK_PROVIDER.get_sizes(path=mask, variable=mask_coordinate)}, {', '.join(MASK_PROVIDER.get_variables(path=mask, variable=mask_coordinate))}{os.linesep}"
                     f"Input Variables: {input_data.sizes}, {list(input_data.variables.keys())}{os.linesep}"
                 )
 
@@ -212,8 +310,17 @@ def subset_vector_file_into_file_by_value(
             if 'stage' in (identifiers or {}):
                 subset_data.attrs['process_step'] = identifiers.get('stage')
 
-            successfully_saved: bool = netcdf.save_netcdf(path=temporary_output_path, dataset=subset_data)
+            for variable_name, variable in subset_data.variables.items():
+                if "chunksizes" in variable.encoding:
+                    subset_data[variable_name].encoding["chunksizes"] = tuple(variable.sizes.values())
 
+                if "preferred_chunks" in variable.encoding:
+                    subset_data[variable_name].encoding["preferred_chunks"] = dict(variable.sizes)
+
+                if "original_shape" in variable.encoding:
+                    subset_data[variable_name].encoding["original_shape"] = tuple(variable.sizes.values())
+
+            successfully_saved: bool = netcdf.save_netcdf(path=temporary_output_path, dataset=subset_data)
             if not successfully_saved:
                 raise Exception(
                     f"Something kept masked data from being saved to '{temporary_output_path}' without a suitable error"
@@ -225,7 +332,26 @@ def subset_vector_file_into_file_by_value(
 
     return output_path
 
-@timed_function(logger=LOGGER)
+
+def select_via_numpy(input_data: "xarray.DataArray", selectors: generic.Mapping[str, generic.Sequence | slice]) -> "numpy.ndarray":
+    import numpy
+
+    raw_data: numpy.ndarray = input_data.data
+    indices: list[generic.Sequence | slice] = []
+    for dimension_name in input_data.sizes.keys():
+        raw_coordinate_values: numpy.ndarray = input_data.coords[dimension_name].values
+        selector: generic.Sequence | slice = selectors.get(str(dimension_name), slice(None))
+
+        if isinstance(selector, slice):
+            start = numpy.searchsorted(raw_coordinate_values, selector.start) if selector.start is not None else None
+            stop = numpy.searchsorted(raw_coordinate_values, selector.stop) if selector.stop is not None else None
+            indices.append(slice(start, stop))
+        else:
+            indices.append(numpy.nonzero(numpy.isin(raw_coordinate_values, selector))[0])
+    return raw_data[tuple(indices)]
+
+
+@timed_function()
 def subset_gridded_file_into_file_by_mask(
     input_file: pathlib.Path,
     mask_path: pathlib.Path,
@@ -372,7 +498,7 @@ def subset_gridded_file_into_file_by_mask(
 
     return output_paths
 
-@timed_function(logger=LOGGER)
+@timed_function()
 def subset_file_into_file_by_mask(
     input_file: pathlib.Path,
     mask: pathlib.Path,

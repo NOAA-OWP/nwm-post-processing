@@ -9,75 +9,21 @@ import collections.abc as generic
 
 from post_processing import enums
 from post_processing.configuration import settings
-from post_processing.utilities.simple_cache import simple_cache
-from post_processing.utilities.simple_cache import CacheEntry
 from post_processing.enums import Verbosity
+
+from post_processing.utilities.common import timed_function
 
 if typing.TYPE_CHECKING:
     import xarray
 
 
 LOGGER: logging.Logger = logging.getLogger(pathlib.Path(__file__).stem)
-SAVED_FILES: typing.List[pathlib.Path] = []
-"""
-A list of files that have been saved. This will indicate if there are frequent rewrites to a file that may end up
- invalidating data
-"""
-SAVED_FILE_LOCK: RLock = RLock()
-"""A lock to ensure that SAVED_FILES is only acted upon by one thread at a time"""
 
 OPEN_LOCK: RLock = RLock()
 """Lock to help secure file opening"""
 
 
-def record_saved_file(path: pathlib.Path):
-    """
-    Record a saved file in order to issue an alert if a netcdf file is written to multiple times, putting the system at risk of a segfault
-
-    :param path: The path to where a file was saved
-    """
-    with SAVED_FILE_LOCK:
-        if path in SAVED_FILES:
-            LOGGER.warning(f"File '{path}' has now been saved to {len(list(filter(lambda p: p == path, SAVED_FILES)))} times")
-        SAVED_FILES.append(path)
-
-
-def _invalidate_netcdf_cache(cache_entry: CacheEntry["xarray.Dataset"]) -> bool:
-    """
-    Invalidate the cache entry for this if the object on disk has changed since this was cached
-
-    Args:
-        cache_entry: The cache entry to be invalidated
-
-    Returns:
-        True if the cache entry should be invalidated
-    """
-    if settings.lazy_load_netcdf:
-        return True
-
-    from datetime import datetime
-    path: typing.Union[pathlib.Path, str, typing.Sequence[typing.Union[pathlib.Path, str]]] = cache_entry.key.kwargs.get("path")
-
-    if path is None:
-        path = cache_entry.key.args[0]
-
-    if isinstance(path, str):
-        path = pathlib.Path(path)
-    elif isinstance(path, typing.Sequence):
-        path: typing.Sequence[pathlib.Path] = list(map(pathlib.Path, path))
-
-    if isinstance(path, pathlib.Path):
-        path: typing.Sequence[pathlib.Path] = [path]
-
-    last_modified: datetime = max(
-        datetime.fromtimestamp(referenced_path.stat().st_mtime)
-        for referenced_path in path
-    )
-    last_cache_access: datetime = cache_entry.last_accessed
-    return last_modified <= last_cache_access
-
-
-@simple_cache()
+@timed_function()
 def load_variable(
     path: pathlib.Path | str | generic.Sequence[pathlib.Path | str],
     variable_name: str,
@@ -102,6 +48,7 @@ def load_variable(
 
 
 # NOTE: The SimpleCache is no longer used here due to memory bloat and stagnation; most files will only be loaded once
+@timed_function()
 def load_netcdf(
     path: typing.Union[pathlib.Path, str, typing.Sequence[typing.Union[pathlib.Path, str]]],
     engine: typing.Union[str, typing.Literal["h5netcdf", "zarr", "netcdf4"]] = settings.default_netcdf_engine,
@@ -148,7 +95,7 @@ def load_netcdf(
                 else:
                     LOGGER.debug(f"Loading '{path}'")
                 dataset: xarray.Dataset = xarray.open_dataset(path, engine=engine, chunks=chunks, **kwargs)
-
+                LOGGER.debug(f"Data from '{path}' has been loaded")
                 # NOTE: It would be safer to load everything in full and move on, but that adds a significant
                 # performance cost. For now, full loads won't be performed by default.
                 break
@@ -176,7 +123,8 @@ def load_netcdf(
     return dataset
 
 
-@simple_cache(invalidator_function=_invalidate_netcdf_cache)
+#@simple_cache(invalidator_function=_invalidate_netcdf_cache)
+@timed_function()
 def load_metadata(
     path: typing.Union[pathlib.Path, str, typing.Sequence[typing.Union[pathlib.Path, str]]],
     engine: typing.Union[str, typing.Literal["h5netcdf", "zarr", "netcdf4"]] = settings.default_netcdf_engine,
@@ -213,7 +161,7 @@ def load_metadata(
 
     return metadata
 
-
+@timed_function()
 def _get_variable_metadata(variable: "xarray.DataArray") -> typing.Dict[str, typing.Any]:
     """
     Get the metadata for specific netcdf variable
@@ -277,6 +225,7 @@ def format_value(value: object) -> str:
     return str(value)
 
 
+@timed_function()
 def format_variable(var: "xarray.DataArray") -> typing.Sequence[str]:
     """
     Format a block of text describing a variable
@@ -339,6 +288,7 @@ def format_variable(var: "xarray.DataArray") -> typing.Sequence[str]:
     return lines_for_variable
 
 
+@timed_function()
 def describe_netcdf(
     netcdf_file: "xarray.Dataset",
     variable_name: str = None,
@@ -374,9 +324,19 @@ def describe_netcdf(
             for dimension, count in netcdf_file.sizes.items()
         ],
         separator_placeholder,
-        "Variables:",
     ])
 
+    if len(netcdf_file.indexes) > 0:
+        lines.extend([
+            "Indices:",
+            *[
+                f"{tab}- {index_name}"
+                for index_name in netcdf_file.indexes.keys()
+            ],
+            separator_placeholder,
+        ])
+
+    lines.append("Variables:")
     for variable in [*list(netcdf_file.data_vars.values()), *list(netcdf_file.coords.values())]:
         variable_lines: typing.Iterable[str] = map(lambda line: tab + line, format_variable(var=variable))
         lines.extend(variable_lines)
@@ -407,7 +367,8 @@ def describe_netcdf(
     return os.linesep.join(lines)
 
 
-@simple_cache()
+#@simple_cache()
+@timed_function()
 def peek(
     path: typing.Union[str, pathlib.Path],
     engine: typing.Union[str, typing.Literal["h5netcdf", "netcdf4"]] = settings.default_netcdf_engine,
@@ -435,6 +396,7 @@ def peek(
                 max_line_length=max_line_length
             )
 
+@timed_function()
 def save_netcdf(
     path: typing.Union[str, pathlib.Path],
     dataset: "xarray.Dataset",
@@ -462,11 +424,15 @@ def save_netcdf(
         raise ValueError(f"{engine} is not a supported engine - only 'h5netcdf' and 'netcdf4' are supported")
 
     compute = str(kwargs.get('compute', True)).lower() in ('true', 'yes', 't', 'y', '1')
-    dataset.to_netcdf(path=path, engine=engine, **kwargs, compute=compute)
+
+    delayed_write: typing.Optional = dataset.to_netcdf(path=path, engine=engine, **kwargs, compute=compute)
+
+    if delayed_write is not None:
+        import dask
+        dask.compute(delayed_write)
 
     if settings.verbosity >= Verbosity.LOUD:
         LOGGER.debug(f"Saved netcdf data to: {path}")
-    record_saved_file(path=path)
 
     if hasattr(peek, "add"):
         description: str = describe_netcdf(netcdf_file=dataset)

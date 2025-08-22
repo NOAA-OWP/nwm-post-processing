@@ -5,9 +5,12 @@ import typing
 import pathlib
 import logging
 
+from post_processing.utilities.common import timed_function
+
 LOGGER: logging.Logger = logging.getLogger(pathlib.Path(__file__).stem)
 
 
+@timed_function()
 def rename_variable(
     input_path: pathlib.Path,
     output_path: pathlib.Path,
@@ -54,6 +57,16 @@ def rename_variable(
                 raise
 
             input_file = input_file.set_coords(coordinates_to_assign)
+
+            for key, value in mapping.items():
+                keys_to_update: list[str] = [
+                    attribute_key
+                    for attribute_key, attribute_value in input_file.attrs.items()
+                    if attribute_value == key
+                ]
+                for key_to_update in keys_to_update:
+                    input_file.attrs[key_to_update] = value
+
             save_netcdf(temporary_output_path, input_file)
 
         output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -61,6 +74,7 @@ def rename_variable(
 
     return output_path
 
+@timed_function()
 def rename_dimension(
     input_path: pathlib.Path,
     output_path: pathlib.Path,

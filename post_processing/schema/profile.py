@@ -15,6 +15,8 @@ import pathlib
 import logging
 import functools
 
+import collections.abc as generic
+
 from datetime import datetime
 
 import xarray
@@ -35,6 +37,7 @@ from post_processing.utilities.common import starmap
 from post_processing.utilities.common import partition
 from post_processing.utilities.common import get_template_variables
 from post_processing.utilities.common import to_json
+from post_processing.utilities.common import timed_function
 from post_processing.configuration import settings
 
 if typing.TYPE_CHECKING:
@@ -671,7 +674,7 @@ class SubsetOperation(PathToPathOperation):
             ]
 
             results: typing.Sequence[typing.Sequence[typing.Union[pathlib.Path]]] = starmap(
-                function=call_operations,
+                function=call_generic_operations,
                 args=arguments_for_each,
                 thread_count=settings.maximum_additional_threads
             )
@@ -891,7 +894,7 @@ class ExtractOperation(PathToPathOperation):
             ]
 
             results: typing.Sequence[typing.Sequence[typing.Union[pathlib.Path]]] = starmap(
-                function=call_operations,
+                function=call_generic_operations,
                 args=arguments_for_each,
                 thread_count=settings.maximum_additional_threads
             )
@@ -1172,6 +1175,74 @@ class DropOperation(PathToPathOperation, FileOutputMixin):
             f"{prefix}Drop the following data variables: {', '.join(self.fields)}"
         )
 
+    def _remove_dimensions(
+        self,
+        input_path: pathlib.Path,
+        output_path: pathlib.Path
+    ) -> pathlib.Path:
+        """
+        Remove the given fields as dimensions
+
+        :param input_path: The path to the netcdf data whose dimensions to remove
+        :param output_path: Where to save the new dataset
+        :returns: The path to the updated data
+        """
+        import tempfile
+        from post_processing.utilities import netcdf
+        import xarray
+        import shutil
+
+        with tempfile.TemporaryDirectory(settings.intermediate_directory) as temporary_directory:
+            temporary_path: pathlib.Path = pathlib.Path(temporary_directory)
+            temporary_output: pathlib.Path = temporary_path / output_path.name
+
+            with netcdf.load_netcdf(path=input_path) as netcdf_data:
+                if self.exclude:
+                    dimensions_to_remove: list[str] = [
+                        str(dimension)
+                        for dimension in netcdf_data.sizes.keys()
+                        if dimension not in self.fields
+                    ]
+                else:
+                    dimensions_to_remove: list[str] = list(self.fields)
+
+                netcdf_without_dimensions: xarray.Dataset = netcdf_data.drop_dims(drop_dims=dimensions_to_remove)
+                successfully_saved: bool = netcdf.save_netcdf(path=temporary_output, dataset=netcdf_without_dimensions)
+
+                if not successfully_saved:
+                    raise RuntimeError(
+                        f"The netcdf file with the following dimensions could not be saved to '{temporary_output}': "
+                        f"{', '.join(dimensions_to_remove)}"
+                    )
+
+            shutil.move(temporary_output, output_path)
+        return output_path
+
+    def _remove_variables(
+        self,
+        input_file: pathlib.Path,
+        output_file: pathlib.Path
+    ) -> pathlib.Path:
+        """
+        Remove the given variables from the netcdf file
+
+        :param input_file: The file to modify
+        :param output_file: Where to save the result
+        :returns: The path to the updated data
+        """
+        if self.exclude:
+            drop_function = nco.keep_only_variables
+        else:
+            drop_function = nco.remove_variables
+
+        result: pathlib.Path = drop_function(
+            input_file=input_file,
+            output_file=output_file,
+            variables=self.fields
+        )
+
+        return result
+
     def __call__(
         self,
         profile: "Profile",
@@ -1185,16 +1256,16 @@ class DropOperation(PathToPathOperation, FileOutputMixin):
         Remove variables from netcdf files
 
         :param profile: The profile that called for this operation
-        :param process_identifier: An identifier tying together other output for this post processing task
+        :param process_identifier: An identifier tying together other output for this post-processing task
         :param work_directory: Where intermediate products may be saved
         :param data: The files to operate on
         :param metadata: Metadata provided from previous operations that may be used as helpful hints
         :returns: The Paths for each created object
         """
-        if self.exclude:
-            drop_function = nco.keep_only_variables
+        if self.drop_dimension:
+            drop_function: generic.Callable[[pathlib.Path, pathlib.Path], pathlib.Path] = self._remove_dimensions
         else:
-            drop_function = nco.remove_variables
+            drop_function: generic.Callable[[pathlib.Path, pathlib.Path], pathlib.Path] = self._remove_variables
 
 
         input_output_mapping: typing.Mapping[pathlib.Path, pathlib.Path] = {
@@ -1211,7 +1282,6 @@ class DropOperation(PathToPathOperation, FileOutputMixin):
             {
                 "input_file": input_path,
                 "output_file": output_path,
-                "variables": self.fields
             }
             for input_path, output_path in input_output_mapping.items()
         ]
@@ -1231,6 +1301,7 @@ class DropOperation(PathToPathOperation, FileOutputMixin):
 
     fields: list[str] = dataclasses.field()
     exclude: bool = dataclasses.field(default=False)
+    drop_dimension: bool = dataclasses.field(default=False)
 
 @dataclasses.dataclass
 class RenameOperation(PathToPathOperation, FileOutputMixin):
@@ -1705,7 +1776,7 @@ class BranchOperation(ProfileOperation[InputType, typing.Sequence[pathlib.Path]]
             with concurrent.futures.ThreadPoolExecutor() as executor:
                 for branch_name, branch_logic in self.branches.items():
                     future_result = executor.submit(
-                        call_operations,
+                        call_generic_operations,
                         operations=branch_logic,
                         profile=profile,
                         process_identifier=process_identifier,
@@ -1790,7 +1861,7 @@ class BranchOperation(ProfileOperation[InputType, typing.Sequence[pathlib.Path]]
 
         try:
             for branch_name, branch_logic in self.branches.items():
-                branch_results: typing.Sequence[pathlib.Path] = call_operations(
+                branch_results: typing.Sequence[pathlib.Path] = call_generic_operations(
                     operations=branch_logic,
                     profile=profile,
                     process_identifier=process_identifier,
@@ -2233,6 +2304,8 @@ class FunctionOperation(ProfileOperation[InputType, OutputType]):
         kwargs.update(args)
         try:
             result: OutputType = self._function(**kwargs)
+            if result is None:
+                result = data
         except Exception as exception:
             if 'failure in' not in str(exception):
                 exception.args = (f"Failure in:{os.linesep}{self}{os.linesep}{exception.args[0]}", *exception.args[1:])
@@ -2367,6 +2440,7 @@ class Profile(BaseModel):
         elif errors:
             raise ExceptionGroup(f"Encountered an improper Profile", errors)
 
+    @timed_function()
     def run(
         self,
         cycle: typing.Union[str, int],
@@ -2381,6 +2455,24 @@ class Profile(BaseModel):
         :param additional_metadata: Additional values that may be passed to use as metadata for value replacement
         :returns: The list of resultant files
         """
+        disabled_operations: list[ProfileOperation] = []
+
+        def add_disabled_operation(operation: ProfileOperation):
+            if getattr(operation, "disable", False):
+                disabled_operations.append(operation)
+
+        self.visit(add_disabled_operation)
+
+        if disabled_operations and settings.debug:
+            LOGGER.warning(
+                f"There are {len(disabled_operations)} disabled operation(s) - make sure these are enabled "
+                f"when run in production"
+            )
+        elif disabled_operations:
+            raise RuntimeError(
+                f"Cannot run the profile at {self.source_file} - there are {len(disabled_operations)} disabled "
+                f"operation(s). Enable or remove them before running in a non-developmental role."
+            )
         from post_processing.utilities.netcdf import load_metadata
         input_metadata: dict[str, typing.Any] = load_metadata(path=files)
         metadata: dict[str, typing.Any] = {
@@ -2410,7 +2502,7 @@ class Profile(BaseModel):
 
         try:
             previous_operations: list[ProfileOperation] = []
-            output: typing.Union[typing.Sequence[pathlib.Path], xarray.Dataset] = call_operations(
+            output: typing.Union[typing.Sequence[pathlib.Path], xarray.Dataset] = call_generic_operations(
                 operations=self.operations,
                 profile=self,
                 process_identifier=process_identifier,
@@ -2502,7 +2594,7 @@ class Profile(BaseModel):
             **kwargs
         )
 
-
+@timed_function()
 def load_profiles(profile_path: typing.Union[str, pathlib.Path] = settings.profile_path) -> typing.Sequence[Profile]:
     """
     Load all available profiles
@@ -2634,7 +2726,7 @@ def get_function_by_name(
 
     return function
 
-
+@timed_function()
 def fan_out_operations(
     operations: typing.Iterable[ProfileOperation],
     profile: Profile,
@@ -2658,6 +2750,7 @@ def fan_out_operations(
     :param thread_count: How many threads to parallelize across
     :returns: The accumulated results from each series of operations
     """
+    LOGGER.debug(f"Fanning out operations for step {metadata.get('stage', '?')}")
     results: typing.Sequence[OutputType] = starmap(
         function=call_generic_operations,
         args=[
@@ -2690,62 +2783,6 @@ def call_generic_operations(
 
     for operation in operations:
         metadata['stage'] = operation.operation_id
-        current_data = operation(
-            profile=profile,
-            process_identifier=process_identifier,
-            work_directory=work_directory,
-            data=current_data,
-            previous_operations=previous_operations,
-            metadata=metadata
-        )
-
-        #if isinstance(current_data, typing.Sequence):
-        #    for entry in filter(lambda value: isinstance(value, pathlib.Path), current_data):
-        #        try:
-        #            assign_stage(entry, operation.operation_id)
-        #        except Exception as e:
-        #            LOGGER.warning(f"Could not assign the profile stage to '{entry}': {e}")
-        #elif isinstance(current_data, pathlib.Path):
-        #    try:
-        #        assign_stage(current_data, operation.operation_id)
-        #    except Exception as e:
-        #        LOGGER.warning(f"Could not assign the profile stage to '{current_data}': {e}")
-
-        if not any(op.operation_id == operation.operation_id for op in previous_operations):
-            previous_operations.append(operation)
-        elif settings.verbosity >= enums.Verbosity.LOUD:
-            LOGGER.debug(
-                f"Not adding a record of a call to '{operation.operation_id}) {operation.__class__.__qualname__}' - "
-                f"there is already a record"
-            )
-
-    return current_data
-
-
-def call_operations(
-    operations: typing.Iterable[ProfileOperation],
-    profile: Profile,
-    process_identifier: str,
-    work_directory: pathlib.Path,
-    data: typing.Sequence[pathlib.Path],
-    previous_operations: list[ProfileOperation],
-    metadata: dict[str, typing.Any]
-) -> typing.Union[typing.Sequence[pathlib.Path], xarray.Dataset]:
-    """
-    Perform post-processing operations based on parameters defined within a profile
-
-    :param operations: The operations to perform
-    :param profile: The profile defining the key parameters of what to do
-    :param process_identifier: The identifier of the process to perform
-    :param work_directory: The directory to write intermediate output to
-    :param data: The data to operate upon (generally file paths at this point)
-    :param previous_operations: The list of operations already performed
-    :param metadata: The metadata to reference when building up names based on characteristics
-    """
-    current_data: typing.Union[typing.Sequence[pathlib.Path], xarray.Dataset] = list(data)
-
-    for operation in operations:
-        metadata['stage'] = operation.operation_id
         if operation.disable:
             LOGGER.warning(f"{operation.__class__.__qualname__} disabled:{os.linesep}{operation}")
             continue
@@ -2761,10 +2798,10 @@ def call_operations(
 
         if not any(op.operation_id == operation.operation_id for op in previous_operations):
             previous_operations.append(operation)
-        else:
-            LOGGER.warning(
-                f"Not adding a record of a call to '{operation.operation_id}) {operation.__class__.__qualname__}' "
-                f"- there is already a record"
+        elif settings.verbosity >= enums.Verbosity.LOUD:
+            LOGGER.debug(
+                f"Not adding a record of a call to '{operation.operation_id}) {operation.__class__.__qualname__}' - "
+                f"there is already a record"
             )
 
     return current_data

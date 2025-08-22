@@ -26,6 +26,7 @@ _site/
 *.log
 *.sqlite
 *.db
+*.profile
 
 # OS generated files #
 ######################

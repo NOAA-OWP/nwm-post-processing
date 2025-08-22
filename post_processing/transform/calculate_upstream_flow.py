@@ -6,22 +6,15 @@ import typing
 import pathlib
 import logging
 import enum
+import dataclasses
 
-try:
-    from post_processing.configuration import settings
-    from post_processing.enums import Verbosity
-    LOG_FORMAT: str = settings.log_format
-    DATE_FORMAT: str = settings.date_format
-    NETCDF_ENGINE: typing.Literal['netcdf4', 'h5netcdf'] = settings.default_netcdf_engine
-    LAZY_LOAD: bool = settings.lazy_load_netcdf
-    PRINT_DETAILED_INFORMATION: bool = settings.verbosity >= Verbosity.LOUD
-except ImportError:
-    settings = None
-    NETCDF_ENGINE = "netcdf4"
-    LAZY_LOAD: bool = True
-    LOG_FORMAT = "[%(asctime)s] %(levelname)s %(name)s: %(message)s"
-    DATE_FORMAT = "%Y-%m-%d %H:%M:%S%z"
-    PRINT_DETAILED_INFORMATION: bool = False
+from post_processing.configuration import settings
+from post_processing.enums import Verbosity
+from post_processing.utilities.common import timed_function
+from post_processing.schema.base import member
+
+if typing.TYPE_CHECKING:
+    import numpy
 
 LOGGER: logging.Logger = logging.getLogger(pathlib.Path(__file__).stem)
 
@@ -33,7 +26,78 @@ class RoutelinkFormat(enum.StrEnum):
     CSV = "csv"
     NETCDF = "netcdf"
 
+@dataclasses.dataclass
+class Linkage:
+    path: pathlib.Path | str
+    to_key: str
+    from_key: str
+    to_: typing.Optional["numpy.ndarray"] = member(default=None)
+    from_: typing.Optional["numpy.ndarray"] = member(default=None)
+    format: RoutelinkFormat = dataclasses.field(default=RoutelinkFormat.NETCDF)
 
+    def __post_init__(self):
+        if isinstance(self.path, str):
+            self.path = pathlib.Path(self.path)
+
+        if self.format == RoutelinkFormat.GEOPACKAGE:
+            import geopandas
+            routelink = geopandas.read_file(self.path, driver="GPKG")
+            from_values = routelink[self.from_key].values
+            to_values = routelink[self.to_key].values
+        elif self.format == RoutelinkFormat.CSV:
+            import pandas
+            routelink: pandas.DataFrame = pandas.read_csv(self.path)
+            from_values = routelink[self.from_key].values
+            to_values = routelink[self.to_key].values
+        elif self.format == RoutelinkFormat.NETCDF:
+            from post_processing.utilities.netcdf import load_variable
+            LOGGER.debug(f"Loading the '{self.to_key}' variable from '{self.path}'")
+            from_values = load_variable(path=self.path, variable_name=self.from_key).data
+            LOGGER.debug(f"Loading the '{self.to_key}' variable from '{self.path}'")
+            to_values = load_variable(path=self.path, variable_name=self.to_key).data
+        else:
+            raise ValueError(
+                f"Cannot load the routelink needed to calculate upstream flow - "
+                f"'{self.format}' is not a supported format"
+            )
+
+        self.to_ = to_values
+        self.from_ = from_values
+
+    def __del__(self):
+        del self.to_
+        del self.from_
+
+class _RouteLinks:
+    def __init__(self):
+        import threading
+        self.__links: dict[tuple[pathlib.Path, RoutelinkFormat, str, str], Linkage] = {}
+        self.__lock: threading.RLock = threading.RLock()
+
+    def get_linkage(self, path: pathlib.Path, format: RoutelinkFormat, to_key: str, from_key: str) -> Linkage:
+        with self.__lock:
+            key: tuple[pathlib.Path, RoutelinkFormat, str, str] = (path, format, to_key, from_key)
+
+            if key not in self.__links:
+                self.__links[key] = Linkage(path=path, to_key=to_key, from_key=from_key, format=format)
+
+            return self.__links[key]
+
+    def clear(self):
+        with self.__lock:
+            while self.__links:
+                linkage = self.__links.popitem()
+                del linkage
+
+
+ROUTELINKS = _RouteLinks()
+
+
+def clean():
+    ROUTELINKS.clear()
+
+
+@timed_function()
 def calculate_upstream_flow(
     input_path: typing.Union[pathlib.Path, str],
     output_path: typing.Union[pathlib.Path, str],
@@ -75,6 +139,7 @@ def calculate_upstream_flow(
         raise ValueError(
             f"Upstreamflow calculation is not an inplace operation - the input path and output path cannot match"
         )
+    LOGGER.debug(f"Calculating upstream flow on '{input_path}'")
     import xarray
     import pandas
     import numpy
@@ -85,28 +150,9 @@ def calculate_upstream_flow(
     if "long_name" not in attributes:
         attributes['long_name'] = "Upstream River Flow"
 
-    try:
-        from post_processing.utilities.netcdf import load_netcdf
-        from post_processing.utilities.netcdf import save_netcdf
-        from post_processing.utilities.netcdf import load_variable
-    except ImportError:
-        from functools import partial
-        load_netcdf = partial(
-            xarray.open_dataset,
-            chunks={} if LAZY_LOAD else None,
-            engine=NETCDF_ENGINE,
-        )
-        def load_variable(path: pathlib.Path, variable_name: str) -> xarray.DataArray:
-            with xarray.open_dataset(path, engine=NETCDF_ENGINE, chunks={} if LAZY_LOAD else None) as dataset:
-                if variable_name not in dataset:
-                    raise KeyError(f"'{variable_name}' is not a variable within '{path}'")
-                return dataset[variable_name].compute()
-
-        def save_netcdf(path: typing.Union[str, pathlib.Path], dataset: xarray.Dataset):
-            dataset.to_netcdf(
-                path=path,
-                engine=NETCDF_ENGINE,
-            )
+    from post_processing.utilities.netcdf import load_netcdf
+    from post_processing.utilities.netcdf import save_netcdf
+    from post_processing.utilities.netcdf import load_variable
 
     if encoding is None:
         encoding = {}
@@ -115,25 +161,13 @@ def calculate_upstream_flow(
         temporary_path: pathlib.Path = pathlib.Path(temporary_directory)
         temporary_output_path: pathlib.Path = temporary_path / output_path.name
         with load_netcdf(input_path) as data_to_transform:
-            raw_data = data_to_transform[variable].values
-
-            if routelink_format == RoutelinkFormat.GEOPACKAGE:
-                import geopandas
-                routelink = geopandas.read_file(routelink_path, driver="GPKG")
-                from_values = routelink[routelink_from_variable]
-                to_values = routelink[routelink_to_variable]
-            elif routelink_format == RoutelinkFormat.CSV:
-                routelink: pandas.DataFrame = pandas.read_csv(input_path)
-                from_values = routelink[routelink_from_variable]
-                to_values = routelink[routelink_to_variable]
-            elif routelink_format == RoutelinkFormat.NETCDF:
-                from_values = load_variable(path=routelink_path, variable_name=routelink_from_variable).values
-                to_values = load_variable(path=routelink_path, variable_name=routelink_to_variable).values
-            else:
-                raise ValueError(
-                    f"Cannot load the routelink needed to calculate upstream flow - "
-                    f"'{routelink_format}' is not a supported format"
-                )
+            raw_data = data_to_transform[variable].data
+            linkage: Linkage = ROUTELINKS.get_linkage(
+                path=routelink_path,
+                to_key=routelink_to_variable,
+                from_key=routelink_from_variable,
+                format=routelink_format,
+            )
 
             # TODO: This may lead to issues if the length of the arrays aren't the same - it's linking on array index,
             #  not index value
@@ -142,7 +176,7 @@ def calculate_upstream_flow(
             #   * Based on the routelink structure, a single feature may have multiple features pointing at it,
             #       but will only ever point to, at most, one feature
             series: pandas.Series = pandas.Series(raw_data)
-            upstream_values: pandas.Series = series.groupby(to_values).sum()
+            upstream_values: pandas.Series = series.groupby(linkage.to_).sum()
 
             # Create a mapping of feature ids to their upstream flow values
             #   * Provides an easier access pattern to the values based off of feature_id - going by Series isn't worth it
@@ -151,7 +185,7 @@ def calculate_upstream_flow(
             # Create a new array of values, in the order of the 'from' values matching the organized_values.
             # The 'to' values won't be in the order of the 'from' values and there won't be matches for all 'from' values
             #   * numpy.vectorize is used here for a large performance improvement based on the relatively simple operation
-            mapped_flow: numpy.ndarray = numpy.vectorize(organized_values.get)(from_values)
+            mapped_flow: numpy.ndarray = numpy.vectorize(organized_values.get)(linkage.from_)
             encoding: typing.Dict[str, typing.Any] = {**data_to_transform[variable].encoding, **encoding}
 
             # Create the upstreamflow variable and add it to the dataset
@@ -200,7 +234,7 @@ def calculate_upstream_flow(
                 raise
         shutil.move(temporary_output_path, output_path)
 
-        if PRINT_DETAILED_INFORMATION:
+        if settings.verbosity >= Verbosity.VERBOSE:
             LOGGER.debug(f"Saved the updated version of '{input_path}' to '{output_path}'")
 
     return output_path
@@ -279,8 +313,6 @@ def main() -> int:
     import xarray
     output_dataset: xarray.Dataset = xarray.open_dataset(
         generated_file_path,
-        chunks={} if LAZY_LOAD else None,
-        engine=NETCDF_ENGINE
     )
     output_dataset.info()
     return 0
@@ -288,8 +320,8 @@ def main() -> int:
 if __name__ == "__main__":
     logging.basicConfig(
         level=logging.INFO,
-        format=LOG_FORMAT,
-        datefmt=DATE_FORMAT,
+        format=settings.log_format,
+        datefmt=settings.date_format,
     )
     import sys
     sys.exit(main())

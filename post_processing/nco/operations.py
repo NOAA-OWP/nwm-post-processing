@@ -4,23 +4,12 @@ Core wrappers around crucial netcdf operations
 import typing
 import logging
 import pathlib
-import os
-import tempfile
-
-import xarray
-
-from post_processing.utilities.common import starmap
-from post_processing.utilities.common import first
 
 from .operation_helpers import run_command
 from .operation_helpers import NCOFunction
-from .operation_helpers import get_header
 from .operation_helpers import EditMode
 
-from .structure import DataVariable
-from .structure import NetcdfSummary
 from .structure import NetcdfType
-from .structure import Attribute
 
 LOGGER: logging.Logger = logging.getLogger(pathlib.Path(__file__).stem)
 

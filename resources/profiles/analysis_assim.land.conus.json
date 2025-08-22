@@ -1,6 +1,23 @@
 {
     "operations": [
         {
+            "operation": "drop",
+            "exclude": true,
+            "fields": [
+                "x",
+                "y",
+                "time",
+                "reference_time",
+                "crs",
+                "ACCET",
+                "SOILSAT_TOP",
+                "FSNO",
+                "SNEQV",
+                "SNOWH",
+                "SNOWT_AVG"
+            ]
+        },
+        {
             "operation": "echo",
             "message": "An output for 'nwm.t<cycle>z.analysis_assim.land.tm00.conus.nc' should be generated, as defined in {source_file}.",
             "level": "error",

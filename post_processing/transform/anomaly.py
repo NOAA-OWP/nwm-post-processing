@@ -8,10 +8,10 @@ import pathlib
 import dataclasses
 
 from threading import RLock
-from collections import abc as generic
 
 from post_processing.configuration import settings
 from post_processing.schema.base import member
+from post_processing.utilities.common import timed_function
 
 if typing.TYPE_CHECKING:
     import xarray
@@ -101,19 +101,54 @@ class ThresholdDefinition:
 
             file_path: pathlib.Path = pathlib.Path(str(self.data_path).format(**path_metadata))
 
+            day_range: list[int] | int = []
+
+            if day_of_year == 0:
+                day_range.append(0)
+                if 1 not in self._data:
+                    day_range.append(1)
+                if 2 not in self._data:
+                    day_range.append(2)
+            elif day_of_year == 365:
+                day_range.append(365)
+                if 0 not in self._data:
+                    day_range.append(0)
+                if 1 not in self._data:
+                    day_range.append(1)
+            else:
+                day_range.append(day_of_year)
+
+                next_day: int = day_of_year + 1 if day_of_year < 365 else 0
+                if next_day not in self._data:
+                    day_range.append(next_day)
+
+                next_day: int = next_day + 1 if day_of_year < 365 else 0
+                if next_day not in self._data:
+                    day_range.append(next_day)
+
+            if len(day_range) == 1:
+                day_range = day_range[0]
+
             with load_netcdf(path=file_path) as dataset:
                 if self.variable not in dataset.variables:
                     raise KeyError(
                         f"The file at '{file_path}' does not contain variable '{self.variable}'"
                     )
                 variable: xarray.DataArray = dataset[self.variable]
+
+                import numpy
                 specific_statistics: xarray.DataArray = variable.sel(
                     **{self.time_coordinate: day_of_year}
-                ).compute()
+                ).compute().astype(numpy.float32)
 
-            import numpy
-            self._data[day_of_year] = specific_statistics.astype(numpy.float32)
-            return specific_statistics
+
+
+                if self.time_coordinate in specific_statistics.dims:
+                    for day in day_range:
+                        self._data[day] = specific_statistics.sel({self.time_coordinate: day}).copy()
+                else:
+                    self._data[day_of_year] = specific_statistics
+            return self._data[day_of_year]
 
 
 def make_apply_thresholds(
@@ -187,7 +222,7 @@ def get_day_of_year(dataset: "xarray.Dataset", variable: str) -> int:
     day: int = day_of_year.item()
     return day
 
-
+@timed_function()
 def calculate_anomaly(
     input_path: pathlib.Path,
     output_path: pathlib.Path,
@@ -210,6 +245,8 @@ def calculate_anomaly(
 
     try:
         dataset = load_netcdf(path=input_path)
+        #dataset.load()
+        #dataset.close()
     except:
         LOGGER.error(f"Could not load the netcdf data at '{input_path.resolve()}'")
         raise
@@ -345,13 +382,14 @@ def calculate_anomaly(
     try:
         from post_processing.utilities.netcdf import save_netcdf
         save_netcdf(path=output_path, dataset=updated_dataset)
+        updated_dataset.close()
     except:
         LOGGER.error(f"Could not save the dataset with the newly calculated anomaly data to '{output_path.resolve()}'")
         raise
 
     return output_path
 
-
+@timed_function()
 def assign_anomaly(
     input_path: pathlib.Path,
     output_path: pathlib.Path,

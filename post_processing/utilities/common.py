@@ -970,7 +970,7 @@ def timed_function(
     :returns: A function that records the time it takes to execute this function if timing is enabled, just the function otherwise
     """
     from post_processing.configuration import settings
-    _logger = logger or LOGGER
+    _logger = logger or logging.getLogger('TIMING')
     _level = _logger.getEffectiveLevel() if level is None else level
 
     def decorator(func: typing.Callable[FunctionParameters, RT]) -> typing.Callable[FunctionParameters, RT]:
@@ -984,6 +984,14 @@ def timed_function(
         # function in order to remove any overhead cost
         if not settings.record_timing or not _logger.isEnabledFor(_level):
             return func
+
+        code = func.__code__
+        function_metadata: dict[str, typing.Any] = {
+            "functionName": func.__name__,
+            "moduleName": func.__module__,
+            "path": code.co_filename,
+            "lineNumber": code.co_firstlineno,
+        }
 
         import functools
         @functools.wraps(func)
@@ -1021,9 +1029,46 @@ def timed_function(
                 if seconds:
                     duration_description += f"{seconds:.2f}S"
 
+                function_description: str = f"{func.__name__}("
+
+                if args:
+                    arg_descriptions: list[str] = []
+
+                    for arg in args:
+                        is_string: bool = isinstance(arg, str)
+                        value: str = str(arg)
+                        if len(value) > 15:
+                            value = f"(...){value[-15:]}"
+                        if is_string:
+                            value = f'"{value}"'
+                        arg_descriptions.append(value)
+
+                    function_description += ", ".join(arg_descriptions)
+
+                if kwargs:
+                    if args:
+                        function_description += " "
+
+                    kwarg_descriptions: list[str] = []
+                    for key, value in kwargs.items():
+                        is_string: bool = isinstance(value, str)
+                        kwarg_value: str = str(value)
+                        if len(kwarg_value) > 15:
+                            kwarg_value = f"(...){kwarg_value[-15:]}"
+
+                        if is_string:
+                            kwarg_value = f'"{kwarg_value}"'
+                        kwarg_descriptions.append(
+                            f"{key}={kwarg_value}"
+                        )
+
+                    function_description += ", ".join(kwarg_descriptions)
+
+                function_description += ")"
                 _logger.log(
                     _level,
-                    f"{func.__name__} executed{', but failed,' if not successful else ''} in: {duration_description}"
+                    f"{function_description} | {'successful' if successful else 'failed'} | {duration_description}",
+                    extra=function_metadata
                 )
 
         return wrapper

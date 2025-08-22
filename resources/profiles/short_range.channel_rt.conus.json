@@ -9,7 +9,7 @@
             "operation": "anomaly",
             "variable_name": "streamflow",
             "default_score": 3,
-            "output_pattern": "anomaly.nwm.t{cycle}z.{Configuration}.{ModelOutputType}.{frame}.{region}.nc",
+            "output_pattern": "{stage}_nwm.t{cycle}z.{Configuration}.{ModelOutputType}.{frame}.{region}.nc",
             "time_variable": "time",
             "dimension_names": "feature_id",
             "output_variable_name": "streamflow_anomaly",
@@ -65,6 +65,11 @@
                     }
                 }
             ]
+        },
+        {
+            "operation": "function",
+            "function_name": "post_processing.transform.calculate_upstream_flow.clean",
+            "comment": "Remove unneeded items from upstreamflow calculations"
         },
         {
             "operation": "merge",

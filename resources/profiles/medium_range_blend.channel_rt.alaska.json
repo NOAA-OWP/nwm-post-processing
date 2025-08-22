@@ -29,35 +29,53 @@
             "file_name_pattern": "nwm.t{cycle}z.{ModelOutputType}.{Configuration}.{Region}.nc"
         },
         {
-            "operation": "rename",
-            "mapping": {
-                "feature_id": "station_id"
+            "operation": "branch",
+            "branches": {
+                "WMS": [
+                    {
+                        "operation": "drop",
+                        "fields": ["upstreamflow"]
+                    },
+                    {
+                        "operation": "save",
+                        "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.alaska.nc",
+                        "directory": "{output_path}/"
+                    }
+                ],
+                "RFC": [
+                    {
+                        "operation": "extract",
+                        "dimension": "feature_id",
+                        "mask_coordinate": "feature_id",
+                        "masks": [
+                            "{mask_path}/alaska.aprfc.nc"
+                        ],
+                        "identifier_pattern": "^(?P<region>\\w+(\\.(?P<rfc>[MmAaLlCcNnPpWwOoSsHh][BbPpNnMmAaCcEeWwHhRrGg]([Rr][Ff][Cc]|[Vv][Ii])))?)",
+                        "output_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.{region}.nc",
+                        "each": [
+                            {
+                                "operation": "rename",
+                                "mapping": {
+                                    "feature_id": "station_id"
+                                }
+                            },
+                            {
+                                "operation": "rename",
+                                "rename_variable": false,
+                                "mapping": {
+                                    "feature_id": "station"
+                                }
+                            },
+                            {
+                                "operation": "save",
+                                "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.alaska.aprfc.nc",
+                                "identifier_pattern": "(?P<rfc>[A-Za-z]{2}[Rr][Ff][Cc])",
+                                "directory": "{output_path}/"
+                            }
+                        ]
+                    }
+                ]
             }
-        },
-        {
-            "operation": "rename",
-            "rename_variable": false,
-            "mapping": {
-                "feature_id": "station"
-            }
-        },
-        {
-            "operation": "extract",
-            "dimension": "station_id",
-            "mask_coordinate": "feature_id",
-            "masks": [
-                "{mask_path}/alaska.aprfc.nc"
-            ],
-            "identifier_pattern": "^(?P<region>\\w+(\\.(?P<rfc>[MmAaLlCcNnPpWwOoSsHh][BbPpNnMmAaCcEeWwHhRrGg]([Rr][Ff][Cc]|[Vv][Ii])))?)",
-            "output_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.{region}.nc",
-            "each": [
-                {
-                    "operation": "save",
-                    "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.alaska.nc",
-                    "identifier_pattern": "(?P<rfc>[A-Za-z]{2}[Rr][Ff][Cc])",
-                    "directory": "{output_path}/"
-                }
-            ]
         }
     ],
     "configuration": "medium_range_blend",

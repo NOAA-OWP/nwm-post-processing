@@ -10,6 +10,10 @@
             "format":"[%(asctime)s] %(levelname)s %(name)s %(filename)s #%(lineno)d: %(message)s",
             "datefmt": "%Y-%m-%d %H:%M:%S%z"
         },
+        "timing": {
+            "format": "%(asctime)s | %(path)s | %(lineNumber)d | %(moduleName)s | %(functionName)s | %(message)s",
+            "datefmt": "%Y-%m-%dT%H:%M:%S%z"
+        },
         "level_based": {
             "()": "post_processing.utilities.logging.LevelBasedFormatter",
             "fmt": "[%(asctime)s] %(levelname)s %(name)s %(filename)s #%(lineno)d: %(message)s",
@@ -68,6 +72,14 @@
             "filters": [
                 "only_errors"
             ]
+        },
+        "timing_file": {
+            "class": "logging.handlers.RotatingFileHandler",
+            "level": "INFO",
+            "formatter": "timing",
+            "filename": "pp_timing.log",
+            "maxBytes": 5000000,
+            "backupCount": 5
         }
     },
     "root": {
@@ -78,5 +90,12 @@
             "log_file",
             "error_file"
         ]
+    },
+    "loggers": {
+        "TIMING": {
+            "level": "INFO",
+            "handlers": ["timing_file"],
+            "propagate": false
+        }
     }
 }
