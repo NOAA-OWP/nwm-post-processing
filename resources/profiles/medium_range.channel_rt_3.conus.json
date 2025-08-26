@@ -81,7 +81,7 @@
                     },
                     {
                         "operation": "save",
-                        "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.{Region}.nc",
+                        "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}_{member}.{Region}.nc",
                         "directory": "{output_path}/"
                     }
                 ],
