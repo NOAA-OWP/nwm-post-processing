@@ -908,6 +908,26 @@ class _Settings(UserDict):
 
         self.__setitem__(key=key, item=value)
 
+    @property
+    def this_is_verbose(self) -> bool:
+        """
+        Whether the application should output more detailed than average messages
+
+        Outputs less data than `this_is_very_verbose`
+        """
+        from post_processing.enums import Verbosity
+        return self.verbosity >= Verbosity.VERBOSE
+
+    @property
+    def this_is_very_verbose(self) -> bool:
+        """
+        Whether this application should output far more detailed than average messages
+
+        Outputs more data than `this_is_verbose`
+        """
+        from post_processing.enums import Verbosity
+        return self.verbosity >= Verbosity.LOUD
+
     def to_dict(self) -> dict[str, typing.Any]:
         """
         Represent all settings as a dictionary

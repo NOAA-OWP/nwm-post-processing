@@ -28,13 +28,18 @@ if __name__ == "__main__":
         format=settings.log_format,
         datefmt=settings.date_format
     )
+    connectionpool_logger: logging.Logger = logging.getLogger("urllib3.connectionpool")
+    connectionpool_logger.setLevel(logging.WARNING)
 
 LOGGER: logging.Logger = logging.getLogger(pathlib.Path(__file__).stem)
 """The primary logger for this file"""
 
 
-_DEFAULT_SOURCE_URL: str = "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/v3.0"
+_DEFAULT_SOURCE_URL: str = "https://hydrology.nws.noaa.gov/pub/nwm/v3.1/wcoss-data"
 """The default location for where to find NWM output"""
+
+_FALLBACK_DEFAULT_SOURCE_URL: str = "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/v3.0"
+"""A fallback url to use if the default providing the most recent revision of data isn't accessible"""
 
 _VALID_CONFIGURATIONS: typing.List[str] = [
     "analysis_assim",
@@ -131,7 +136,7 @@ class Arguments:
     Command line parameter parser and handler
     """
     def __init__(self, *args: str):
-        self.source_url: str = _DEFAULT_SOURCE_URL
+        self.source_url: str = None
         """Where to retrieve NWM output"""
         self.configuration: Configuration = None
         """What NWM configuration to download"""
@@ -176,8 +181,8 @@ class Arguments:
         if int(self.cycle) > 23:
             raise ValueError(f"'{self.cycle}' is too high - the maximum value is 23")
         
-        if self.configuration not in (Configuration.LongRange, Configuration.MediumRange) and self.member:
-            raise ValueError(f"Ensemble members are only valid for long or short range configurations. Received '{self.configuration}'")
+        if self.configuration not in (Configuration.LongRange, Configuration.MediumRange, Configuration.MediumRangeBlend) and self.member:
+            raise ValueError(f"Ensemble members are only valid for long or medium range configurations. Received '{self.configuration}'")
         
         if self.member and self.member < 1:
             raise ValueError(f"The minimum ensemble member is 1 - received {self.member}")
@@ -197,6 +202,10 @@ class Arguments:
                 f"it MUST be a regex pattern that ONLY matches on numbers, like '\d' or '\d\d' or '0+' or '00'"
             )
 
+        if self.source_url is None:
+            verify_default_url()
+            self.source_url = _DEFAULT_SOURCE_URL
+
     def __parse(self, args: typing.Sequence[str]):
         """
         Parse input parameters and set values
@@ -212,7 +221,7 @@ class Arguments:
             "--url",
             dest="source_url",
             type=str,
-            default=self.source_url,
+            default=None,
             help="Where to get the data"
         )
 
@@ -384,6 +393,7 @@ def form_configuration_link(
 
 
 def download_file(
+    http_session: requests.Session,
     url: str,
     filename: str,
     directory: pathlib.Path,
@@ -392,6 +402,7 @@ def download_file(
     """
     Download the file at the URL and store it within the directory
 
+    :param http_session: A connection pool session
     :param url: Where the file is
     :param filename: What to name the file
     :param directory: What directory to store the file in
@@ -409,8 +420,11 @@ def download_file(
         raise ValueError(f"Cannot save '{filename}' to '{path}' - it is already a directory")
     
     LOGGER.info(f"Downloading '{filename}'")
-    raw_data: bytes = requests.get(url=url).content
-    path.write_bytes(data=raw_data)
+    with http_session.get(url=url, stream=True) as response:
+        with path.open("wb") as file:
+            for chunk in response.iter_content(chunk_size=8192):
+                file.write(chunk)
+
     return path
 
 
@@ -487,21 +501,39 @@ def download_input(
     download_directory: pathlib.Path = destination / f"nwm.{date}"
     download_directory.mkdir(parents=True, exist_ok=True)
 
-    downloaded_files: typing.Sequence[pathlib.Path] = starmap(
-        download_file,
-        [
-            {
-                "url": url,
-                "filename": filename,
-                "directory": download_directory,
-                "overwrite": overwrite
-            }
-            for filename, url in pertinent_links.items()
-        ]
-    )
+    with requests.Session() as session:
+        downloaded_files: typing.Sequence[pathlib.Path] = starmap(
+            download_file,
+            [
+                {
+                    "http_session": session,
+                    "url": url,
+                    "filename": filename,
+                    "directory": download_directory,
+                    "overwrite": overwrite
+                }
+                for filename, url in pertinent_links.items()
+            ]
+        )
 
-    downloaded_files = list(filter(lambda path: path is not None, downloaded_files))
+        downloaded_files = list(filter(lambda path: path is not None, downloaded_files))
     return downloaded_files
+
+
+def verify_default_url():
+    global _DEFAULT_SOURCE_URL
+    with requests.head(_DEFAULT_SOURCE_URL) as response:
+        if response.status_code < 400:
+            return
+
+    LOGGER.error(f"The default source url is not accessible, trying the fallback url...")
+    with requests.head(_FALLBACK_DEFAULT_SOURCE_URL) as response:
+        if response.status_code < 400:
+            LOGGER.warning(f"Changing the default source url to '{_FALLBACK_DEFAULT_SOURCE_URL}")
+            _DEFAULT_SOURCE_URL = _FALLBACK_DEFAULT_SOURCE_URL
+
+    raise Exception(f"There is not an accessible default source url")
+
 
 
 def main() -> int:
@@ -511,7 +543,7 @@ def main() -> int:
     arguments: Arguments = Arguments()
 
     LOGGER.setLevel(logging.getLevelName(arguments.log_level))
-
+    start: datetime = datetime.now()
     try:
         downloaded_files: typing.Sequence[pathlib.Path] = download_input(
             source_url=arguments.source_url,
@@ -535,6 +567,7 @@ def main() -> int:
     except BaseException as exception:
         LOGGER.error(f"'{__file__} failed: {exception}", exc_info=True)
         return 1
+    LOGGER.info(f"Data downloaded in {datetime.now() - start}")
     return 0
 
 if __name__ == "__main__":

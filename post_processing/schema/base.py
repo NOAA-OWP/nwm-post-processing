@@ -7,9 +7,13 @@ import dataclasses
 import pathlib
 import logging
 
+import collections.abc as generic
+
 T = typing.TypeVar("T")
 
 MEMBER_FIELD_KEY: typing.Final[str] = "__IS_MEMBER__"
+INIT_FUNCTION_KEY: typing.Final[str] = "__INIT_FUNCTION__"
+LOAD_ORDER_KEY: typing.Final[str] = "__LOAD_ORDER__"
 
 
 LOGGER: logging.Logger = logging.getLogger(pathlib.Path(__file__).stem)
@@ -21,6 +25,8 @@ def member(
     default_factory: typing.Callable[[], T] = dataclasses.MISSING,
     metadata: dict = None,
     kw_only: bool = False,
+    init_function: typing.Callable[[], typing.Any] = None,
+    load_order: int = 0
 ) -> dataclasses.Field:
     """
     Create a member specific field
@@ -29,6 +35,10 @@ def member(
         metadata = {}
 
     metadata[MEMBER_FIELD_KEY] = True
+    metadata[LOAD_ORDER_KEY] = load_order
+
+    if callable(default_factory):
+        metadata[INIT_FUNCTION_KEY] = init_function
 
     if dataclasses.MISSING not in (default, default_factory):
         raise ValueError(
@@ -77,6 +87,24 @@ class BaseModel:
 
     def __post_init__(self):
         self._validate()
+        self.__load_members__()
+
+    def __load_members__(self):
+        loaders_and_order: list[tuple[typing.Callable[[], typing.Any], int]] = [
+            (field.metadata[INIT_FUNCTION_KEY], field.metadata.get(LOAD_ORDER_KEY, 0))
+            for field in get_fields(self)
+            if not field.init
+                and MEMBER_FIELD_KEY in field.metadata
+                and isinstance(field.metadata[INIT_FUNCTION_KEY], typing.Callable)
+        ]
+
+        loaders: generic.Iterable[generic.Callable[[], typing.Any]] = map(
+            lambda pair: pair[0],
+            sorted(loaders_and_order, key=lambda pair: pair[1])
+        )
+
+        for loader in loaders:
+            loader()
 
     @classmethod
     def from_dict(cls: typing.Type[ModelType], **kwargs: typing.Any) -> ModelType:
@@ -163,6 +191,27 @@ class BaseModel:
         """
         pass
 
+    def __getstate__(self):
+        member_fields: set[str] = {
+            field.name
+            for field in dataclasses.fields(type(self))
+            if not field.init and MEMBER_FIELD_KEY in field.metadata
+        }
+        vanilla_state: dict[str, typing.Any] = {
+            key: value
+            for key, value in super().__getstate__().items()
+            if key not in member_fields
+        }
+        return vanilla_state
+
+    def __setstate__(self, state):
+        for key, value in state.items():
+            if hasattr(self, key):
+                setattr(self, key, value)
+            else:
+                raise ValueError(f"Cannot set the '{key}' value on a '{type(self)}' - that field does not exist")
+        self.__load_members__()
+
     def to_dict(self) -> typing.Mapping[str, typing.Any]:
         """
         Convert the model to a dictionary ready for serialization
@@ -175,8 +224,8 @@ class BaseModel:
             field
             for field in dataclasses.fields(self)
             if field.init
-               and MEMBER_FIELD_KEY not in field.metadata
-               and not field.name.startswith("_")
+                and MEMBER_FIELD_KEY not in field.metadata
+                and not field.name.startswith("_")
         ]
 
         values: dict[str, typing.Any] = {}
@@ -188,7 +237,7 @@ class BaseModel:
                 value = value.to_dict()
 
             if value != field.default:
-                values[field.name] = value
+                values[field.name] = to_dict(obj=value)
 
         return values
 

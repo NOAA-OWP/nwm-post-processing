@@ -85,9 +85,10 @@ class ConversionFactor:
                 f"'{target_unit_name}' - '{variable.name} is not numeric ({variable.dtype})"
             )
 
+        original_encoding: dict[str, typing.Any] = variable.encoding.copy()
         variable.data = ((variable.data + self.initial_adjustment) * self.factor) + self.final_adjustment
         variable.attrs[UNIT_NAME_ATTRIBUTE] = target_unit_name
-
+        variable.encoding.update(original_encoding)
         return variable
 
 class _Conversions:
