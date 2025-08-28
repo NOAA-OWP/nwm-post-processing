@@ -421,9 +421,21 @@ def download_file(
     
     LOGGER.info(f"Downloading '{filename}'")
     with http_session.get(url=url, stream=True) as response:
+        content_length: int = int(response.headers.get("Content-Length", -1))
+        update_pattern: str = "\rDownloading " + pathlib.Path(url).name + ": {progress:.1f}%"
         with path.open("wb") as file:
-            for chunk in response.iter_content(chunk_size=8192):
+            chunk_size: int = 8192
+            for chunk_index, chunk in enumerate(response.iter_content(chunk_size=8192)):
                 file.write(chunk)
+                if content_length > 0:
+                    progress: int = chunk_size * chunk_index
+                    percentage: float = (progress / content_length) * 100
+                    update: str = update_pattern.format(progress=percentage)
+                    sys.stdout.write(update)
+                    sys.stdout.flush()
+            if content_length > 0:
+                sys.stdout.write("\n")
+                sys.stdout.flush()
 
     return path
 
