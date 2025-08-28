@@ -108,7 +108,11 @@ def rename_dimension(
 
         try:
             with load_netcdf(path=input_path) as input_file:
+                previous_indices: set[str] = set(input_file.indexes.keys())
                 input_file = input_file.rename_dims(dims_dict=mapping)
+                missing_indexes: set[str] = set(input_file.indexes.keys()).difference(previous_indices)
+                if missing_indexes:
+                    input_file = input_file.set_xindex(missing_indexes)
                 save_netcdf(temporary_output_path, input_file)
         except:
             from post_processing.configuration import settings

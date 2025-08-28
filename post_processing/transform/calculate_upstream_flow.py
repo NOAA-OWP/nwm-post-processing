@@ -98,6 +98,138 @@ def clean():
 
 
 @timed_function()
+def calculate_upstream_flow_binned(
+    input_path: typing.Union[pathlib.Path, str],
+    output_path: typing.Union[pathlib.Path, str],
+    routelink_path: typing.Union[pathlib.Path, str],
+    variable: str = "streamflow",
+    target_variable: str = "upstreamflow",
+    routelink_to_variable: str = "to",
+    routelink_feature_variable: str = "link",
+    routelink_format: RoutelinkFormat = RoutelinkFormat.NETCDF,
+    work_directory: pathlib.Path = None,
+    *,
+    encoding: typing.Mapping[str, typing.Any] = None,
+    **attributes
+) -> pathlib.Path:
+    """
+    Add an upstreamflow variable calculated via numpy bincounting
+
+    :param input_path: Where to find the input data
+    :param output_path: Where to save the resulting data
+    :param routelink_path: Where to find the routelink data
+    :param variable: The name of the variable whose data to use as input
+    :param target_variable: The name of the variable that will hold the resulting data
+    :param routelink_to_variable: The name of the variable that holds the reference to the downstream feature
+    :param routelink_feature_variable: The name of the variable in the routelink that describes the name for each entry in the routelink
+    :param routelink_format: How the routelink is stored
+    :param work_directory: Where intermediate data should be saved
+    :param encoding: Override properties to use when encoding the resuling data
+    :param attributes: Extra attributes to assign to the new variable
+    :returns: The path to the file that contains the netcdf with the new upstreamflow variable
+    """
+    import xarray
+    import numpy
+    import tempfile
+    import shutil
+
+    import pandas
+
+    from post_processing.utilities.netcdf import load_netcdf
+    from post_processing.utilities.netcdf import save_netcdf
+
+    if work_directory is None:
+        work_directory = settings.intermediate_directory
+
+    if encoding is None:
+        encoding = {}
+
+    with tempfile.TemporaryDirectory(dir=work_directory) as temporary_directory:
+        temporary_path: pathlib.Path = pathlib.Path(temporary_directory)
+        temporary_output: pathlib.Path = temporary_path / output_path.name
+
+        with load_netcdf(input_path) as input_data:
+            linkage: Linkage = ROUTELINKS.get_linkage(
+                path=routelink_path,
+                format=routelink_format,
+                to_key=routelink_to_variable,
+                from_key=routelink_feature_variable
+            )
+
+            input_variable: xarray.DataArray = input_data[variable]
+            input_feature_ids: numpy.typing.NDArray = input_variable[list(input_variable.sizes)[0]].to_numpy()
+            data: numpy.typing.NDArray[numpy.floating] = input_variable.to_numpy()
+
+            if len(data.shape) > 2:
+                raise ValueError(f"Only 1 and 2 dimensional upstreamflow calculation is currently supported")
+
+            target_feature_index_position: numpy.typing.NDArray[numpy.integer] = pandas.Index(input_feature_ids).get_indexer(linkage.to_)
+
+            inflow_mask: numpy.typing.NDArray[numpy.bool_] = (
+                (linkage.to_ >= input_feature_ids.min()) &
+                (linkage.to_ <= input_feature_ids.max()) &
+                (target_feature_index_position >= 0)
+            )
+
+            if '_FillValue' in input_variable.encoding:
+                fill_value = input_variable.encoding['_FillValue']
+            elif "missing_value" in input_variable.encoding:
+                fill_value = input_variable.encoding['missing_value']
+            else:
+                fill_value = numpy.nan
+
+            output_array: numpy.typing.NDArray = numpy.full(
+                shape=data.shape,
+                fill_value=fill_value,
+                dtype=input_variable.dtype
+            )
+
+            if len(data.shape) == 2:
+                for second_dimension_position in range(data.shape[1]):
+                    output_array[:, second_dimension_position] = numpy.bincount(
+                        target_feature_index_position[inflow_mask],
+                        weights=data[inflow_mask, second_dimension_position],
+                        minlength=data.shape[0]
+                    )
+            else:
+                output_array[:] = numpy.bincount(
+                    target_feature_index_position[inflow_mask],
+                    weights=data[inflow_mask],
+                    minlength=data.shape[0],
+                )
+
+            inbound_count: numpy.typing.NDArray[numpy.integer] = numpy.bincount(
+                target_feature_index_position[inflow_mask],
+                minlength=data.shape[0]
+            )
+            has_inbound_flow: numpy.typing.NDArray[numpy.bool_] = inbound_count > 0
+
+            overwrite: numpy.typing.NDArray = numpy.asarray(fill_value, dtype=output_array.dtype)
+            output_array[~has_inbound_flow] = overwrite
+
+            upstreamflow: xarray.DataArray = xarray.DataArray(
+                name=target_variable,
+                data=output_array,
+                dims=input_variable.dims,
+                attrs={
+                    **input_variable.attrs,
+                    "long_name": "Upstream River Flow",
+                    **attributes
+                },
+            )
+
+            input_data[target_variable] = upstreamflow
+            input_data[target_variable].encoding = {
+                **input_variable.encoding,
+                **encoding
+            }
+
+            save_netcdf(path=temporary_output, data=input_data)
+        shutil.move(temporary_output, output_path)
+    return output_path
+
+
+@timed_function()
 def calculate_upstream_flow(
     input_path: typing.Union[pathlib.Path, str],
     output_path: typing.Union[pathlib.Path, str],
@@ -105,7 +237,7 @@ def calculate_upstream_flow(
     variable: str = "streamflow",
     target_variable: str = "upstreamflow",
     routelink_to_variable: str = "to",
-    routelink_from_variable: str = "link",
+    routelink_feature_variable: str = "link",
     routelink_format: RoutelinkFormat = RoutelinkFormat.NETCDF,
     *,
     encoding: typing.Mapping[str, typing.Any] = None,
@@ -122,7 +254,7 @@ def calculate_upstream_flow(
     :param variable: The name of the variable within the file at `input_path` that contains streamflow values
     :param target_variable: What to name the upstream flow variable
     :param routelink_to_variable: The name of the field that details where a feature_id leads
-    :param routelink_from_variable: The name of the field that details the ids of the features that lead to the
+    :param routelink_feature_variable: The name of the field that details the ids of the features that lead to the
         downstream feature. The feature_id variable is not guaranteed to contain the actual values.
     :param routelink_format: The file format of the routelink
     :param encoding: Values used to dictate how the new variable is written to the resulting value
@@ -154,7 +286,6 @@ def calculate_upstream_flow(
 
     from post_processing.utilities.netcdf import load_netcdf
     from post_processing.utilities.netcdf import save_netcdf
-    from post_processing.utilities.netcdf import load_variable
 
     if encoding is None:
         encoding = {}
@@ -167,7 +298,7 @@ def calculate_upstream_flow(
             linkage: Linkage = ROUTELINKS.get_linkage(
                 path=routelink_path,
                 to_key=routelink_to_variable,
-                from_key=routelink_from_variable,
+                from_key=routelink_feature_variable,
                 format=routelink_format,
             )
 
@@ -179,21 +310,18 @@ def calculate_upstream_flow(
             #       but will only ever point to, at most, one feature
             series: pandas.Series = pandas.Series(raw_data)
             upstream_values: pandas.Series = series.groupby(linkage.to_).sum()
+            upstream_values = upstream_values.reindex(linkage.from_).sort_index()
+            upstream_values = upstream_values.fillna(
+                data_to_transform[variable].encoding['_FillValue']
+            )
 
-            # Create a mapping of feature ids to their upstream flow values
-            #   * Provides an easier access pattern to the values based off of feature_id - going by Series isn't worth it
-            organized_values: dict[int, float] = upstream_values.to_dict()
-
-            # Create a new array of values, in the order of the 'from' values matching the organized_values.
-            # The 'to' values won't be in the order of the 'from' values and there won't be matches for all 'from' values
-            #   * numpy.vectorize is used here for a large performance improvement based on the relatively simple operation
-            mapped_flow: numpy.ndarray = numpy.vectorize(organized_values.get)(linkage.from_)
             encoding: dict[str, typing.Any] = {**data_to_transform[variable].encoding, **encoding}
 
             # Create the upstreamflow variable and add it to the dataset
-            upstreamflow_variable = xarray.Variable(
+            upstreamflow_variable: xarray.DataArray = xarray.DataArray(
+                name=target_variable,
                 dims=data_to_transform[variable].dims,
-                data=mapped_flow,
+                data=upstream_values.to_numpy(),
                 attrs={**data_to_transform[variable].attrs, **attributes},
             )
 
@@ -222,18 +350,26 @@ def calculate_upstream_flow(
                 fill_value += add_offset
 
             upstreamflow_variable = upstreamflow_variable.fillna(fill_value)
-
-            upstreamflow_variable.encoding.update(encoding)
-
             data_to_transform[target_variable] = upstreamflow_variable
+            data_to_transform[target_variable].encoding.update({
+                **data_to_transform[variable].encoding,
+                **encoding,
+            })
 
             try:
                 save_netcdf(path=temporary_output_path, dataset=data_to_transform)
-            except OSError:
+            except:
+                from post_processing.utilities.netcdf import describe_netcdf
+                import os
+
+                description: str = describe_netcdf(data_to_transform, variable_name=target_variable)
                 LOGGER.error(
-                    f"Could not write the modified version of '{input_path}' with the new '{target_variable}' variable to '{output_path}'"
+                    f"Could not write the modified version of '{input_path}' with the new '{target_variable}' "
+                    f"variable to '{output_path}'. '{target_variable}':{os.linesep}"
+                    f"{description}"
                 )
                 raise
+
         shutil.move(temporary_output_path, output_path)
 
         if settings.verbosity >= Verbosity.VERBOSE:

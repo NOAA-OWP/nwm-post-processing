@@ -103,7 +103,6 @@ def merge_files(files: typing.Sequence[str | pathlib.Path]) -> xarray.Dataset:
             previous_encoding = variable.encoding.copy()
             variable = variable.astype(new_dtype)
             variable.encoding.update(previous_encoding)
-            combined_files = combined_files.assign_coords({variable_name: variable})
 
         if len(variable.dims) != 1:
             continue
@@ -156,5 +155,6 @@ def merge_files(files: typing.Sequence[str | pathlib.Path]) -> xarray.Dataset:
             new_order.append(str(dimension))
 
     combined_files = combined_files.transpose(*new_order)
+    combined_files = combined_files.compute()
     return combined_files
 

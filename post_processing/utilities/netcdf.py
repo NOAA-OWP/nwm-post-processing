@@ -4,6 +4,7 @@ Helper functions and objects used to standardize file IO operations
 import typing
 import logging
 import pathlib
+import os
 from threading import RLock
 import collections.abc as generic
 
@@ -22,6 +23,7 @@ LOGGER: logging.Logger = logging.getLogger(pathlib.Path(__file__).stem)
 OPEN_LOCK: RLock = RLock()
 """Lock to help secure file opening"""
 
+os.environ.setdefault("HDF5_USE_FILE_LOCKING", "FALSE")
 
 @timed_function()
 def load_variable(
@@ -423,7 +425,11 @@ def save_netcdf(
 
     compute = str(kwargs.get('compute', True)).lower() in ('true', 'yes', 't', 'y', '1')
 
-    delayed_write: typing.Optional = dataset.to_netcdf(path=path, engine=engine, **kwargs, compute=compute)
+    try:
+        delayed_write: typing.Optional = dataset.to_netcdf(path=path, engine=engine, **kwargs, compute=compute)
+    except BaseException as e:
+        LOGGER.error(f"Could not write to '{path}' - {e}")
+        raise
 
     if delayed_write is not None:
         import dask

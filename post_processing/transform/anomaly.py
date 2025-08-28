@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Objects and functions used to bin values by percentile
 """
@@ -29,6 +28,7 @@ class ThresholdDefinition:
     level: typing.Union[int, float, "numpy.float32"]
     variable: str
     time_coordinate: str = dataclasses.field(default='time')
+    # TODO: Should this be a dict of numpy arrays rather than data arrays?
     _data: dict[int, "xarray.DataArray"] = member(default_factory=dict)
     _lock: RLock = member(default_factory=RLock)
 
@@ -245,8 +245,6 @@ def calculate_anomaly(
 
     try:
         dataset = load_netcdf(path=input_path)
-        #dataset.load()
-        #dataset.close()
     except:
         LOGGER.error(f"Could not load the netcdf data at '{input_path.resolve()}'")
         raise
@@ -275,19 +273,13 @@ def calculate_anomaly(
             long_name: str = "Anomaly"
         field_metadata['long_name'] = long_name.title()
 
-    if encoding is None:
-        encoding: dict[str, typing.Any] = {
-            "chunksizes": (396677, 2),
-            "fletcher32": False,
-            "shuffle": True,
-            "preferred_chunks": {'feature_id': 396677, "time": 2},
-            "zlib": True,
-            "complevel": 1,
-            "dtype": numpy.int32,
-            "missing_value": -99990,
-            "_FillValue": -99990,
-            "scale_factor": 0.1
-        }
+    field_metadata = {
+        **variable.attrs,
+        **field_metadata,
+    }
+
+    if not encoding:
+        encoding = variable.encoding
 
     minimum_id = variable[dimension_names].min()
     variable_size: int = variable.size
@@ -363,8 +355,6 @@ def calculate_anomaly(
         dims=dimension_names,
         attrs=field_metadata,
     )
-    output_array.encoding.update(encoding)
-
 
     try:
         updated_dataset: xarray.Dataset = dataset.assign(**{output_array.name: output_array})
@@ -381,6 +371,7 @@ def calculate_anomaly(
 
     try:
         from post_processing.utilities.netcdf import save_netcdf
+        updated_dataset[output_array.name].encoding.update(encoding)
         save_netcdf(path=output_path, dataset=updated_dataset)
         updated_dataset.close()
     except:
@@ -441,19 +432,3 @@ def assign_anomaly(
         raise
 
     return written_path
-
-
-def main() -> int:
-    import argparse
-    parser: argparse.ArgumentParser = argparse.ArgumentParser(
-        description="Assign values within a variable to a bin"
-    )
-    return 0
-
-if __name__ == "__main__":
-    logging.basicConfig(
-        format=settings.log_format,
-        datefmt=settings.date_format
-    )
-    import sys
-    sys.exit(main())
