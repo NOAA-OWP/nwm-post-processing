@@ -84,6 +84,15 @@ class Arguments:
         )
 
         parser.add_argument(
+            "--output-path",
+            "-o",
+            dest="output_path",
+            type=pathlib.Path,
+            default=None,
+            help="Where to place the reindexed data. Not supplying this will replace the original."
+        )
+
+        parser.add_argument(
             "reference_path",
             type=pathlib.Path,
             help="The path to the reference file"
@@ -104,8 +113,14 @@ class Arguments:
                 raise KeyError(f"Unknown argument '{key}'")
 
 
-def reindex_features(target: pathlib.Path, target_variable: str, reference: xarray.DataArray, fill_value = None) -> xarray.Dataset:
-    target_dataset: xarray.Dataset = xarray.open_dataset(target, chunks="auto")
+def reindex_features(
+    target: pathlib.Path,
+    target_variable: str,
+    reference: xarray.DataArray,
+    fill_value = None
+) -> xarray.Dataset:
+    LOGGER.info(f"Loading the data to reindex from '{target}'")
+    target_dataset: xarray.Dataset = xarray.load_dataset(target)
 
     if target_variable not in target_dataset.variables:
         raise KeyError(
@@ -118,10 +133,20 @@ def reindex_features(target: pathlib.Path, target_variable: str, reference: xarr
             f"Cannot reindex '{target}' - '{target_variable}' is not an index that can be reindexed"
         )
 
+    LOGGER.info(
+        f"The target data from '{target}' has been loaded with an existing {target_dataset[target_variable].shape[0]} "
+        f"values"
+    )
+
+    LOGGER.info(f"Dropping preexisting duplicate values from '{target.stem}::{target_variable}'")
+    target_dataset = target_dataset.drop_duplicates(list(target_dataset[target_variable].sizes.keys())[0])
+
+    LOGGER.info(f"Reindexing '{target.name}' based on '{target.stem}::{target_variable}'")
     reindexed_data: xarray.Dataset = target_dataset.reindex(
         {target_variable: reference.data},
         fill_value=fill_value or DEFAULT_FILL_VALUE
     )
+    LOGGER.info(f"The reindexed version of '{target.name}' is now in memory")
 
     return reindexed_data
 
@@ -133,6 +158,7 @@ def main() -> int:
     arguments: Arguments = Arguments()
 
     try:
+        LOGGER.info(f"Loading reference data")
         with xarray.open_dataset(arguments.reference_path) as reference_dataset:
             if arguments.reference_variable not in reference_dataset.variables:
                 raise KeyError(
@@ -143,6 +169,8 @@ def main() -> int:
     except BaseException as exception:
         traceback.print_exception(exception)
         return 1
+
+    LOGGER.info(f"Reference data has been loaded with {reference.shape[0]} values")
 
     try:
         reindexed_data: xarray.Dataset = reindex_features(
@@ -167,6 +195,7 @@ def main() -> int:
             temporary_output_path: pathlib.Path = temporary_directory_path / arguments.output_path.name
 
             try:
+                LOGGER.info(f"Temporarily saving the updated data to '{temporary_output_path}'")
                 reindexed_data.to_netcdf(temporary_output_path, compute=True)
             except BaseException as exception:
                 LOGGER.error(
@@ -176,6 +205,7 @@ def main() -> int:
                 return 1
 
             try:
+                LOGGER.info(f"Closing the reindexed data")
                 reindexed_data.close()
                 del reindexed_data
             except BaseException as exception:
@@ -186,6 +216,8 @@ def main() -> int:
                 return 1
 
             try:
+                LOGGER.info(f"Moving the reindexed data to '{arguments.output_path}'")
+                arguments.output_path.parent.mkdir(parents=True, exist_ok=True)
                 shutil.move(temporary_output_path, arguments.output_path)
             except BaseException as exception:
                 LOGGER.error(

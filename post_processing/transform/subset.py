@@ -123,7 +123,7 @@ class SubsettingContext(BaseModel):
 
     def __set_input_ids(self, input_data: "xarray.Dataset"):
         import numpy
-        if self.input_coordinate in input_data.sizes and not self.input_coordinate not in input_data.variables:
+        if self.input_coordinate in input_data.sizes and self.input_coordinate not in input_data.variables:
             raise ValueError(
                 f"Cannot subset '{self.input_path}' by '{self.input_coordinate}' - it is a dimension and not a variable."
             )
