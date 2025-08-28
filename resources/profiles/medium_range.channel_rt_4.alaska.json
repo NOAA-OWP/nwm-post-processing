@@ -58,7 +58,7 @@
                     },
                     {
                         "operation": "extract",
-                        "dimension": "feature_id",
+                        "dimension": "station_id",
                         "mask_coordinate": "feature_id",
                         "masks": [
                             "{mask_path}/alaska.aprfc.nc"
