@@ -51,7 +51,7 @@ class Linkage:
             to_values = routelink[self.to_key].values
         elif self.format == RoutelinkFormat.NETCDF:
             from post_processing.utilities.netcdf import load_variable
-            LOGGER.debug(f"Loading the '{self.to_key}' variable from '{self.path}'")
+            LOGGER.debug(f"Loading the '{self.from_key}' variable from '{self.path}'")
             from_values = load_variable(path=self.path, variable_name=self.from_key).data
             LOGGER.debug(f"Loading the '{self.to_key}' variable from '{self.path}'")
             to_values = load_variable(path=self.path, variable_name=self.to_key).data

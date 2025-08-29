@@ -16,6 +16,7 @@ from post_processing.utilities.common import timed_function
 
 if typing.TYPE_CHECKING:
     import xarray
+    import numpy
 
 
 LOGGER: logging.Logger = logging.getLogger(pathlib.Path(__file__).stem)
@@ -24,6 +25,27 @@ OPEN_LOCK: RLock = RLock()
 """Lock to help secure file opening"""
 
 os.environ.setdefault("HDF5_USE_FILE_LOCKING", "FALSE")
+
+def get_default_encoding() -> dict["numpy.dtype", dict[str, typing.Any]]:
+    """
+    Get default encoding values for different dtypes to enforce if one is not provided on netcdf values to save
+
+    TODO: It might be more appropriate to add a configuration for this
+    :returns: A dictionary mapping dtypes to default configuration values
+    """
+    import numpy
+    encodings: dict[numpy.dtype, dict[str, typing.Any]] = {}
+    encodings[numpy.dtype("float32")] = {
+        "_FillValue": numpy.int32(-99_900),
+        "scale_factor": numpy.float32(0.01),
+        "missing_value": numpy.int32(-99_900),
+        "zlib": True,
+        "shuffle": True,
+        "complevel": 3,
+        "dtype": numpy.int32,
+    }
+    encodings[numpy.dtype("float64")] = encodings[numpy.dtype("float32")].copy()
+    return encodings
 
 @timed_function()
 def load_variable(
@@ -412,6 +434,7 @@ def save_netcdf(
     :param kwargs: Arguments to pass to the xarray.Dataset.to_netcdf function. See: https://docs.xarray.dev/en/stable/generated/xarray.Dataset.to_netcdf.html
     :returns: Whether the netcdf file that was supposed to be saved exists
     """
+    import numpy
     if isinstance(path, str):
         path = pathlib.Path(path)
 
@@ -426,6 +449,12 @@ def save_netcdf(
     compute = str(kwargs.get('compute', True)).lower() in ('true', 'yes', 't', 'y', '1')
 
     try:
+        default_encodings: dict[numpy.dtype, dict[str, typing.Any]] = get_default_encoding()
+        for variable_name, variable in [*dataset.coords.items(), *dataset.data_vars.items()]:
+            default_encoding: dict[str, typing.Any] = default_encodings.get(variable.dtype, {})
+            for encoding_key, encoding_value in default_encoding.items():
+                if encoding_key not in dataset[variable_name].encoding:
+                    dataset[variable_name].encoding[encoding_key] = encoding_value
         delayed_write: typing.Optional = dataset.to_netcdf(path=path, engine=engine, **kwargs, compute=compute)
     except BaseException as e:
         LOGGER.error(f"Could not write to '{path}' - {e}")

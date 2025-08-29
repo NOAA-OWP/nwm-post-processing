@@ -125,6 +125,8 @@ class OperationType(enum.StrEnum):
     """Print information about the current set of data to the logs"""
     REPROJECT = "reproject"
     """Reproject a grid into another coordinate reference system or size"""
+    UNIT_CONVERSION = "unit_conversion"
+    """Convert the units for a variable into a different unit"""
 
 
 @dataclasses.dataclass
@@ -208,6 +210,23 @@ class FileOutputMixin:
 
         formatted_name: str = self.output_pattern.format(**template_arguments)
         return formatted_name
+
+
+@dataclasses.dataclass
+class ConversionMapping(BaseModel):
+    """
+    Couples the name of the variable to convert to the desired unit
+    """
+    variable_name: str
+    """The name of the variable to convert"""
+    target_unit: str
+    """The desired unit to convert into"""
+
+    def __str__(self):
+        return f"{self.variable_name} to {self.target_unit}"
+
+    def __hash__(self):
+        return hash((self.variable_name, self.target_unit))
 
 
 @dataclasses.dataclass
@@ -1374,6 +1393,102 @@ class RenameOperation(PathToPathOperation, FileOutputMixin):
 
     mapping: dict[str, str] = dataclasses.field()
     rename_variable: bool = dataclasses.field(default=True)
+
+@dataclasses.dataclass
+class UnitConversionOperation(PathToPathOperation, FileOutputMixin):
+    """
+    Tells how to rename variables or dimensions
+    """
+    @classmethod
+    def operation(cls) -> OperationType:
+        return OperationType.UNIT_CONVERSION
+
+    def __post_init__(self):
+        super().__post_init__()
+
+        for conversion_index, conversion in enumerate(self.conversions):
+            if isinstance(conversion, generic.Mapping):
+                self.conversions[conversion_index] = ConversionMapping.from_dict(**conversion)
+            elif not isinstance(conversion, ConversionMapping):
+                raise TypeError(f"Item {conversion_index} is not a ConversionMapping")
+
+    def _validate(self):
+        super()._validate()
+
+        if not self.conversions:
+            raise ValueError(
+                f"There must be at least one unit conversion on a {self.__class__.__name__} but there were none"
+            )
+
+    def __str__(self):
+        prefix: str = f"{self.operation_id}: " if self.operation_id else ''
+
+        if len(self.conversions) == 1:
+            mapping_description = str(self.conversions[0])
+        elif len(self.conversions) == 2:
+            mapping_description = f"{self.conversions[0]} and {self.conversions[1]}"
+        else:
+            mapping_description = ", ".join(map(str, self.conversions[:-1]))
+            mapping_description += f", and {self.conversions[-1]}"
+
+        return f"{prefix}Convert {mapping_description}"
+
+    def __call__(
+        self,
+        profile: "Profile",
+        process_identifier: str,
+        work_directory: pathlib.Path,
+        data: typing.Sequence[pathlib.Path],
+        previous_operations: list[ProfileOperation],
+        metadata: dict[str, typing.Any]
+    ) -> typing.Sequence[pathlib.Path]:
+        """
+        Rename variables from netcdf files
+
+        :param profile: The profile that called for this operation
+        :param process_identifier: An identifier tying together other output for this post processing task
+        :param work_directory: Where intermediate products may be saved
+        :param data: The files to operate on
+        :param metadata: Metadata provided from previous operations that may be used as helpful hints
+        :returns: The Paths for each created object
+        """
+        from post_processing.transform.convert import convert_file
+
+        arguments: list[dict[str, typing.Any]] = [
+            {
+                "input_path": file,
+                "output_path": self.get_output_path(
+                    work_directory=work_directory,
+                    input_path=file,
+                    process_identifier=process_identifier,
+                    **metadata
+                ),
+                "conversions": [
+                    (mapping.variable_name, mapping.target_unit)
+                    for mapping in self.conversions
+                ],
+                "work_directory": work_directory,
+            }
+            for file in data
+        ]
+
+        try:
+            new_files: typing.Sequence[pathlib.Path] = starmap(
+                function=convert_file,
+                args=arguments
+            )
+        except Exception as exception:
+            if 'failure in' not in str(exception):
+                exception.args = (f"Failure in:{os.linesep}{self}{os.linesep}{exception.args[0]}", *exception.args[1:])
+            raise exception
+
+        return new_files
+
+    def __hash__(self) -> int:
+        return hash((super.__hash__(self), *[mapping for mapping in self.conversions]))
+
+    conversions: list[ConversionMapping]
+
 
 @dataclasses.dataclass(unsafe_hash=True)
 class AttributeOperation(PathToPathOperation, FileOutputMixin):

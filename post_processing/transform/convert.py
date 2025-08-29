@@ -6,12 +6,14 @@ import pathlib
 import logging
 import dataclasses
 
+import collections.abc as generic
+
 if typing.TYPE_CHECKING:
     import xarray
 
 LOGGER: logging.Logger = logging.getLogger(pathlib.Path(__file__).stem)
 
-UNIT_NAME_ATTRIBUTE: str = "unit_name"
+UNIT_NAME_ATTRIBUTE: str = "units"
 """The name of the proper NetCDF attribute containing the name of the unit that the value is measured in"""
 
 
@@ -105,8 +107,8 @@ class _Conversions:
         """
         self.__factors.extend([
             ConversionFactor(
-                to_unit=["cms", "m3/s", "m^3/s", "m3 s-1"],
-                from_unit=["cfs", "ft3/s", "ft^3/s", "ft3 s-1"],
+                to_unit=["cfs", "ft3/s", "ft^3/s", "ft3 s-1"],
+                from_unit=["cms", "m3/s", "m^3/s", "m3 s-1"],
                 factor=35.3146667,
             )
         ])
@@ -139,23 +141,68 @@ def convert_variable_unit(
     :param to_unit: The desired unit for the data
     :return: The converted variable
     """
-    if UNIT_NAME_ATTRIBUTE not in variable.attrs:
-        LOGGER.warning(f"Cannot convert the values in '{variable.name}' to '{to_unit}' - there are no defined units.")
-        return variable
+    if UNIT_NAME_ATTRIBUTE not in variable.attrs and UNIT_NAME_ATTRIBUTE not in variable.encoding:
+        raise KeyError(f"Cannot convert the values in '{variable.name}' to '{to_unit}' - there are no defined units.")
 
-    unit_name: str = str(variable.attrs[UNIT_NAME_ATTRIBUTE])
+    unit_name: str = str((variable.attrs | variable.encoding)[UNIT_NAME_ATTRIBUTE])
     if unit_name.isdigit():
-        LOGGER.warning(
+        raise ValueError(
             f"Cannot convert the values in '{variable.name}' from '{unit_name}' to '{to_unit}' - "
             f"it uses a categorical unit, not a physical unit"
         )
-        return variable
 
     conversion_factor: ConversionFactor = CONVERSIONS.find(from_unit=unit_name, to_unit=to_unit)
 
     import xarray
-    converted_values: xarray.DataArray = conversion_factor.convert(variable, target_unit_name=unit_name)
+    converted_values: xarray.DataArray = conversion_factor.convert(variable, target_unit_name=to_unit)
 
-    assert converted_values.attrs.get(UNIT_NAME_ATTRIBUTE) == unit_name, f"The unit was not properly renamed for '{variable.name}' to '{to_unit}'"
+    assert converted_values.attrs.get(UNIT_NAME_ATTRIBUTE) == to_unit, f"The unit was not properly renamed for '{variable.name}' to '{to_unit}'"
 
     return converted_values
+
+
+def convert_file(
+    input_path: pathlib.Path,
+    output_path: pathlib.Path,
+    conversions: generic.Sequence[tuple[str, str]],
+    work_directory: pathlib.Path,
+) -> pathlib.Path:
+    """
+    Convert all specified variables in a file
+
+    :param input_path: The path to the input file
+    :param output_path: Where to save the results
+    :param conversions: A listing of the names of the variables to convert and what unit to convert them to
+    :param work_directory: Where to save intermediate products
+    :return: The path to the converted file
+    """
+    import shutil
+    import xarray
+    import tempfile
+
+    from post_processing.utilities.netcdf import load_netcdf
+    from post_processing.utilities.netcdf import save_netcdf
+
+    with tempfile.TemporaryDirectory(dir=work_directory) as temporary_directory:
+        temporary_path: pathlib.Path = pathlib.Path(temporary_directory)
+        temporary_output_path: pathlib.Path = temporary_path / output_path.name
+
+        LOGGER.debug(
+            f"Opening '{input_path}' to convert {', '.join(map(lambda pair: pair[0], conversions))} to new units."
+        )
+        with load_netcdf(input_path) as input_data:
+            for variable_name, new_unit in conversions:
+                if variable_name not in input_data.data_vars:
+                    raise KeyError(f"Cannot convert the '{variable_name}' variable to '{new_unit}' - it is not in '{input_path}'")
+                data: xarray.DataArray = input_data.data_vars[variable_name]
+                LOGGER.debug(f"Converting '{input_path.stem}::{variable_name}' to '{new_unit}'")
+                converted_data = convert_variable_unit(variable=data, to_unit=new_unit)
+                original_encoding: dict[str, typing.Any] = converted_data.encoding.copy()
+                input_data[variable_name] = converted_data
+                input_data.encoding = original_encoding
+            LOGGER.debug(f"Saving the updated '{input_path.name}' data to a temporary location")
+            save_netcdf(path=temporary_output_path, dataset=input_data)
+        LOGGER.debug(f"Saving the temporary '{input_path.name}' data to {output_path}")
+        shutil.move(temporary_output_path, output_path)
+    return output_path
+

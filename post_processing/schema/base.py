@@ -95,7 +95,7 @@ class BaseModel:
             for field in get_fields(self)
             if not field.init
                 and MEMBER_FIELD_KEY in field.metadata
-                and isinstance(field.metadata[INIT_FUNCTION_KEY], typing.Callable)
+                and isinstance(field.metadata.get(INIT_FUNCTION_KEY), typing.Callable)
         ]
 
         loaders: generic.Iterable[generic.Callable[[], typing.Any]] = map(
