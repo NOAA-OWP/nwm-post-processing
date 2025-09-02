@@ -10,6 +10,8 @@ import tempfile
 import traceback
 import io
 import logging
+import re
+import dataclasses
 
 try:
     import xarray
@@ -23,11 +25,112 @@ except ImportError:
     print(f"Cannot use '{__file__}' - `requests` is required. Please install it.", file=sys.stderr)
     sys.exit(1)
 
+import numpy
+
 # No need to wrap in a try - if you have xarray, you have pandas
 import pandas
 
 # Use a logger instead of print so that it's easier to control what prints and when
 LOGGER: logging.Logger = logging.getLogger(pathlib.Path(__file__).stem)
+
+OUTPUT_NAME_PATTERN: re.Pattern = re.compile(
+    r"(?P<model>\w+)\."
+    r"t(?P<date>\d{8})?(?P<cycle>\d{2})z\."
+    r"(?P<configuration>[a-zA-Z_]+)\."
+    r"(?P<model_output_type>channel_rt|forcing|land|reservoir|)(_(?P<member>\d+))?\."
+    r"((?P<frame>tm\d+|f\d+)\.)?"
+    r"(?P<domain>[a-zA-Z]+)\."
+    r"(?P<output_format>\w+)"
+)
+"""The pattern used to pull apart the name of a NWM file"""
+
+FEATURE_COLUMN_NAME: str = "feature"
+TIME_COLUMN_NAME: str = "time"
+CYCLE_COLUMN_NAME: str = "cycle"
+DATE_COLUMN_NAME: str = "reference_time"
+CONFIGURATION_COLUMN_NAME: str = "configuration"
+MODEL_OUTPUT_TYPE_COLUMN_NAME: str = "model_output_type"
+MEMBER_COLUMN_NAME: str = "member"
+DOMAIN_COLUMN_NAME: str = "domain"
+FRAME_COLUMN_NAME: str = "frame"
+
+@dataclasses.dataclass
+class NWMName:
+    model: str
+    cycle: str
+    configuration: str
+    model_output_type: str
+    domain: str
+    output_format: str
+    frame: typing.Optional[str] = dataclasses.field(default=None)
+    date: typing.Optional[str] = dataclasses.field(default=None)
+    member: typing.Optional[str] = dataclasses.field(default=None)
+
+    def create_feature_filename(self, feature_id: str | int, variable: str, file_format: str = "csv") -> str:
+        filename: str = f"{self.model}.t"
+
+        if self.date:
+            filename += self.date
+
+        filename += f"{self.cycle}z.{self.configuration}.{self.model_output_type}"
+
+        if self.member:
+            filename += f"_{self.member}"
+
+        filename += "."
+
+        if self.frame:
+            filename += f"{self.frame}."
+
+        filename += f"{feature_id}.{variable}.{file_format}"
+
+        return filename
+
+
+    @classmethod
+    def parse(cls, path: pathlib.Path | str) -> "NWMName":
+        if isinstance(path, str):
+            path = pathlib.Path(path)
+
+        if not isinstance(path, pathlib.Path):
+            raise TypeError(
+                f"The path to parse must be a string or Path, not a {type(path)} - "
+                f"a {cls.__qualname__} cannot be created"
+            )
+
+        filename: str = path.name
+
+        name_match: typing.Optional[re.Match] = OUTPUT_NAME_PATTERN.match(filename)
+
+        if not name_match:
+            raise ValueError(
+                f"Cannot create a '{cls.__qualname__}' from '{filename}' - it is not a valid name. "
+                f"The pattern must match '{OUTPUT_NAME_PATTERN.pattern}'"
+            )
+
+        name_parts: dict[str, str | None] = name_match.groupdict()
+
+        return cls(**name_parts)
+
+    def __str__(self):
+        representation: str = f"{self.model}.t"
+
+        if self.date:
+            representation += self.date
+
+        representation += f"{self.cycle}z.{self.configuration}.{self.model_output_type}"
+
+        if self.member:
+            representation += f"_{self.member}"
+
+        representation += "."
+
+        if self.frame:
+            representation += f"{self.frame}."
+
+        representation += f"{self.domain}.{self.output_format}"
+
+        return representation
 
 class Arguments:
     """Application arguments"""
@@ -42,6 +145,8 @@ class Arguments:
         """The coordinate to get a value for"""
         self.variable: str = "streamflow"
         """The name of the variable to pull data from"""
+        self.time_dimension: str = "time"
+        """The name of the temporal dimension for the variable of note"""
 
         self._parse_args(args=args)
         self._validate()
@@ -73,6 +178,14 @@ class Arguments:
             default=self.feature_variable,
             dest="feature_variable",
             help="What variable stores feature information"
+        )
+
+        parser.add_argument(
+            "--time-dimension",
+            "-t",
+            default=self.time_dimension,
+            dest="time_dimension",
+            help="The name of the temporal dimension on the variable of note"
         )
 
         parser.add_argument(
@@ -178,13 +291,30 @@ def extract_data(
     if variable not in dataset:
         raise KeyError(f"The data at '{path}' does not have '{variable}' data.")
 
+    if feature_field not in dataset:
+        raise KeyError(f"Can't select '{feature_field}={feature}' - '{feature_field}' is not in the dataset.")
+
     data: xarray.DataArray = dataset[variable].reset_coords(drop=True)
 
-    if feature_field not in data.coords:
-        raise KeyError(f"Cannot select data in '{path}' by '{feature_field}' - it is not a coordinate.")
+    if feature_field in data.coords:
+        data = data.sel({feature_field: int(float(feature))})
+        LOGGER.info(f"'{variable}({feature_field}={feature})' selected ")
+    elif len(dataset[feature_field].dims) == 1 and dataset[feature_field].dims[0] in data.dims:
+        feature_dimension = dataset[feature_field].dims[0]
+        LOGGER.info(
+            f"'{feature_field}' is not a coordinate, but references '{feature_dimension}' singularly, "
+            f"which is a coordinate of '{variable}' while '{feature_dimension}' has no assigned coordinate. "
+            f"Now indexing '{feature_dimension}' by '{feature_field}'. This will change the name of '{feature_field}' "
+            f"to '{feature_dimension}'."
+        )
+        indexed_dataset: xarray.Dataset = dataset.set_index({feature_dimension: feature_field})
+        data = indexed_dataset[variable].sel({feature_dimension: int(float(feature))})
+    else:
+        raise KeyError(
+            f"While {feature_field}({', '.join(map(str, dataset[feature_field].dims))}) is in '{path}', "
+            f"it cannot be used to access {variable}({', '.join(map(str, data.dims))})"
+        )
 
-    data = data.sel({feature_field: int(float(feature))})
-    LOGGER.info(f"'{variable}({feature_field}={feature})' selected ")
     return data
 
 
@@ -210,6 +340,8 @@ def main() -> int:
         traceback.print_exception(e)
         return 1
 
+    filename_details: NWMName = NWMName.parse(arguments.url)
+
     try:
         if is_local(arguments.url):
             load_function = get_local_series
@@ -226,12 +358,42 @@ def main() -> int:
         traceback.print_exception(e)
         return 1
 
+    name_remapping: dict[str, str] = {
+        str([coordinate for coordinate in series.coords.keys() if coordinate != arguments.time_dimension][0]): FEATURE_COLUMN_NAME
+    }
+
+    if list(name_remapping.keys())[0] != arguments.feature_variable:
+        series = series.rename(name_remapping)
+
+    reference_time: numpy.datetime64 = (
+        series.coords[arguments.time_dimension] - series.coords[arguments.time_dimension].diff(arguments.time_dimension)
+    ).min().dt.date.item()
+
     dataframe: pandas.DataFrame = series.to_dataframe()
 
-    if arguments.output_path:
-        arguments.output_path.parent.mkdir(parents=True, exist_ok=True)
-        dataframe.to_csv(path_or_buf=arguments.output_path)
-        LOGGER.info(f"{arguments.variable}({arguments.feature_variable}={arguments.feature}) saved to '{arguments.output_path}'")
+    dataframe[CYCLE_COLUMN_NAME] = filename_details.cycle
+    dataframe[DOMAIN_COLUMN_NAME] = filename_details.domain
+    dataframe[CONFIGURATION_COLUMN_NAME] = filename_details.configuration
+    dataframe[MODEL_OUTPUT_TYPE_COLUMN_NAME] = filename_details.model_output_type
+    dataframe[MEMBER_COLUMN_NAME] = filename_details.member
+    dataframe[FRAME_COLUMN_NAME] = filename_details.frame
+    dataframe[DATE_COLUMN_NAME] = reference_time
+
+    output_path: pathlib.Path | None = arguments.output_path
+
+    if isinstance(output_path, pathlib.Path) and output_path.is_dir():
+        if not re.search(r"\d{8}$", output_path.parent.name):
+            output_path = output_path / f"{filename_details.model}.{reference_time.strftime('%Y%m%d')}"
+        output_path = output_path / filename_details.create_feature_filename(
+            feature_id=arguments.feature,
+            variable=arguments.variable,
+            file_format="csv"
+        )
+
+    if output_path:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        dataframe.to_csv(path_or_buf=output_path)
+        LOGGER.info(f"{arguments.variable}({arguments.feature_variable}={arguments.feature}) saved to '{output_path}'")
     else:
         buffer: io.StringIO = io.StringIO()
         dataframe.to_csv(buffer)

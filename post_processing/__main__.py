@@ -48,6 +48,8 @@ class Arguments:
         self.settings: bool = False
         """Print available settings rather than run a profile"""
         self.analyze: bool = False
+        """Whether to analyze performance"""
+        self.env_file: pathlib.Path | None = None
 
         self.__parse(args=args)
         self.__validate()
@@ -57,6 +59,11 @@ class Arguments:
         Raise exceptions if arguments are invalid
         """
         messages: list[str] = []
+
+        if isinstance(self.env_file, pathlib.Path) and self.env_file.is_dir():
+            raise FileNotFoundError(f"Cannot use '{self.env_file}' as a .env file - it is a directory, not a file")
+        elif isinstance(self.env_file, pathlib.Path) and self.env_file.is_file():
+            settings.apply_env(self.env_file)
 
         if self.settings or self.version:
             return
@@ -111,6 +118,15 @@ class Arguments:
             "--summarize",
             action="store_true",
             help="Describe what will occur rather than running the post processing operations"
+        )
+
+        parser.add_argument(
+            "--env-file",
+            "-e",
+            dest="env_file",
+            type=pathlib.Path,
+            default=None,
+            help="A path to an optional env file to use for additional configuration"
         )
 
         parser.add_argument(
