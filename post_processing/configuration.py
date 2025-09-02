@@ -135,8 +135,15 @@ class _Settings(UserDict):
             self.__setitem__(key=matching_key, item=argument)
 
         env_file: pathlib.Path = self.application_path / ".env"
+        self.apply_env(env_path=env_file)
 
-        configured_variables: typing.Mapping[str, typing.Any] = _parse_env_file(env_path=env_file)
+    def apply_env(self, env_path: pathlib.Path):
+        """
+        Apply settings from a .env file
+
+        :param env_path: The path to the .env file
+        """
+        configured_variables: typing.Mapping[str, typing.Any] = _parse_env_file(env_path=env_path)
 
         for key, value in configured_variables.items():
             matching_key: str = self._find_key(key)
@@ -377,6 +384,9 @@ class _Settings(UserDict):
     def loggers_to_quiet(self, entries: typing.Sequence[str]) -> None:
         proposed_key: str = "{prefix}_loggers_to_quiet".format(prefix=self.prefix).lower()
         key: str = self._find_key(key=proposed_key)
+
+        for entry in entries:
+            logging.getLogger(entry).setLevel(logging.WARNING)
         self.__setitem__(key, entries)
 
     @property
@@ -408,6 +418,12 @@ class _Settings(UserDict):
 
     @json_log_path.setter
     def json_log_path(self, value: typing.Optional[pathlib.Path]):
+        logging.warning(
+            f"The json log path is being overwritten. If the logger is already configured, this change won't take "
+            f"affect.",
+            stacklevel=3,
+            stack_info=True
+        )
         proposed_key: str = f"{self.prefix}_json_log_path"
         key: str = self._find_key(key=proposed_key)
 
@@ -448,6 +464,12 @@ class _Settings(UserDict):
 
     @log_level_override_path.setter
     def log_level_override_path(self, value: typing.Optional[pathlib.Path]):
+        logging.warning(
+            f"The log level override path is being overwritten. If the logger is already configured, this change won't take "
+            f"affect.",
+            stacklevel=3,
+            stack_info=True
+        )
         proposed_key: str = f"{self.prefix}_log_level_override_path"
         key: str = self._find_key(key=proposed_key)
         if value is None:
@@ -498,6 +520,12 @@ class _Settings(UserDict):
 
     @json_log_level.setter
     def json_log_level(self, value: typing.Optional[int]):
+        logging.warning(
+            f"The json log level is being overwritten. If the logger is already configured, this change won't take "
+            f"affect.",
+            stacklevel=3,
+            stack_info=True
+        )
         proposed_key: str = f"{self.prefix}_json_log_level"
         key: str = self._find_key(key=proposed_key)
         self.__setitem__(key=key, item=value)
@@ -522,6 +550,12 @@ class _Settings(UserDict):
 
     @json_log_maximum_bytes.setter
     def json_log_maximum_bytes(self, value: typing.Optional[int]):
+        logging.warning(
+            f"The json log maximum size is being overwritten. If the logger is already configured, this change won't take "
+            f"affect.",
+            stacklevel=3,
+            stack_info=True
+        )
         proposed_key: str = f"{self.prefix}_json_log_maximum_bytes"
         key: str = self._find_key(key=proposed_key)
         self.__setitem__(key=key, item=None if value is None else int(float(value)))
@@ -714,6 +748,12 @@ class _Settings(UserDict):
         """
         The setter for logging_config_path
         """
+        logging.warning(
+            f"The log config path is being overwritten. If the logger is already configured, this change won't take "
+            f"affect.",
+            stacklevel=3,
+            stack_info=True
+        )
         proposed_key: str = "{prefix}_log_config_path".format(prefix=self.prefix).lower()
         key: str = self._find_key(key=proposed_key)
 

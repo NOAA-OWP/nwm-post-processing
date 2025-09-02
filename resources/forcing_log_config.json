@@ -1,0 +1,101 @@
+{
+    "version": 1,
+    "disable_existing_loggers": false,
+    "formatters": {
+        "simple": {
+            "format": "[%(asctime)s] %(levelname)s %(name)s: %(message)s",
+            "datefmt": "%Y-%m-%d %H:%M:%S%z"
+        },
+        "detailed": {
+            "format":"[%(asctime)s] %(levelname)s %(name)s %(filename)s #%(lineno)d: %(message)s",
+            "datefmt": "%Y-%m-%d %H:%M:%S%z"
+        },
+        "timing": {
+            "format": "%(asctime)s | %(path)s | %(lineNumber)d | %(moduleName)s | %(functionName)s | %(message)s",
+            "datefmt": "%Y-%m-%dT%H:%M:%S%z"
+        },
+        "level_based": {
+            "()": "post_processing.utilities.logging.LevelBasedFormatter",
+            "fmt": "[%(asctime)s] %(levelname)s %(name)s %(filename)s #%(lineno)d: %(message)s",
+            "datefmt": "%Y-%m-%d %H:%M:%S%z",
+            "level_formats": {
+                "INFO": "[%(asctime)s] %(levelname)s %(name)s: %(message)s",
+                "CRITICAL": "FATAL ERROR: %(message)s"
+            }
+        }
+    },
+    "filters": {
+        "exclude_errors": {
+            "()": "post_processing.utilities.logging.ErrorExclusionFilter"
+        },
+        "only_errors": {
+            "()": "post_processing.utilities.logging.OnlyErrorFilter"
+        }
+    },
+    "handlers": {
+        "stdout": {
+            "class": "logging.StreamHandler",
+            "level": "DEBUG",
+            "formatter": "level_based",
+            "stream": "ext://sys.stdout",
+            "filters": [
+                "exclude_errors"
+            ]
+        },
+        "stderr": {
+            "class": "logging.StreamHandler",
+            "level": "ERROR",
+            "formatter": "level_based",
+            "stream": "ext://sys.stderr",
+            "filters": [
+                "only_errors"
+            ]
+        },
+        "log_file": {
+            "class": "logging.handlers.RotatingFileHandler",
+            "level": "DEBUG",
+            "formatter": "level_based",
+            "filename": "pp_forcing_info.log",
+            "maxBytes": 5000000,
+            "backupCount": 5,
+            "filters": [
+                "exclude_errors"
+            ]
+        },
+        "error_file": {
+            "class": "logging.handlers.RotatingFileHandler",
+            "level": "ERROR",
+            "formatter": "level_based",
+            "filename": "pp_forcing_error.log",
+            "maxBytes": 5000000,
+            "backupCount": 5,
+            "filters": [
+                "only_errors"
+            ]
+        },
+        "timing_file": {
+            "class": "logging.handlers.RotatingFileHandler",
+            "level": "INFO",
+            "formatter": "timing",
+            "filename": "pp_forcing_timing.log",
+            "maxBytes": 5000000,
+            "backupCount": 5
+        }
+    },
+    "root": {
+        "level": "INFO",
+        "handlers": [
+            "stdout",
+            "stderr",
+            "log_file",
+            "error_file"
+        ]
+    },
+    "loggers": {
+        "TIMING": {
+            "level": "INFO",
+            "handlers": ["timing_file"],
+            "propagate": false
+        }
+    }
+}
