@@ -8,6 +8,8 @@ import logging
 import enum
 import dataclasses
 
+import collections.abc as generic
+
 from post_processing.configuration import settings
 from post_processing.enums import Verbosity
 from post_processing.utilities.common import timed_function
@@ -51,10 +53,19 @@ class Linkage:
             to_values = routelink[self.to_key].values
         elif self.format == RoutelinkFormat.NETCDF:
             from post_processing.utilities.netcdf import load_variable
+            from post_processing.utilities.netcdf import operate_on_variable
             LOGGER.debug(f"Loading the '{self.from_key}' variable from '{self.path}'")
-            from_values = load_variable(path=self.path, variable_name=self.from_key).data
+            from_values = operate_on_variable(
+                path=self.path,
+                variable_name=self.from_key,
+                operation=lambda array: array.data
+            )
             LOGGER.debug(f"Loading the '{self.to_key}' variable from '{self.path}'")
-            to_values = load_variable(path=self.path, variable_name=self.to_key).data
+            to_values = operate_on_variable(
+                path=self.path,
+                variable_name=self.to_key,
+                operation=lambda array: array.data
+            )
         else:
             raise ValueError(
                 f"Cannot load the routelink needed to calculate upstream flow - "
@@ -99,8 +110,8 @@ def clean():
 
 @timed_function()
 def calculate_upstream_flow_binned(
-    input_path: typing.Union[pathlib.Path, str],
-    output_path: typing.Union[pathlib.Path, str],
+    input_path: typing.Union[pathlib.Path, str, generic.Sequence[pathlib.Path]],
+    output_path: typing.Union[pathlib.Path, str, generic.Sequence[pathlib.Path]],
     routelink_path: typing.Union[pathlib.Path, str],
     variable: str = "streamflow",
     target_variable: str = "upstreamflow",
@@ -111,7 +122,7 @@ def calculate_upstream_flow_binned(
     *,
     encoding: typing.Mapping[str, typing.Any] = None,
     **attributes
-) -> pathlib.Path:
+) -> pathlib.Path | generic.Sequence[pathlib.Path]:
     """
     Add an upstreamflow variable calculated via numpy bincounting
 
@@ -128,6 +139,36 @@ def calculate_upstream_flow_binned(
     :param attributes: Extra attributes to assign to the new variable
     :returns: The path to the file that contains the netcdf with the new upstreamflow variable
     """
+    input_is_paths: bool = (
+        isinstance(input_path, generic.Sequence)
+        and not isinstance(input_path, (str, bytes, generic.Mapping))
+        and all(map(lambda path: isinstance(path, (str, pathlib.Path)), input_path))
+    )
+    output_is_paths: bool = (
+        isinstance(output_path, generic.Sequence)
+        and not isinstance(output_path, (str, bytes, generic.Mapping))
+        and all(map(lambda path: isinstance(path, (str, pathlib.Path)), output_path))
+    )
+
+    if input_is_paths and output_is_paths and len(input_path) == len(output_path):
+        results: list[pathlib.Path] = [
+            calculate_upstream_flow_binned(
+                input_path=read_path,
+                output_path=write_path,
+                routelink_path=routelink_path,
+                variable=variable,
+                target_variable=target_variable,
+                routelink_to_variable=routelink_to_variable,
+                routelink_feature_variable=routelink_feature_variable,
+                routelink_format=routelink_format,
+                work_directory=work_directory,
+                encoding=encoding,
+                **attributes
+            )
+            for read_path, write_path in zip(input_path, output_path)
+        ]
+        return results
+
     import xarray
     import numpy
     import tempfile
@@ -144,11 +185,14 @@ def calculate_upstream_flow_binned(
     if encoding is None:
         encoding = {}
 
+    if isinstance(output_path, str):
+        output_path = pathlib.Path(output_path)
+
     with tempfile.TemporaryDirectory(dir=work_directory) as temporary_directory:
         temporary_path: pathlib.Path = pathlib.Path(temporary_directory)
         temporary_output: pathlib.Path = temporary_path / output_path.name
 
-        with load_netcdf(input_path) as input_data:
+        with load_netcdf(input_path, chunks="auto") as input_data:
             linkage: Linkage = ROUTELINKS.get_linkage(
                 path=routelink_path,
                 format=routelink_format,
@@ -163,7 +207,9 @@ def calculate_upstream_flow_binned(
             if len(data.shape) > 2:
                 raise ValueError(f"Only 1 and 2 dimensional upstreamflow calculation is currently supported")
 
+            LOGGER.debug(f"Creating a specialized index to link feature ids with the 'to' array")
             target_feature_index_position: numpy.typing.NDArray[numpy.integer] = pandas.Index(input_feature_ids).get_indexer(linkage.to_)
+            LOGGER.debug(f"Specialized index has been created")
 
             inflow_mask: numpy.typing.NDArray[numpy.bool_] = (
                 (linkage.to_ >= input_feature_ids.min()) &
@@ -185,28 +231,36 @@ def calculate_upstream_flow_binned(
             )
 
             if len(data.shape) == 2:
+                LOGGER.debug(f"Starting to perform the upstream bincount")
                 for second_dimension_position in range(data.shape[1]):
                     output_array[:, second_dimension_position] = numpy.bincount(
                         target_feature_index_position[inflow_mask],
                         weights=data[inflow_mask, second_dimension_position],
                         minlength=data.shape[0]
                     )
+                LOGGER.debug(f"Upstream bincount is complete")
             else:
+                LOGGER.debug(f"Starting to perform the upstream bincount")
                 output_array[:] = numpy.bincount(
                     target_feature_index_position[inflow_mask],
                     weights=data[inflow_mask],
                     minlength=data.shape[0],
                 )
+                LOGGER.debug(f"Upstream bincount is complete")
 
+            LOGGER.debug(f"Finding locations that need to have the fill value applied")
             inbound_count: numpy.typing.NDArray[numpy.integer] = numpy.bincount(
                 target_feature_index_position[inflow_mask],
                 minlength=data.shape[0]
             )
             has_inbound_flow: numpy.typing.NDArray[numpy.bool_] = inbound_count > 0
 
+            LOGGER.debug(f"Creating the fill value mask")
             overwrite: numpy.typing.NDArray = numpy.asarray(fill_value, dtype=output_array.dtype)
+            LOGGER.debug(f"Overwriting values with the fill value...")
             output_array[~has_inbound_flow] = overwrite
 
+            LOGGER.debug("Adding everything to the upstream value array")
             upstreamflow: xarray.DataArray = xarray.DataArray(
                 name=target_variable,
                 data=output_array,
@@ -223,8 +277,9 @@ def calculate_upstream_flow_binned(
                 **input_variable.encoding,
                 **encoding
             }
-
-            save_netcdf(path=temporary_output, data=input_data)
+            LOGGER.debug(f"Upstream value array created, added to the input data, and encoded.")
+            save_netcdf(path=temporary_output, dataset=input_data)
+            LOGGER.debug(f"Upstream flow data has been saved")
         shutil.move(temporary_output, output_path)
     return output_path
 
@@ -376,90 +431,3 @@ def calculate_upstream_flow(
             LOGGER.debug(f"Saved the updated version of '{input_path}' to '{output_path}'")
 
     return output_path
-
-
-def main() -> int:
-    """
-    A basic example of how to use the contained code
-    """
-    import argparse
-    parser: argparse.ArgumentParser = argparse.ArgumentParser(
-        description=f"A simple test for {__file__}",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-    )
-    parser.add_argument(
-        "input_path",
-        type=pathlib.Path,
-        help="What data to create upstreamflow for"
-    )
-    parser.add_argument(
-        "output_path",
-        type=pathlib.Path,
-        help="Where to store the output"
-    )
-    parser.add_argument(
-        "routelink_path",
-        type=pathlib.Path,
-        help="The path to the routelink to use"
-    )
-    parser.add_argument(
-        "-v",
-        "--variable",
-        dest="variable",
-        type=str,
-        default="streamflow",
-        help="The variable containing the input data"
-    )
-    parser.add_argument(
-        "-n",
-        "--target-variable",
-        dest="target_variable",
-        type=str,
-        default="upstreamflow",
-        help="The name of the variable to create"
-    )
-    parser.add_argument(
-        "-t",
-        "--to-field",
-        type=str,
-        dest="routelink_to_variable",
-        default='to',
-        help="The field in the routelink that dictates where variable values lead"
-    )
-    parser.add_argument(
-        "-f",
-        "--from-field",
-        type=str,
-        dest="routelink_from_variable",
-        default="link",
-        help="The field in the routelink that dictates where variable values came from"
-    )
-    parser.add_argument(
-        "-r",
-        "--routelink-format",
-        dest="routelink_format",
-        type=RoutelinkFormat,
-        default=RoutelinkFormat.NETCDF,
-        help="The format of the routelink to use"
-    )
-
-    parameters: argparse.Namespace = parser.parse_args()
-
-    generated_file_path: pathlib.Path = calculate_upstream_flow(**vars(parameters))
-
-    # Load and print the generated data
-    import xarray
-    output_dataset: xarray.Dataset = xarray.open_dataset(
-        generated_file_path,
-    )
-    output_dataset.info()
-    return 0
-
-if __name__ == "__main__":
-    logging.basicConfig(
-        level=logging.INFO,
-        format=settings.log_format,
-        datefmt=settings.date_format,
-    )
-    import sys
-    sys.exit(main())

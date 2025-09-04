@@ -39,6 +39,7 @@ from post_processing.utilities.common import get_template_variables
 from post_processing.utilities.common import to_json
 from post_processing.utilities.common import timed_function
 from post_processing.configuration import settings
+from post_processing.utilities.common import starmap_threaded
 
 if typing.TYPE_CHECKING:
     from post_processing.transform import anomaly
@@ -646,29 +647,31 @@ class SubsetOperation(PathToPathOperation):
 
             from post_processing.enums import RFC
 
+            from post_processing.transform.subset import mask_dataset
+
             subset_arguments: list[dict[str, typing.Any]] = [
                 {
-                    "input_file": input_file,
-                    "mask_path": self.mask,
+                    "input_path": input_file,
+                    "masks": list(self._mask_identifiers.keys()),
+                    "mask_variable": self.mask_variable,
                     "work_directory": work_directory,
-                    "mask_variables": self.mask_names,
-                    "identifiers": {
+                    "mask_coordinates": self.mask_coordinates,
+                    "metadata": {
                         **metadata,
-                        "mask_name": self.mask.stem,
-                        "input_path": input_file.name,
+                        "mask_name": mask.stem,
                         "input_name": input_file.stem,
                         "frame": get_frame_identifier(input_file.name),
-                        "RFC": RFC.from_string(self.mask.stem, strict=False),
-                        **(self._mask_identifiers or {})
+                        "RFC": RFC.from_string(mask.stem, strict=False),
+                        **identifiers
                     },
+                    "identifier_pattern": self._pattern,
                     "output_pattern": self.output_pattern,
                 }
-                for input_file in data
+                for input_file, (mask, identifiers) in zip(data, self._mask_identifiers.items())
             ]
 
-            from post_processing.transform.subset import subset_gridded_file_into_file_by_mask
-            subset_paths: typing.Sequence[pathlib.Path] = starmap(
-                function=subset_gridded_file_into_file_by_mask,
+            subset_paths: typing.Sequence[pathlib.Path] = starmap_threaded(
+                function=mask_dataset,
                 args=subset_arguments,
                 thread_count=settings.maximum_additional_threads
             )
@@ -707,21 +710,20 @@ class SubsetOperation(PathToPathOperation):
     def __post_init__(self):
         errors: list[Exception] = []
         from post_processing.utilities.common import expand_paths
-        from post_processing.utilities.common import find_candidate_paths
 
-        expanded_paths: list[pathlib.Path] = expand_paths([self.mask])
+        expanded_paths: list[pathlib.Path] = expand_paths(self.masks)
 
         if len(expanded_paths) == 0:
-            candidate_paths: typing.Sequence[pathlib.Path] = find_candidate_paths([self.mask])
-
+            from post_processing.utilities.common import find_candidate_paths
             template_pattern: re.Pattern = re.compile(r"\{[^}]+}")
+            candidate_paths: generic.Sequence[pathlib.Path] = find_candidate_paths(self.masks)
 
-            message: str = f"Could not find any files based off of {self.mask}"
+            message: str = f"Could not find any files based off of {', '.join(map(str, self.masks))}"
 
             if len(candidate_paths) == 0:
-                if template_pattern.search(str(self.mask)):
+                if any(map(template_pattern.search, map(str, self.masks))):
                     message += os.linesep
-                    message += "Available Metadata for the templates:" + os.linesep
+                    message += "Template variables detected. Available Metadata for the templates:" + os.linesep
                     message += to_json(settings.to_dict())
             else:
                 message += os.linesep + (
@@ -729,15 +731,8 @@ class SubsetOperation(PathToPathOperation):
                     f"    - {(os.linesep + '    - ').join(map(str, candidate_paths))}{os.linesep}"
                 )
             errors.append(FileNotFoundError(message))
-        elif len(expanded_paths) > 1:
-            error = ValueError(
-                f"'{self.__class__.__qualname__}' operations on many masks within one file, "
-                f"but received information on multiple files. Use the '{ExtractOperation.__qualname__}' "
-                f"operation for that."
-            )
-            errors.append(error)
 
-        self.mask = expanded_paths[0]
+        self.masks = expanded_paths
 
         if self.identifier_pattern:
             try:
@@ -754,17 +749,22 @@ class SubsetOperation(PathToPathOperation):
                 )
                 errors.append(error)
 
-            identifier_match: typing.Optional[re.Match] = self._pattern.search(self.mask.name)
+            self._mask_identifiers = {}
 
-            if identifier_match:
-                self._mask_identifiers = {
-                    key: '' if value is None else value
-                    for key, value in identifier_match.groupdict().items()
-                }
-            else:
-                LOGGER.debug(
-                    f"The regular expression '{self.identifier_pattern}' did not match anything from '{self.mask.name}'"
-                )
+            for mask in self.masks:
+                mask_filename: str = mask.name
+
+                identifier_match: re.Match | None = self._pattern.search(mask_filename)
+
+                if identifier_match:
+                    self._mask_identifiers[mask] = {
+                        key: '' if value is None else str(value)
+                        for key, value in identifier_match.groupdict().items()
+                    }
+                else:
+                    LOGGER.debug(
+                        f"The regular expression '{self._pattern.pattern}' did not match anything from '{mask_filename}'"
+                    )
 
         if self.each:
             for operation_index, operation in enumerate(self.each):
@@ -798,8 +798,8 @@ class SubsetOperation(PathToPathOperation):
 
         return hash((
             parent_hash,
-            self.mask,
-            *self.mask_names,
+            *self.masks,
+            self.mask_variable,
             self.identifier_pattern,
             self.output_pattern,
             *self.each,
@@ -808,15 +808,17 @@ class SubsetOperation(PathToPathOperation):
     def __str__(self):
         return (
             f"{self.operation_id + ': ' if self.operation_id else ''}"
-            f"Subset a file by data within the following variables in {self.mask}:{os.linesep}"
-            f"    - {(os.linesep + '    - ').join(map(str, self.mask_names))}{os.linesep}"
+            f"Subset a file by data within the '{self.mask_variable}' variable within the following mask files:{os.linesep}"
+            f"    - {(os.linesep + '    - ').join(map(str, self.masks))}{os.linesep}"
             f"And perform {len(self.each)} operations on all resulting datasets"
         )
 
-    mask: pathlib.Path
+    masks: list[pathlib.Path | str]
     """Where to find a single file that contains all the mask data needed"""
-    mask_names: list[str]
-    """The names of each mask to use"""
+    mask_variable: str
+    """The name of the variable within the mask file that says whether to keep or drop locations"""
+    mask_coordinates: list[str]
+    """The variable(s) to use as coordinates within the mask files. Assumes that all masks have the same variables"""
     each: list[ProfileOperation]
     """Operations to perform upon each subsetted chunk of data"""
     output_pattern: typing.Optional[str] = dataclasses.field(default=None)
@@ -825,7 +827,7 @@ class SubsetOperation(PathToPathOperation):
     """A pattern used to extract metadata from the mask filename"""
     _pattern: typing.Optional[re.Pattern] = member(default=None)
     """The generated pattern that may be used to pull identifiers from """
-    _mask_identifiers: dict[str, str] = member(default_factory=dict)
+    _mask_identifiers: dict[pathlib.Path, dict[str, typing.Any]] = member(default_factory=dict)
     """Identifiers that were lifted from the mask filename"""
 
 @dataclasses.dataclass
@@ -1235,6 +1237,7 @@ class DropOperation(PathToPathOperation, FileOutputMixin):
                     )
 
             shutil.move(temporary_output, output_path)
+        LOGGER.debug(f'Removed dimensions from "{input_path}"')
         return output_path
 
     def _remove_variables(
@@ -1259,6 +1262,8 @@ class DropOperation(PathToPathOperation, FileOutputMixin):
             output_file=output_file,
             variables=self.fields
         )
+
+        LOGGER.debug(f"Dropped variables from '{output_file}'")
 
         return result
 
@@ -1306,7 +1311,7 @@ class DropOperation(PathToPathOperation, FileOutputMixin):
         ]
 
         try:
-            updated_files: typing.Sequence[pathlib.Path] = starmap(
+            updated_files: typing.Sequence[pathlib.Path] = starmap_threaded(
                 function=drop_function,
                 args=arguments,
                 thread_count=settings.maximum_additional_threads
@@ -1359,27 +1364,43 @@ class RenameOperation(PathToPathOperation, FileOutputMixin):
         :param metadata: Metadata provided from previous operations that may be used as helpful hints
         :returns: The Paths for each created object
         """
-        arguments: list[dict[str, typing.Any]] = [
-            {
-                "input_path": file,
-                "output_path": self.get_output_path(
-                    work_directory=work_directory,
-                    input_path=file,
-                    process_identifier=process_identifier,
-                    **metadata
-                ),
-                "mapping": self.mapping
-            }
-            for file in data
-        ]
+        if isinstance(data, pathlib.Path):
+            LOGGER.warning(f"For some reason, a path was sent to {self.__class__.__name__} instead of a list of paths.")
+            arguments: list[dict[str, typing.Any]] = [
+                {
+                    "input_path": data,
+                    "output_path": self.get_output_path(
+                        work_directory=work_directory,
+                        input_path=data,
+                        process_identifier=process_identifier,
+                        **metadata
+                    ),
+                    "mapping": self.mapping
+                }
+            ]
+        else:
+            arguments: list[dict[str, typing.Any]] = [
+                {
+                    "input_path": file,
+                    "output_path": self.get_output_path(
+                        work_directory=work_directory,
+                        input_path=file,
+                        process_identifier=process_identifier,
+                        **metadata
+                    ),
+                    "mapping": self.mapping
+                }
+                for file in data
+            ]
 
         from post_processing.transform.rename import rename_variable
         from post_processing.transform.rename import rename_dimension
 
         try:
-            new_files: typing.Sequence[pathlib.Path] = starmap(
+            new_files: typing.Sequence[pathlib.Path] = starmap_threaded(
                 function=rename_variable if self.rename_variable else rename_dimension,
-                args=arguments
+                args=arguments,
+                thread_count=settings.maximum_additional_threads
             )
         except Exception as exception:
             if 'failure in' not in str(exception):
@@ -1469,7 +1490,7 @@ class UnitConversionOperation(PathToPathOperation, FileOutputMixin):
                 ],
                 "work_directory": work_directory,
             }
-            for file in data
+            for file in (data if isinstance(data, generic.Sequence) else [data])
         ]
 
         try:
@@ -2260,8 +2281,9 @@ class AnomalyOperation(PathToPathOperation):
         """
 
         """
+        from post_processing.utilities.netcdf import operate_on_variable
         from post_processing.transform import anomaly
-        output_paths: list[pathlib.Path] = []
+        output_paths: generic.Sequence[pathlib.Path] = []
         frame_pattern: re.Pattern = re.compile(
             r"(?P<model>[a-zA-Z]+)\."
             r"(?P<configuration>\w+)\."
@@ -2271,6 +2293,21 @@ class AnomalyOperation(PathToPathOperation):
             r"nc"
         )
         try:
+            sorted_files: generic.Sequence[pathlib.Path] = sorted(data, key=lambda path: path.name)
+            earliest_path: pathlib.Path = sorted_files[0]
+            latest_path: pathlib.Path = sorted_files[-1]
+            earliest_day: int = operate_on_variable(
+                path=earliest_path,
+                variable_name=self.time_variable,
+                operation=lambda time_variable: time_variable.min().dt.dayofyear.data
+            ).item()
+            latest_day: int = operate_on_variable(
+                path=latest_path,
+                variable_name=self.time_variable,
+                operation=lambda time_variable: time_variable.max().dt.dayofyear.data
+            ).item()
+            all_metadata: dict[pathlib.Path, dict[str, typing.Any]] = {}
+
             for input_path in data:
                 file_specific_metadata: dict[str, typing.Any] = {
                     **metadata
@@ -2279,7 +2316,66 @@ class AnomalyOperation(PathToPathOperation):
                 if identification_match:
                     identifiers: typing.Mapping[str, typing.Any] = identification_match.groupdict()
                     file_specific_metadata.update(identifiers)
+                all_metadata[input_path] = file_specific_metadata
 
+            import concurrent.futures as futures
+            from time import sleep
+
+            with futures.ThreadPoolExecutor(max_workers=settings.maximum_additional_threads) as executor:
+                load_results: list[futures.Future] = []
+                for threshold in self.thresholds:
+                    future_load_result: futures.Future = executor.submit(
+                        threshold.preload_stats,
+                        earliest_day=earliest_day,
+                        latest_day=latest_day,
+                        **metadata
+                    )
+                    load_results.append(future_load_result)
+                    LOGGER.debug(f"Scheduled a preload for the data for {threshold}")
+                while load_results:
+                    load_result = load_results.pop(0)
+                    try:
+                        load_result.result(0.25)
+                    except TimeoutError:
+                        load_results.append(load_result)
+                        if len(load_results) == 1:
+                            sleep(0.5)
+                    except BaseException as e:
+                        for future in load_results:
+                            try:
+                                future.cancel()
+                            except:
+                                pass
+                        LOGGER.error(f"{metadata['stage']}: Failed to preload threshold data: {e}")
+                        raise e
+                LOGGER.debug(f"Threshold data has been preloaded")
+
+            arguments: list[dict[str, typing.Any]] = [
+                {
+                    "input_path": input_path,
+                    "output_path": work_directory / self.output_pattern.format(**all_metadata[input_path]),
+                    "variable_to_bin": self.variable_name,
+                    "thresholds": self.thresholds,
+                    "default_score": self.default_score,
+                    "time_variable": self.time_variable,
+                    "dimension_names": self.dimension_names,
+                    "output_variable_name": self.output_variable_name,
+                    "field_metadata": self.anomaly_metadata,
+                    "encoding": self.encoding,
+                    "operational_metadata": all_metadata[input_path],
+                }
+                for input_path in data
+            ]
+
+            from post_processing.utilities.common import starmap_threaded
+
+            output_paths: generic.Sequence[pathlib.Path] = starmap_threaded(
+                function=anomaly.calculate_anomaly,
+                args=arguments,
+                thread_count=settings.maximum_additional_threads,
+            )
+            """
+            for input_path in data:
                 desired_path: pathlib.Path = work_directory / self.output_pattern.format(**file_specific_metadata)
                 anomaly.calculate_anomaly(
                     input_path=input_path,
@@ -2297,6 +2393,7 @@ class AnomalyOperation(PathToPathOperation):
                 if not desired_path.exists():
                     raise OSError(f"There is no generated anomaly data at {desired_path}")
                 output_paths.append(desired_path)
+            """
         except Exception as exception:
             if 'failure in' not in str(exception):
                 exception.args = (f"Failure in:{os.linesep}{self}{os.linesep}{exception.args[0]}", *exception.args[1:])
@@ -2372,6 +2469,10 @@ class FunctionOperation(ProfileOperation[InputType, OutputType]):
             mapping_source['input_name'] = data.name
             mapping_source['input_stem'] = data.stem
             mapping_source['input_suffix'] = data.suffix
+        elif isinstance(data, generic.Sequence) and len(data) == 1 and isinstance(data[0], pathlib.Path):
+            mapping_source['input_name'] = data[0].name
+            mapping_source['input_stem'] = data[0].stem
+            mapping_source['input_suffix'] = data[0].suffix
 
         kwargs: dict[str, typing.Any] = {}
 

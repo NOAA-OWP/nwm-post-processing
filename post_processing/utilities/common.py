@@ -300,7 +300,7 @@ def starmap_threaded(
     from post_processing.enums import Verbosity
 
     if not settings.allow_threading:
-        raise RuntimeError(f"Cannot thread function - threading is disabled.")
+        LOGGER.warning(f"Threading is being called directly even though it is supposed to be disabled")
 
     if thread_count is None:
         thread_count = settings.maximum_additional_threads

@@ -6,9 +6,11 @@ import logging
 import pathlib
 import dataclasses
 
-from threading import RLock
+import collections.abc as generic
 
-from post_processing.configuration import settings
+from threading import RLock
+from threading import current_thread
+
 from post_processing.schema.base import member
 from post_processing.utilities.common import timed_function
 
@@ -18,6 +20,7 @@ if typing.TYPE_CHECKING:
 
 LOGGER: logging.Logger = logging.getLogger(pathlib.Path(__file__).stem)
 
+LOAD_LOCK = RLock()
 
 @dataclasses.dataclass
 class ThresholdDefinition:
@@ -31,6 +34,16 @@ class ThresholdDefinition:
     # TODO: Should this be a dict of numpy arrays rather than data arrays?
     _data: dict[int, "xarray.DataArray"] = member(default_factory=dict)
     _lock: RLock = member(default_factory=RLock)
+
+    @classmethod
+    def generate_init_key(
+        cls,
+        data_path: pathlib.Path,
+        level: typing.Union[int, float, "numpy.float32"],
+        variable: str,
+        time_coordinate: str = "time"
+    ) -> int:
+        return hash((data_path, level, variable, time_coordinate))
 
     def update_stats(self, day_of_year: int, stats: "xarray.DataArray"):
         with self._lock:
@@ -88,17 +101,66 @@ class ThresholdDefinition:
     def __repr__(self):
         return str(self)
 
+    def preload_stats(self, earliest_day: int, latest_day: int, **path_metadata):
+        """
+        Load in all data between the earliest day and the latest day for future use
+
+        :param earliest_day: The earliest day, inclusive, to load
+        :param latest_day: The latest day, inclusive, to load
+        :param path_metadata: Metadata to load if the path to the data is templated
+        """
+        LOGGER.debug(f"{current_thread().name}: Preloading threshold data between day {earliest_day} and day {latest_day} for {self}")
+        file_path: pathlib.Path = pathlib.Path(str(self.data_path).format(**path_metadata))
+        days_of_year: generic.Sequence[int] = list(range(earliest_day, latest_day + 1))
+        self._load_range(file_path=file_path, days_of_year=days_of_year)
+        LOGGER.debug(f"{current_thread().name}: Done preloading threshold data between day {earliest_day} and day {latest_day} for {self}")
+
+    def _load_range(self, file_path: pathlib.Path, days_of_year: typing.Sequence[int]):
+        with self._lock:
+            days_of_year = [
+                day_of_year
+                for day_of_year in days_of_year
+                if day_of_year not in self._data.keys()
+            ]
+
+            if not days_of_year:
+                # Everything has already been loaded
+                return
+
+            if len(days_of_year) == 1:
+                days_of_year = days_of_year[0]
+
+            import numpy
+            import xarray
+            from post_processing.utilities.netcdf import operate_on_variable
+
+            def get_days_of_year(array: xarray.DataArray) -> xarray.DataArray:
+                return array.sel(**{self.time_coordinate: days_of_year}).astype(numpy.float32).compute()
+
+            specific_statistics: xarray.DataArray = operate_on_variable(
+                path=file_path,
+                variable_name=self.variable,
+                operation=get_days_of_year
+            )
+
+            if self.time_coordinate in specific_statistics.dims:
+                for day in days_of_year:
+                    self._data[day] = specific_statistics.sel({self.time_coordinate: day}).copy()
+            else:
+                # The time coordinate may have been reduced out of the dataset by the `.sel` if there was just a
+                # single day. If so, there's only one day to assign
+                self._data[days_of_year] = specific_statistics.copy()
+
     def get_stats(self, day_of_year: int, **path_metadata) -> "xarray.DataArray":
         """
         Get statistical value from a netcdf file based on the day of the year
         """
         with self._lock:
             if day_of_year in self._data:
+                LOGGER.debug(f"Day {day_of_year} was already loaded")
                 return self._data[day_of_year]
 
-            import xarray
-            from post_processing.utilities.netcdf import load_netcdf
-
+            LOGGER.debug(f"Loading day {day_of_year} of {self.data_path.name}")
             file_path: pathlib.Path = pathlib.Path(str(self.data_path).format(**path_metadata))
 
             day_range: list[int] | int = []
@@ -126,29 +188,9 @@ class ThresholdDefinition:
                 if next_day not in self._data:
                     day_range.append(next_day)
 
-            if len(day_range) == 1:
-                day_range = day_range[0]
+            self._load_range(file_path=file_path, days_of_year=day_range)
 
-            with load_netcdf(path=file_path) as dataset:
-                if self.variable not in dataset.variables:
-                    raise KeyError(
-                        f"The file at '{file_path}' does not contain variable '{self.variable}'"
-                    )
-                variable: xarray.DataArray = dataset[self.variable]
-
-                import numpy
-                specific_statistics: xarray.DataArray = variable.sel(
-                    **{self.time_coordinate: day_of_year}
-                ).compute().astype(numpy.float32)
-
-
-
-                if self.time_coordinate in specific_statistics.dims:
-                    for day in day_range:
-                        self._data[day] = specific_statistics.sel({self.time_coordinate: day}).copy()
-                else:
-                    self._data[day_of_year] = specific_statistics
-            return self._data[day_of_year]
+        return self._data[day_of_year]
 
 
 def make_apply_thresholds(
@@ -200,6 +242,7 @@ def make_apply_thresholds(
                 continue
             mask = variable < threshold
             output_array[mask] = scores[score_index]
+            LOGGER.debug(f"Binned Threshold {score_index}")
 
         if incorrect_lengths:
             raise ValueError(
@@ -243,8 +286,12 @@ def calculate_anomaly(
     if operational_metadata is None:
         operational_metadata = {}
 
+    LOGGER.debug(f"Preparing to calculate anomaly for '{input_path}'")
+
     try:
-        dataset = load_netcdf(path=input_path)
+        with LOAD_LOCK:
+            dataset = load_netcdf(path=input_path, full_load=True, chunks=False)
+            LOGGER.debug(f"Loaded '{input_path}' for processing")
     except:
         LOGGER.error(f"Could not load the netcdf data at '{input_path.resolve()}'")
         raise
@@ -292,6 +339,7 @@ def calculate_anomaly(
     day_of_year: int = get_day_of_year(dataset=dataset, variable=time_variable)
 
     for threshold in thresholds:
+        LOGGER.debug(f"Getting '{threshold}' for '{input_path}'")
         daily_values: xarray.DataArray = threshold.get_stats(day_of_year=day_of_year, **operational_metadata)
         daily_values = daily_values.where(daily_values[dimension_names] >= minimum_id, drop=True)
 
@@ -326,6 +374,7 @@ def calculate_anomaly(
         threshold_arrays.append(daily_values.values)
         scores.append(threshold.level)
 
+    LOGGER.debug(f"Creating the threshold application function")
     apply_thresholds: typing.Callable[[xarray.DataArray, *numpy.ndarray], numpy.ndarray] = make_apply_thresholds(
         scores=scores,
         default_score=default_score,
@@ -348,6 +397,7 @@ def calculate_anomaly(
         output_dtypes=[numpy.result_type(*scores)],
         dask="parallelized"
     )
+    LOGGER.debug(f"Anomaly has been calculated from {input_path}")
 
     output_array: xarray.DataArray = xarray.DataArray(
         data=anomaly_scores,
