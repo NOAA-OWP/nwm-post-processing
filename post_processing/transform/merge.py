@@ -32,8 +32,9 @@ def merge_files(files: typing.Sequence[str | pathlib.Path]) -> xarray.Dataset:
         for file in files
     ]
 
+    LOGGER.debug(f"Merging {len(files)} files")
     combined_files: xarray.Dataset = load_netcdf(path=files)
-
+    LOGGER.debug(f"Data from {len(files)} have been merged. Now they are being encoded.")
     for coordinate_name, variable in combined_files.coords.items():
         new_dtype = variable.dtype
 
@@ -156,5 +157,6 @@ def merge_files(files: typing.Sequence[str | pathlib.Path]) -> xarray.Dataset:
 
     combined_files = combined_files.transpose(*new_order)
     combined_files = combined_files.compute()
+    LOGGER.debug(f"Data from {len(files)} files have been merged and encoded")
     return combined_files
 

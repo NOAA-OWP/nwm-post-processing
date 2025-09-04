@@ -11,7 +11,7 @@
             "datefmt": "%Y-%m-%d %H:%M:%S%z"
         },
         "timing": {
-            "format": "%(asctime)s | %(path)s | %(lineNumber)d | %(moduleName)s | %(functionName)s | %(message)s",
+            "format": "%(asctime)s | %(path)s | %(lineNumber)d | %(moduleName)s | %(functionName)s | %(message)s | %(process)d",
             "datefmt": "%Y-%m-%dT%H:%M:%S%z"
         },
         "level_based": {

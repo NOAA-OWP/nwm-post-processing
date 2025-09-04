@@ -8,6 +8,7 @@ import argparse
 import logging
 import pathlib
 import sys
+import faulthandler
 
 from datetime import datetime
 
@@ -24,6 +25,8 @@ from post_processing.enums import ModelOutputType
 from post_processing.schema import InputManifest
 from post_processing.schema.profile import Profile
 from post_processing.schema.profile import get_profile
+
+faulthandler.enable(all_threads=True)
 
 if __name__.endswith("__main__"):
     setup_logging()

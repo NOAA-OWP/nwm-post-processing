@@ -8,6 +8,7 @@ import typing
 import pathlib
 import logging
 import dataclasses
+import re
 
 from collections import abc as generic
 
@@ -219,8 +220,9 @@ class _MaskProvider:
     def __init__(self):
         import numpy
         import threading
+        import xarray
         self.__lock: threading.RLock = threading.RLock()
-        self.__mask_ids: dict[tuple[pathlib.Path, str], numpy.ndarray] = {}
+        self.__mask_ids: dict[tuple[pathlib.Path, str], typing.Union[numpy.ndarray, xarray.DataArray]] = {}
         self.__sizes: dict[pathlib.Path, dict[str, int]] = {}
         self.__variables: dict[pathlib.Path, generic.Mapping[str, str]] = {}
 
@@ -235,14 +237,17 @@ class _MaskProvider:
             if mask_id_key in self.__mask_ids and path in self.__sizes and path in self.__variables:
                 return
 
-            with load_netcdf(path=path) as mask_source:
+            with load_netcdf(path=path, full_load=True, chunks=None) as mask_source:
                 if variable not in mask_source:
                     raise KeyError(f"'{variable}' is not a variable within '{path}'. It may not be used as a mask")
 
                 mask_variable: xarray.DataArray = mask_source[variable]
-                mask_values: numpy.ndarray = mask_variable.data
 
-                mask_ids: numpy.ndarray = numpy.unique(mask_values)
+                if len(mask_variable.shape) == 1:
+                    mask_values: numpy.ndarray = mask_variable.data
+                    mask_ids: numpy.ndarray = numpy.unique(mask_values)
+                else:
+                    mask_ids: xarray.DataArray = mask_variable.copy()
 
                 self.__mask_ids[(path, variable)] = mask_ids
                 self.__sizes[path] = {str(name): count for name, count in mask_source.sizes.items()}
@@ -251,7 +256,7 @@ class _MaskProvider:
                     for variable_name, variable in mask_source.variables.items()
                 }
 
-    def get_ids(self, path: pathlib.Path, variable: str) -> "numpy.ndarray":
+    def get_ids(self, path: pathlib.Path, variable: str) -> typing.Union["numpy.ndarray", "xarray.DataArray"]:
         key: tuple[pathlib.Path, str] = (path, variable)
 
         if key in self.__mask_ids:
@@ -543,6 +548,133 @@ def select_via_numpy(
     return raw_data[tuple(indices)]
 
 
+@timed_function()
+def mask_array(
+    input_data: "xarray.DataArray",
+    mask: "xarray.DataArray",
+) -> "xarray.DataArray":
+    import xarray
+    original_indices: dict[str, xarray.Index] =  dict(input_data.indexes.items())
+    masked_data: xarray.DataArray = input_data.where(mask)
+    masked_data = masked_data.reindex(original_indices)
+    masked_data.encoding.update(input_data.encoding.copy())
+    LOGGER.debug(f"Subset the {input_data.name} variable")
+    return masked_data
+
+@timed_function()
+def mask_dataset(
+    input_path: pathlib.Path,
+    masks: generic.Sequence[pathlib.Path],
+    mask_variable: str,
+    mask_coordinates: generic.Sequence[str],
+    work_directory: pathlib.Path,
+    output_pattern: str,
+    identifier_pattern: re.Pattern,
+    metadata: generic.Mapping[str, typing.Any]
+) -> generic.Sequence[pathlib.Path]:
+    import tempfile
+    import shutil
+
+    import xarray
+
+    from post_processing.utilities.netcdf import load_netcdf
+    from post_processing.utilities.netcdf import save_netcdf
+
+    masked_files: list[pathlib.Path] = []
+
+    with tempfile.TemporaryDirectory(dir=work_directory) as temporary_directory:
+        temporary_directory_path: pathlib.Path = pathlib.Path(temporary_directory)
+        files_to_move: list[pathlib.Path] = []
+
+        LOGGER.debug(f"Subsetting '{input_path}' by {len(masks)} masks")
+        with load_netcdf(input_path, full_load=True, chunks=None) as input_data:
+            LOGGER.info(f"Loaded '{input_path}'")
+            # find a way to use the mask provider?
+            for mask_path in masks:
+                identifier_match: re.Match | None = identifier_pattern.search(mask_path.name)
+
+                if identifier_match is None:
+                    identifiers: dict[str, typing.Any] = {}
+                else:
+                    identifiers: dict[str, typing.Any] = identifier_match.groupdict()
+
+                output_name: str = output_pattern.format_map({
+                    "mask_variable": mask_variable,
+                    "mask_name": mask_path.stem,
+                    **identifiers,
+                    **metadata,
+                })
+
+                temporary_output_path: pathlib.Path = temporary_directory_path / output_name
+                LOGGER.debug(f"Loading the mask at '{mask_path}' for '{input_path}'")
+                mask_data: xarray.DataArray = MASK_PROVIDER.get_ids(path=mask_path, variable=mask_variable)
+                LOGGER.debug(f"Loaded the mask at '{mask_path}' for '{input_path}'")
+                inconsequential_dimensions: generic.Sequence[str] = [
+                    str(dimension)
+                    for dimension, count in mask_data.sizes.items()
+                    if count == 1
+                       and dimension not in mask_coordinates
+                ]
+
+                if inconsequential_dimensions:
+                    mask_data = mask_data.isel({
+                        key: 0
+                        for key in inconsequential_dimensions
+                        if key in mask_data.dims
+                    })
+
+                extra_dimensions: set[str] = set(map(str, mask_data.sizes.keys())).difference(mask_coordinates)
+
+                if extra_dimensions:
+                    sizes: dict[str, int] = {
+                        dimension_name: mask_data.sizes[dimension_name]
+                        for dimension_name in extra_dimensions
+                    }
+                    message: str = f"Cannot subset '{input_data}' - the mask has extra coordinates: '{sizes}'"
+                    raise KeyError(message)
+
+                masked_variables: dict[str, xarray.DataArray] = {
+                    variable_name: mask_array(input_data=variable, mask=mask_data)
+                    for variable_name, variable in input_data.data_vars.items()
+                }
+
+                copied_input_data: xarray.Dataset = xarray.Dataset(
+                    data_vars={},
+                    coords={
+                        coordinate_name: coordinate.copy()
+                        for coordinate_name, coordinate in input_data.coords.items()
+                    },
+                    attrs=input_data.attrs.copy(),
+                )
+
+                for coordinate_name in copied_input_data.coords.keys():
+                    copied_input_data[coordinate_name].encoding = copied_input_data[coordinate_name].encoding.copy()
+
+                while masked_variables:
+                    variable_name, variable = masked_variables.popitem()
+                    if isinstance(variable, xarray.Dataset):
+                        LOGGER.warning(
+                            f"Something happened and the '{variable_name}' variable from '{input_path.name}' "
+                            f"was a dataset, not a data array."
+                        )
+                        variable = variable[variable_name]
+                    copied_input_data[variable_name] = variable
+                    copied_input_data[variable_name].encoding = variable.encoding.copy()
+
+                copied_input_data.encoding.update(input_data.encoding)
+                LOGGER.debug(f"Subset '{input_path}' by '{mask_path}")
+                save_netcdf(path=temporary_output_path, dataset=copied_input_data)
+                files_to_move.append(temporary_output_path)
+
+        for file_to_move in files_to_move:
+            output_path: pathlib.Path = work_directory / file_to_move.name
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(file_to_move, output_path)
+            masked_files.append(output_path)
+
+    return masked_files
+
+# the following function isn't going to work - it will only cut down by a box, not the full mask. Loop in the above
 @timed_function()
 def subset_gridded_file_into_file_by_mask(
     input_file: pathlib.Path,

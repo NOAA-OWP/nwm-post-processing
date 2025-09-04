@@ -48,6 +48,45 @@ def get_default_encoding() -> dict["numpy.dtype", dict[str, typing.Any]]:
     return encodings
 
 @timed_function()
+def operate_on_variable(
+    path: pathlib.Path | str,
+    variable_name: str,
+    operation: generic.Callable[["xarray.DataArray"], typing.Union["xarray.DataArray", "numpy.ndarray"]],
+    engine: str | typing.Literal['h5netcdf', 'netcdf4'] = settings.default_netcdf_engine,
+    chunks: generic.Mapping[str, typing.Any] | typing.Literal['auto'] | None = "auto",
+    **kwargs,
+) -> typing.Union["xarray.DataArray", "numpy.ndarray"]:
+    """
+    Perform a quick operation on a single variable within a single netcdf file
+
+    :param path: The path to the netcdf file of interest
+    :param variable_name: The name of the variable to operate on
+    :param operation: The function to perform
+    :param engine: The netcdf engine to use to load data
+    :param chunks: The configuration for loading in data as chunks
+    :param kwargs: Keyword arguments for xarray.open_dataset
+    :returns: The numpy array containing the results of the operation
+    """
+    if isinstance(path, str):
+        path = pathlib.Path(path)
+
+    if not isinstance(path, pathlib.Path):
+        raise TypeError(
+            f"Cannot operate on a variable - the path must be a pathlike object but received '{path}' (type={type(path)})"
+        )
+
+    import xarray
+
+    with OPEN_LOCK:
+        with xarray.open_dataset(filename_or_obj=path, engine=engine, chunks=chunks, **kwargs) as dataset:
+            if variable_name not in dataset:
+                raise KeyError(
+                    f"Cannot operate on '{path.name}::{variable_name}' - '{variable_name}' is not a member of '{path}'"
+                )
+            result = operation(dataset[variable_name])
+            return result
+
+@timed_function()
 def load_variable(
     path: pathlib.Path | str | generic.Sequence[pathlib.Path | str],
     variable_name: str,
@@ -67,7 +106,10 @@ def load_variable(
             if variable_name not in dataset:
                 raise KeyError(f"There is no '{variable_name}' variable in {path}")
 
-            variable: xarray.DataArray = dataset[variable_name].compute()
+            variable: xarray.DataArray = dataset[variable_name]
+
+            if hasattr(variable, "compute") and callable(variable.compute):
+                variable = variable.compute().copy()
             return variable
 
 
@@ -77,6 +119,7 @@ def load_netcdf(
     path: typing.Union[pathlib.Path, str, typing.Sequence[typing.Union[pathlib.Path, str]]],
     engine: typing.Union[str, typing.Literal["h5netcdf", "zarr", "netcdf4"]] = settings.default_netcdf_engine,
     chunks: typing.Optional[typing.Union[typing.Mapping[str, typing.Any], typing.Literal['auto', 'force']]] = None,
+    full_load: bool = False,
     **kwargs
 ) -> "xarray.Dataset":
     """
@@ -117,11 +160,15 @@ def load_netcdf(
                 if settings.verbosity >= enums.Verbosity.LOUD:
                     LOGGER.debug(f"Loading '{path}'", stack_info=True)
 
-                dataset: xarray.Dataset = xarray.open_dataset(path, engine=engine, chunks=chunks, **kwargs)
+                with OPEN_LOCK:
+                    dataset: xarray.Dataset = xarray.open_dataset(path, engine=engine, chunks=chunks, **kwargs)
+                    if full_load:
+                        dataset = dataset.load()
+                        dataset.close()
+                    return dataset
 
                 # NOTE: It would be safer to load everything in full and move on, but that adds a significant
                 # performance cost. For now, full loads won't be performed by default.
-                break
             except Exception as e:
                 last_exception = e
                 last_exception.args = (f"Could not load data at '{path}'. {e.args[0]}", *e.args[1:])
@@ -389,7 +436,6 @@ def describe_netcdf(
     return os.linesep.join(lines)
 
 
-#@simple_cache()
 @timed_function()
 def peek(
     path: typing.Union[str, pathlib.Path],
@@ -455,7 +501,14 @@ def save_netcdf(
             for encoding_key, encoding_value in default_encoding.items():
                 if encoding_key not in dataset[variable_name].encoding:
                     dataset[variable_name].encoding[encoding_key] = encoding_value
-        delayed_write: typing.Optional = dataset.to_netcdf(path=path, engine=engine, **kwargs, compute=compute)
+    except BaseException as e:
+        LOGGER.error(f"Ran into issues when configuring encoding settings for '{path.name}': {e}")
+        raise
+
+    # TODO: manually scale floats to ints - numpy will end up being more efficient
+    try:
+        with OPEN_LOCK:
+            delayed_write: typing.Optional = dataset.to_netcdf(path=path, engine=engine, **kwargs, compute=compute)
     except BaseException as e:
         LOGGER.error(f"Could not write to '{path}' - {e}")
         raise
