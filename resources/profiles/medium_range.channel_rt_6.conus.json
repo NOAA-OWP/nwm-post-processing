@@ -48,88 +48,73 @@
             ]
         },
         {
-            "operation": "on_each",
-            "comment": "Add upstreamflow to each input file by calling 'post_processing.transform.calculate_upstream_flow.calculate_upstream_flow' on each",
-            "on_each": [
-                {
-                    "operation": "function",
-                    "function_name": "post_processing.transform.calculate_upstream_flow.calculate_upstream_flow",
-                    "comment": "This should end up calling `calculate_upstream_flow(input_path=data, output_path=data, routelink_path='{application_path}/RouteLink_CONUS.nc')`",
-                    "kwargs": {
-                        "routelink_path": "{routelink_path}/RouteLink_CONUS.nc",
-                        "routelink_from_variable": "from",
-                        "output_path": "{work_directory}/upstream.{input_name}"
-                    },
-                    "argument_mapping": {
-                        "input_path": "data"
-                    }
-                }
-            ]
-        },
-        {
             "operation": "merge",
             "file_name_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}_{member}.{Region}.nc"
         },
         {
-            "operation": "branch",
-            "branches": {
-                "WMS": [
-                    {
-                        "operation": "drop",
-                        "fields": ["upstreamflow"],
-                        "output_pattern": "no_upstream.nwm.t{cycle}z.{Configuration}.{ModelOutputType}_{member}.{Region}.nc"
-                    },
-                    {
-                        "operation": "save",
-                        "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}_{member}.{Region}.nc",
-                        "directory": "{output_path}/"
-                    }
-                ],
-                "RFC": [
-                    {
-                        "operation": "drop",
-                        "fields": ["streamflow_anomaly"]
-                    },
-                    {
-                        "operation": "rename",
-                        "mapping": {
-                            "feature_id": "station_id"
-                        }
-                    },
-                    {
-                        "operation": "rename",
-                        "rename_variable": false,
-                        "mapping": {
-                            "feature_id": "station"
-                        }
-                    },
-                    {
-                        "operation": "extract",
-                        "dimension": "station_id",
-                        "mask_coordinate": "feature_id",
-                        "masks": [
-                            "{mask_path}/abrfc.nc",
-                            "{mask_path}/c*rfc.nc",
-                            "{mask_path}/m*rfc.nc",
-                            "{mask_path}/lmrfc.nc",
-                            "{mask_path}/n*rfc.nc",
-                            "{mask_path}/ohrfc.nc",
-                            "{mask_path}/serfc.nc",
-                            "{mask_path}/wgrfc.nc"
-                        ],
-                        "identifier_pattern": "^(?P<region>\\w+(\\.(?P<rfc>[MmAaLlCcNnPpWwOoSsHh][BbPpNnMmAaCcEeWwHhRrGg]([Rr][Ff][Cc]|[Vv][Ii])))?)",
-                        "output_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}_{member}.{region}.nc",
-                        "each": [
-                            {
-                                "operation": "save",
-                                "filename_pattern": "{file_name}",
-                                "identifier_pattern": "(?P<rfc>[A-Za-z]{2}[Rr][Ff][Cc])",
-                                "directory": "{output_path}/"
-                            }
-                        ]
-                    }
-                ]
+            "operation": "save",
+            "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}_{member}.{Region}.nc",
+            "directory": "{output_path}/"
+        },
+        {
+            "operation": "drop",
+            "fields": ["streamflow_anomaly"]
+        },
+        {
+            "operation": "function",
+            "function_name": "post_processing.transform.calculate_upstream_flow.calculate_upstream_flow_binned",
+            "comment": "This should end up calling `calculate_upstream_flow(input_path=data, output_path=data, routelink_path='{application_path}/RouteLink_CONUS.nc')`",
+            "kwargs": {
+                "routelink_path": "{routelink_path}/RouteLink_CONUS.nc",
+                "routelink_feature_variable": "link",
+                "output_path": "{work_directory}/upstream.{input_name}"
+            },
+            "argument_mapping": {
+                "input_path": "data"
             }
+        },
+        {
+            "operation": "function",
+            "function_name": "post_processing.transform.calculate_upstream_flow.clean",
+            "comment": "Remove unneeded items from upstreamflow calculations"
+        },
+        {
+            "operation": "rename",
+            "mapping": {
+                "feature_id": "station_id"
+            }
+        },
+        {
+            "operation": "rename",
+            "rename_variable": false,
+            "mapping": {
+                "feature_id": "station"
+            }
+        },
+        {
+            "operation": "extract",
+            "dimension": "station_id",
+            "mask_coordinate": "feature_id",
+            "masks": [
+                "{mask_path}/abrfc.nc",
+                "{mask_path}/c*rfc.nc",
+                "{mask_path}/m*rfc.nc",
+                "{mask_path}/lmrfc.nc",
+                "{mask_path}/n*rfc.nc",
+                "{mask_path}/ohrfc.nc",
+                "{mask_path}/serfc.nc",
+                "{mask_path}/wgrfc.nc"
+            ],
+            "identifier_pattern": "^(?P<region>\\w+(\\.(?P<rfc>[MmAaLlCcNnPpWwOoSsHh][BbPpNnMmAaCcEeWwHhRrGg]([Rr][Ff][Cc]|[Vv][Ii])))?)",
+            "output_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}_{member}.{region}.nc",
+            "each": [
+                {
+                    "operation": "save",
+                    "filename_pattern": "{file_name}",
+                    "identifier_pattern": "(?P<rfc>[A-Za-z]{2}[Rr][Ff][Cc])",
+                    "directory": "{output_path}/"
+                }
+            ]
         }
     ],
     "configuration": "medium_range",

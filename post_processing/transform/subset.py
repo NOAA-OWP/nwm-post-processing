@@ -471,9 +471,6 @@ def subset_vector_file_into_file_by_value(
                 input_data = input_data.swap_dims({target_dimension: coordinate})
                 dimensions_to_rename[coordinate] = target_dimension
 
-            if settings.this_is_verbose:
-                LOGGER.debug(f"Extracting data from '{input_file}' that matches the allowable ids")
-
             subset_data: xarray.Dataset = _subset_by_label(context=context)
 
             if subset_data is None:
