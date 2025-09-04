@@ -1237,7 +1237,6 @@ class DropOperation(PathToPathOperation, FileOutputMixin):
                     )
 
             shutil.move(temporary_output, output_path)
-        LOGGER.debug(f'Removed dimensions from "{input_path}"')
         return output_path
 
     def _remove_variables(
@@ -1262,8 +1261,6 @@ class DropOperation(PathToPathOperation, FileOutputMixin):
             output_file=output_file,
             variables=self.fields
         )
-
-        LOGGER.debug(f"Dropped variables from '{output_file}'")
 
         return result
 
@@ -1397,7 +1394,7 @@ class RenameOperation(PathToPathOperation, FileOutputMixin):
         from post_processing.transform.rename import rename_dimension
 
         try:
-            new_files: typing.Sequence[pathlib.Path] = starmap_threaded(
+            new_files: typing.Sequence[pathlib.Path] = starmap(
                 function=rename_variable if self.rename_variable else rename_dimension,
                 args=arguments,
                 thread_count=settings.maximum_additional_threads

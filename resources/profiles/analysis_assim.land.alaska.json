@@ -1,22 +1,26 @@
 {
     "operations": [
         {
-            "operation": "echo",
-            "message": "An output for 'nwm.t<cycle>z.analysis_assim.land.tm00.alaska.nc' should be generated, as defined in {source_file}.",
-            "level": "error",
-            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/WMS/analysis_assim/land/nwm.t2025060718z.analysis_assim.land.tm00.alaska.nc"
+            "operation": "drop",
+            "exclude": true,
+            "fields": [
+                "x",
+                "y",
+                "time",
+                "reference_time",
+                "crs",
+                "ACCET",
+                "SOILSAT_TOP",
+                "FSNO",
+                "SNEQV",
+                "SNOWH",
+                "SNOWT_AVG"
+            ]
         },
         {
-            "operation": "echo",
-            "message": "An output for 'nwm.t<cycle>z.analysis_assim.land.tm01.alaska.nc' should be generated, as defined in {source_file}.",
-            "level": "error",
-            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AP/land/nwm.t2025060718z.analysis_assim.land.tm01.alaska.aprfc.nc"
-        },
-        {
-            "operation": "echo",
-            "message": "An output for 'nwm.t<cycle>z.analysis_assim.land.tm02.alaska.nc' should be generated, as defined in {source_file}.",
-            "level": "error",
-            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/AP/land/nwm.t2025060718z.analysis_assim.land.tm02.alaska.aprfc.nc"
+            "operation": "save",
+            "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.tm{tminus}.alaska.aprfc.nc",
+            "directory": "{output_path}/"
         }
     ],
     "configuration": "analysis_assim",

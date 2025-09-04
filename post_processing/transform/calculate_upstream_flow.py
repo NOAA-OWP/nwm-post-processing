@@ -335,6 +335,7 @@ def calculate_upstream_flow(
 
     import tempfile
     import shutil
+    from dask import array
 
     if "long_name" not in attributes:
         attributes['long_name'] = "Upstream River Flow"
@@ -357,6 +358,9 @@ def calculate_upstream_flow(
                 format=routelink_format,
             )
 
+            to_linkage = linkage.to_.compute() if isinstance(linkage.to_, array.Array) else linkage.to_
+            from_linkage = linkage.from_.compute() if isinstance(linkage.from_, array.Array) else linkage.from_
+
             # TODO: This may lead to issues if the length of the arrays aren't the same - it's linking on array index,
             #  not index value
 
@@ -364,8 +368,8 @@ def calculate_upstream_flow(
             #   * Based on the routelink structure, a single feature may have multiple features pointing at it,
             #       but will only ever point to, at most, one feature
             series: pandas.Series = pandas.Series(raw_data)
-            upstream_values: pandas.Series = series.groupby(linkage.to_).sum()
-            upstream_values = upstream_values.reindex(linkage.from_).sort_index()
+            upstream_values: pandas.Series = series.groupby(to_linkage).sum()
+            upstream_values = upstream_values.reindex(from_linkage).sort_index()
             upstream_values = upstream_values.fillna(
                 data_to_transform[variable].encoding['_FillValue']
             )
