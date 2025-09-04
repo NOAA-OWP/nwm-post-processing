@@ -27,6 +27,7 @@ _site/
 *.sqlite
 *.db
 *.profile
+*.log.*
 
 # OS generated files #
 ######################
@@ -97,6 +98,7 @@ dist/
 # Output #
 ##############
 *.nc
+output/*
 
 # Experiments #
 ##############
