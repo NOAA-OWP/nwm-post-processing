@@ -44,6 +44,15 @@
             ]
         },
         {
+            "operation": "save",
+            "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.tm{tminus}.conus.nc",
+            "directory": "{output_path}/",
+            "include_conditions": {
+                "tminus": "00"
+            },
+            "return_new_paths": false
+        },
+        {
             "operation": "echo",
             "message": "WARNING: The configuration for {source_file} is not complete - individual RFC files have not actually been processed"
         },
