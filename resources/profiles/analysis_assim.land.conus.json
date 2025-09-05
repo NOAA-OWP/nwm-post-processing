@@ -33,7 +33,7 @@
                 "{mask_path}/processing_mask_1000m_WGRFC.nc"
             ],
             "identifier_pattern": "(?P<rfc>[A-Z]{5})(?=\\.nc)",
-            "output_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.f{frame}.{rfc}.nc",
+            "output_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.tm{tminus}.{rfc}.nc",
             "each": [
                 {
                     "operation": "save",
@@ -49,67 +49,67 @@
         },
         {
             "operation": "save",
-            "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.f{frame}.ABRFC.nc",
+            "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.tm{tminus}.ABRFC.nc",
             "directory": "{output_path}/",
             "return_new_paths": false
         },
         {
             "operation": "save",
-            "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.f{frame}.CBRFC.nc",
+            "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.tm{tminus}.CBRFC.nc",
             "directory": "{output_path}/",
             "return_new_paths": false
         },
         {
             "operation": "save",
-            "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.f{frame}.CNRFC.nc",
+            "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.tm{tminus}.CNRFC.nc",
             "directory": "{output_path}/",
             "return_new_paths": false
         },
         {
             "operation": "save",
-            "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.f{frame}.MARFC.nc",
+            "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.tm{tminus}.MARFC.nc",
             "directory": "{output_path}/",
             "return_new_paths": false
         },
         {
             "operation": "save",
-            "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.f{frame}.MBRFC.nc",
+            "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.tm{tminus}.MBRFC.nc",
             "directory": "{output_path}/",
             "return_new_paths": false
         },
         {
             "operation": "save",
-            "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.f{frame}.NCRFC.nc",
+            "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.tm{tminus}.NCRFC.nc",
             "directory": "{output_path}/",
             "return_new_paths": false
         },
         {
             "operation": "save",
-            "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.f{frame}.NERFC.nc",
+            "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.tm{tminus}.NERFC.nc",
             "directory": "{output_path}/",
             "return_new_paths": false
         },
         {
             "operation": "save",
-            "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.f{frame}.NWRFC.nc",
+            "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.tm{tminus}.NWRFC.nc",
             "directory": "{output_path}/",
             "return_new_paths": false
         },
         {
             "operation": "save",
-            "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.f{frame}.OHRFC.nc",
+            "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.tm{tminus}.OHRFC.nc",
             "directory": "{output_path}/",
             "return_new_paths": false
         },
         {
             "operation": "save",
-            "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.f{frame}.SERFC.nc",
+            "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.tm{tminus}.SERFC.nc",
             "directory": "{output_path}/",
             "return_new_paths": false
         },
         {
             "operation": "save",
-            "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.f{frame}.WGRFC.nc",
+            "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.tm{tminus}.WGRFC.nc",
             "directory": "{output_path}/"
         }
     ],
