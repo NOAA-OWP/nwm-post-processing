@@ -1616,7 +1616,7 @@ class AttributeOperation(PathToPathOperation, FileOutputMixin):
     mode: nco.EditMode = dataclasses.field(default_factory=lambda: nco.EditMode.OVERWRITE)
 
 
-@dataclasses.dataclass(unsafe_hash=True)
+@dataclasses.dataclass
 class SaveOperation(PathToPathOperation):
     """
     Save the given files in another location
@@ -1718,6 +1718,19 @@ class SaveOperation(PathToPathOperation):
                     if rfc_abbreviation:
                         file_specific_metadata["RFC"] = rfc_abbreviation
 
+                exclude: bool = False
+                for field_name, expected_value in self.include_conditions.items():
+                    if field_name in file_specific_metadata and file_specific_metadata[field_name] != expected_value:
+                        if settings.this_is_verbose:
+                            LOGGER.debug(
+                                f"'{file}' does not meet the metadata requirements for saving. It will be skipped."
+                            )
+                            saved_files.append(file)
+                        exclude = True
+                        break
+                if exclude:
+                    continue
+
                 try:
                     # If the logic says "Just let the name fall through",
                     # scrub off any references to the stage in the name
@@ -1787,10 +1800,20 @@ class SaveOperation(PathToPathOperation):
 
         return data
 
+    def __hash__(self):
+        return hash((
+            self.directory,
+            self.filename_pattern,
+            self.return_new_paths,
+            self.identifier_pattern,
+            *self.include_conditions.items(),
+        ))
+
     directory: pathlib.Path = dataclasses.field()
     filename_pattern: typing.Optional[str] = dataclasses.field(default=None)
     return_new_paths: bool = dataclasses.field(default=True)
     identifier_pattern: typing.Optional[str] = dataclasses.field(default=None)
+    include_conditions: dict[str, typing.Any] = dataclasses.field(default_factory=dict)
     _compiled_pattern: typing.Optional[re.Pattern] = member(default=None)
 
 

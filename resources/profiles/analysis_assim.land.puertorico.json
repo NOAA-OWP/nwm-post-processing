@@ -19,6 +19,15 @@
         },
         {
             "operation": "save",
+            "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.tm{tminus}.puertorico.nc",
+            "directory": "{output_path}/",
+            "include_conditions": {
+                "tminus": "00"
+            },
+            "return_new_paths": false
+        },
+        {
+            "operation": "save",
             "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.tm{tminus}.puertorico.serfc.nc",
             "directory": "{output_path}/"
         }
