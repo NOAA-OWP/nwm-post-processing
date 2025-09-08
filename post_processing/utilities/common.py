@@ -299,7 +299,7 @@ def starmap_threaded(
     from post_processing.configuration import settings
     from post_processing.enums import Verbosity
 
-    if not settings.allow_threading:
+    if not settings.allow_threading and settings.this_is_verbose:
         LOGGER.warning(f"Threading is being called directly even though it is supposed to be disabled")
 
     if thread_count is None:
@@ -677,7 +677,7 @@ def get_property_values(obj: object) -> dict[str, typing.Any]:
         raise ValueError("Cannot get property values from 'None'. Pass a non-null object")
 
     import inspect
-    properties: dict[str, generic.Any] = {
+    properties: dict[str, typing.Any] = {
         name: prop.fget(obj)
         for name, prop in inspect.getmembers(obj.__class__, lambda member: isinstance(member, property))
         if not name.startswith("_")

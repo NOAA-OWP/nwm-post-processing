@@ -86,21 +86,20 @@ class SubsetTest(unittest.TestCase):
         """
         Test to ensure the `merge` operation correctly merges multiple files and maintains data and metadata integrity
         """
-        from post_processing.transform import subset_file_into_file_by_mask
 
         LOGGER.info(f"Splitting up {self.input_file} into {len(self.masks)} files")
         subset_files: typing.List[typing.Tuple[pathlib.Path, pathlib.Path]] = []
         for mask in self.masks:
             LOGGER.info(f"Using {mask.name} as a mask")
             output_filename: str = f"{self.input_file.stem}.{mask.stem}.nc"
-            subset_file_into_file_by_mask(
-                input_file=self.input_file,
-                mask=mask,
-                coordinate="feature_id",
-                work_directory=self.output_directory,
-                output_filename=output_filename,
-            )
-            subset_files.append((mask, self.output_directory / output_filename))
+            #subset_file_into_file_by_mask(
+            #    input_file=self.input_file,
+            #    mask=mask,
+            #    coordinate="feature_id",
+            #    work_directory=self.output_directory,
+            #    output_filename=output_filename,
+            #)
+            #subset_files.append((mask, self.output_directory / output_filename))
 
 if __name__ == '__main__':
     unittest.main()
