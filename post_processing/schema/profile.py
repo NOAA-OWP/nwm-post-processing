@@ -541,10 +541,19 @@ class ReprojectionOperation(PathToPathOperation, FileOutputMixin):
         from post_processing.utilities import netcdf
         updated_paths: list[pathlib.Path] = []
 
-        with netcdf.load_netcdf(self.reference_dataset_path) as reference_file:  # type: xarray.Dataset
+        reference_path: pathlib.Path = pathlib.Path(
+            str(self.reference_dataset_path).format_map(metadata)
+        )
+
+        if not reference_path.is_file():
+            raise FileNotFoundError(
+                f"Could not find a reference path for reprojection at '{reference_path}'"
+            )
+        with netcdf.load_netcdf(reference_path) as reference_file:  # type: xarray.Dataset
             for input_path_index, input_path in enumerate(data):  # type: int, pathlib.Path
                 try:
                     with netcdf.load_netcdf(input_path) as netcdf_file:  # type: xarray.Dataset
+
                         reprojected_data: xarray.Dataset = reproject.reproject_data(
                             dataset=netcdf_file,
                             reprojection_dataset=reference_file,
@@ -583,20 +592,13 @@ class ReprojectionOperation(PathToPathOperation, FileOutputMixin):
     def __post_init__(self) -> None:
         super().__post_init__()
         if isinstance(self.reference_dataset_path, str):
-            self.reference_dataset_path = pathlib.Path(self.reference_dataset_path)
+            self.reference_dataset_path = pathlib.Path(self.reference_dataset_path.format_map(settings.to_dict()))
+        else:
+            self.reference_dataset_path = pathlib.Path(
+                str(self.reference_dataset_path).format_map(settings.to_dict())
+            )
 
         self.reference_dataset_path = self.reference_dataset_path.resolve()
-
-        if not self.reference_dataset_path.exists():
-            raise FileNotFoundError(
-                f"Cannot use '{self.reference_dataset_path} as a reference to reproject a coordinate reference system "
-                f"- there isn't a file there"
-            )
-        if not self.reference_dataset_path.is_file():
-            raise FileNotFoundError(
-                f"Cannot use '{self.reference_dataset_path} as a reference to reproject a coordinate reference system "
-                f"- it is a directory, not a file"
-            )
 
     reference_dataset_path: typing.Union[pathlib.Path, str]
     crs_variable: str = dataclasses.field(default="crs")
@@ -649,8 +651,10 @@ class SubsetOperation(PathToPathOperation):
 
             from post_processing.transform.subset import mask_dataset
 
-            subset_arguments: list[dict[str, typing.Any]] = [
-                {
+            subset_arguments: list[dict[str, typing.Any]] = []
+
+            for input_file in data:
+                file_kwargs: dict[str, typing.Any] = {
                     "input_path": input_file,
                     "masks": list(self._mask_identifiers.keys()),
                     "mask_variable": self.mask_variable,
@@ -658,26 +662,27 @@ class SubsetOperation(PathToPathOperation):
                     "mask_coordinates": self.mask_coordinates,
                     "metadata": {
                         **metadata,
-                        "mask_name": mask.stem,
                         "input_name": input_file.stem,
                         "frame": get_frame_identifier(input_file.name),
-                        "RFC": RFC.from_string(mask.stem, strict=False),
-                        **identifiers
                     },
                     "identifier_pattern": self._pattern,
                     "output_pattern": self.output_pattern,
+                    "mask_metadata": self._mask_identifiers.copy()
                 }
-                for input_file, (mask, identifiers) in zip(data, self._mask_identifiers.items())
-            ]
 
-            subset_paths: typing.Sequence[pathlib.Path] = starmap_threaded(
+                subset_arguments.append(file_kwargs)
+
+            subset_paths: typing.Sequence[generic.Sequence[pathlib.Path]] = starmap_threaded(
                 function=mask_dataset,
                 args=subset_arguments,
                 thread_count=settings.maximum_additional_threads
             )
 
-            # TODO: Should these be callbacks for the subset operation above?
-            arguments_for_each: list[dict[str, typing.Any]] = [
+            collapsed_paths: list[pathlib.Path] = [
+                path for inner_paths in subset_paths for path in inner_paths
+            ]
+
+            arguments_on_each: list[dict[str, typing.Any]] = [
                 {
                     "operations": self.each,
                     "profile": profile,
@@ -692,12 +697,12 @@ class SubsetOperation(PathToPathOperation):
                         "RFC": RFC.from_string(subset_path.stem, strict=False)
                     }
                 }
-                for subset_path in subset_paths
+                for subset_path in collapsed_paths
             ]
 
             results: typing.Sequence[typing.Sequence[typing.Union[pathlib.Path]]] = starmap(
                 function=call_generic_operations,
-                args=arguments_for_each,
+                args=arguments_on_each,
                 thread_count=settings.maximum_additional_threads
             )
         except Exception as exception:
@@ -889,7 +894,7 @@ class ExtractOperation(PathToPathOperation):
                 for input_file, (mask, identifiers) in itertools.product(data, self._identifier_mapping.items())
             ]
 
-            from post_processing.transform.subset import subset_vector_file_into_file_by_value
+            from post_processing.transform.subsetting.vector import subset_vector_file_into_file_by_value
             subset_paths: typing.Sequence[pathlib.Path] = starmap(
                 function=subset_vector_file_into_file_by_value,
                 args=subset_arguments,
@@ -2708,6 +2713,12 @@ class Profile(BaseModel):
             raise RuntimeError(
                 f"Cannot run the profile at {self.source_file} - there are {len(disabled_operations)} disabled "
                 f"operation(s). Enable or remove them before running in a non-developmental role."
+            )
+
+        if settings.this_is_verbose:
+            LOGGER.debug(
+                f"Operating on the following files:{os.linesep}"
+                f"    - {(os.linesep + '    - ').join(map(str, files))}"
             )
         from post_processing.utilities.netcdf import load_metadata
         input_metadata: dict[str, typing.Any] = load_metadata(path=files)

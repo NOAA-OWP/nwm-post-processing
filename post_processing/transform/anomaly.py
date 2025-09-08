@@ -157,10 +157,8 @@ class ThresholdDefinition:
         """
         with self._lock:
             if day_of_year in self._data:
-                LOGGER.debug(f"Day {day_of_year} was already loaded")
                 return self._data[day_of_year]
 
-            LOGGER.debug(f"Loading day {day_of_year} of {self.data_path.name}")
             file_path: pathlib.Path = pathlib.Path(str(self.data_path).format(**path_metadata))
 
             day_range: list[int] | int = []
@@ -235,14 +233,12 @@ def make_apply_thresholds(
 
         output_array: numpy.ndarray = numpy.full(variable.shape, default_score, dtype=numpy.result_type(*scores))
         incorrect_lengths: list[int] = []
-        LOGGER.debug("Now applying bins")
         for score_index, threshold in enumerate(thresholds):
             if variable.size != threshold.size:
                 incorrect_lengths.append(scores[score_index].item())
                 continue
             mask = variable < threshold
             output_array[mask] = scores[score_index]
-            LOGGER.debug(f"Binned Threshold {score_index}")
 
         if incorrect_lengths:
             raise ValueError(
@@ -286,12 +282,9 @@ def calculate_anomaly(
     if operational_metadata is None:
         operational_metadata = {}
 
-    LOGGER.debug(f"Preparing to calculate anomaly for '{input_path}'")
-
     try:
         with LOAD_LOCK:
             dataset = load_netcdf(path=input_path, full_load=True, chunks=False)
-            LOGGER.debug(f"Loaded '{input_path}' for processing")
     except:
         LOGGER.error(f"Could not load the netcdf data at '{input_path.resolve()}'")
         raise
@@ -339,7 +332,6 @@ def calculate_anomaly(
     day_of_year: int = get_day_of_year(dataset=dataset, variable=time_variable)
 
     for threshold in thresholds:
-        LOGGER.debug(f"Getting '{threshold}' for '{input_path}'")
         daily_values: xarray.DataArray = threshold.get_stats(day_of_year=day_of_year, **operational_metadata)
         daily_values = daily_values.where(daily_values[dimension_names] >= minimum_id, drop=True)
 
@@ -374,7 +366,6 @@ def calculate_anomaly(
         threshold_arrays.append(daily_values.values)
         scores.append(threshold.level)
 
-    LOGGER.debug(f"Creating the threshold application function")
     apply_thresholds: typing.Callable[[xarray.DataArray, *numpy.ndarray], numpy.ndarray] = make_apply_thresholds(
         scores=scores,
         default_score=default_score,
@@ -388,7 +379,6 @@ def calculate_anomaly(
         ]
     ]
 
-    LOGGER.debug(f"Now binning {input_path.name}({variable_to_bin}) based off of: {thresholds}")
     anomaly_scores: numpy.ndarray = xarray.apply_ufunc(
         apply_thresholds,
         variable,
@@ -397,7 +387,6 @@ def calculate_anomaly(
         output_dtypes=[numpy.result_type(*scores)],
         dask="parallelized"
     )
-    LOGGER.debug(f"Anomaly has been calculated from {input_path}")
 
     output_array: xarray.DataArray = xarray.DataArray(
         data=anomaly_scores,

@@ -6,6 +6,7 @@
             "fields": [
                 "crs",
                 "SOILSAT_TOP",
+                "SNEQV",
                 "time",
                 "reference_time",
                 "x",
@@ -13,10 +14,13 @@
             ]
         },
         {
+            "operation": "reproject",
+            "reference_dataset_path": "{resource_path}/projections/sphere_lambert.nc"
+        },
+        {
             "operation": "subset",
             "mask_variable": "mask",
             "mask_coordinates": ["y", "x"],
-            "disable": true,
             "masks": [
                 "{mask_path}/processing_mask_1000m_ABRFC.nc",
                 "{mask_path}/processing_mask_1000m_C*RFC.nc",
@@ -28,7 +32,7 @@
                 "{mask_path}/processing_mask_1000m_WGRFC.nc"
             ],
             "identifier_pattern": "(?P<rfc>[A-Z]{5})(?=\\.nc)",
-            "output_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.f{frame}.{rfc}.nc",
+            "output_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.{frame}.{rfc}.nc",
             "each": [
                 {
                     "operation": "save",
@@ -37,75 +41,6 @@
                     "directory": "{output_path}/"
                 }
             ]
-        },
-        {
-            "operation": "echo",
-            "message": "WARNING: The configuration for {source_file} is not complete - individual RFC files have not actually been processed"
-        },
-        {
-            "operation": "save",
-            "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.f{frame}.ABRFC.nc",
-            "directory": "{output_path}/",
-            "return_new_paths": false
-        },
-        {
-            "operation": "save",
-            "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.f{frame}.CBRFC.nc",
-            "directory": "{output_path}/",
-            "return_new_paths": false
-        },
-        {
-            "operation": "save",
-            "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.f{frame}.CNRFC.nc",
-            "directory": "{output_path}/",
-            "return_new_paths": false
-        },
-        {
-            "operation": "save",
-            "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.f{frame}.MARFC.nc",
-            "directory": "{output_path}/",
-            "return_new_paths": false
-        },
-        {
-            "operation": "save",
-            "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.f{frame}.MBRFC.nc",
-            "directory": "{output_path}/",
-            "return_new_paths": false
-        },
-        {
-            "operation": "save",
-            "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.f{frame}.NCRFC.nc",
-            "directory": "{output_path}/",
-            "return_new_paths": false
-        },
-        {
-            "operation": "save",
-            "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.f{frame}.NERFC.nc",
-            "directory": "{output_path}/",
-            "return_new_paths": false
-        },
-        {
-            "operation": "save",
-            "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.f{frame}.NWRFC.nc",
-            "directory": "{output_path}/",
-            "return_new_paths": false
-        },
-        {
-            "operation": "save",
-            "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.f{frame}.OHRFC.nc",
-            "directory": "{output_path}/",
-            "return_new_paths": false
-        },
-        {
-            "operation": "save",
-            "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.f{frame}.SERFC.nc",
-            "directory": "{output_path}/",
-            "return_new_paths": false
-        },
-        {
-            "operation": "save",
-            "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.f{frame}.WGRFC.nc",
-            "directory": "{output_path}/"
         }
     ],
     "configuration": "short_range",

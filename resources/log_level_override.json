@@ -1,3 +1,8 @@
 {
-    "h5py._conv": "WARNING"
+    "h5py._conv": "WARNING",
+    "rasterio.env": "WARNING",
+    "rasterio._env": "WARNING",
+    "rasterio.warp": "WARNING",
+    "rasterio._warp": "WARNING",
+    "rasterio._base": "WARNING"
 }

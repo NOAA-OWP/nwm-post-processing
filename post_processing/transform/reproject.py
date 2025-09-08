@@ -11,6 +11,8 @@ import typing
 import pathlib
 import logging
 
+from post_processing.configuration import settings
+
 if typing.TYPE_CHECKING:
     import affine
     import xarray
@@ -174,6 +176,7 @@ def coordinates_are_the_same(
     :returns: True if all the x and y values match in both datasets
     """
     import xarray
+    import numpy
 
     original_x_variable: xarray.DataArray = get_x_coordinate(dataset=dataset, variable_name=x_coordinate_name)
     original_y_variable: xarray.DataArray = get_y_coordinate(dataset=dataset, variable_name=y_coordinate_name)
@@ -195,10 +198,10 @@ def coordinates_are_the_same(
     if original_y_variable.shape != reprojection_y_variable.shape:
         return False
 
-    if original_x_variable.values != reprojection_x_variable.values:
+    if not numpy.array_equal(original_x_variable.values, reprojection_x_variable.values):
         return False
 
-    if original_y_variable.values != reprojection_y_variable.values:
+    if not numpy.array_equal(original_y_variable.values, reprojection_y_variable.values):
         return False
 
     return True
@@ -390,6 +393,9 @@ def reproject_variable(
     # Determine the overall background value for when values are not available
     fill_value: typing.Any = get_fill_value(variable=source_variable)
     """The default value for every cell in the variable"""
+
+    if settings.this_is_verbose:
+        LOGGER.debug(f"Setting the fill/no data value of '{source_variable.name}' to '{fill_value}' when reprojecting it")
 
     # Allocate space for the reprojected data in the shape of the non-spatial coordinates from the source and the
     # spatial coordinates for the target projection

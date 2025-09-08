@@ -193,7 +193,6 @@ def load_netcdf(
     return dataset
 
 
-@timed_function()
 def load_metadata(
     path: typing.Union[pathlib.Path, str, typing.Sequence[typing.Union[pathlib.Path, str]]],
     engine: typing.Union[str, typing.Literal["h5netcdf", "zarr", "netcdf4"]] = settings.default_netcdf_engine,
@@ -230,7 +229,6 @@ def load_metadata(
 
     return metadata
 
-@timed_function()
 def _get_variable_metadata(variable: "xarray.DataArray") -> dict[str, typing.Any]:
     """
     Get the metadata for specific netcdf variable
@@ -294,7 +292,6 @@ def format_value(value: object) -> str:
     return str(value)
 
 
-@timed_function()
 def format_variable(var: "xarray.DataArray") -> typing.Sequence[str]:
     """
     Format a block of text describing a variable
@@ -357,7 +354,6 @@ def format_variable(var: "xarray.DataArray") -> typing.Sequence[str]:
     return lines_for_variable
 
 
-@timed_function()
 def describe_netcdf(
     netcdf_file: "xarray.Dataset",
     variable_name: str = None,
@@ -497,6 +493,8 @@ def save_netcdf(
     try:
         default_encodings: dict[numpy.dtype, dict[str, typing.Any]] = get_default_encoding()
         for variable_name, variable in [*dataset.coords.items(), *dataset.data_vars.items()]:
+            if variable.encoding:
+                continue
             default_encoding: dict[str, typing.Any] = default_encodings.get(variable.dtype, {})
             for encoding_key, encoding_value in default_encoding.items():
                 if encoding_key not in dataset[variable_name].encoding:
@@ -505,7 +503,6 @@ def save_netcdf(
         LOGGER.error(f"Ran into issues when configuring encoding settings for '{path.name}': {e}")
         raise
 
-    # TODO: manually scale floats to ints - numpy will end up being more efficient
     try:
         with OPEN_LOCK:
             delayed_write: typing.Optional = dataset.to_netcdf(path=path, engine=engine, **kwargs, compute=compute)
