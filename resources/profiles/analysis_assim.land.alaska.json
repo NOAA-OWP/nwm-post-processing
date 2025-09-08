@@ -18,18 +18,35 @@
             ]
         },
         {
-            "operation": "save",
-            "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.tm{tminus}.alaska.nc",
-            "directory": "{output_path}/",
-            "include_conditions": {
-                "tminus": "00"
-            },
-            "return_new_paths": false
-        },
-        {
-            "operation": "save",
-            "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.tm{tminus}.alaska.aprfc.nc",
-            "directory": "{output_path}/"
+            "operation": "branch",
+            "branches": {
+                "WMS": [
+                    {
+                        "operation": "reproject",
+                        "reference_dataset_path": "{resource_path}/projections/alaska_mercator.nc",
+                        "reference_crs_variable": "mercator"
+                    },
+                    {
+                        "operation": "save",
+                        "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.tm{tminus}.alaska.nc",
+                        "directory": "{output_path}/",
+                        "include_conditions": {
+                            "tminus": "00"
+                        }
+                    }
+                ],
+                "RFC": [
+                    {
+                        "operation": "reproject",
+                        "reference_dataset_path": "{resource_path}/projections/alaska_sphere_stereographic.nc"
+                    },
+                    {
+                        "operation": "save",
+                        "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.tm{tminus}.alaska.aprfc.nc",
+                        "directory": "{output_path}/"
+                    }
+                ]
+            }
         }
     ],
     "configuration": "analysis_assim",

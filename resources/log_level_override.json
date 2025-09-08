@@ -4,5 +4,7 @@
     "rasterio._env": "WARNING",
     "rasterio.warp": "WARNING",
     "rasterio._warp": "WARNING",
-    "rasterio._base": "WARNING"
+    "rasterio._base": "WARNING",
+    "rasterio.session": "WARNING",
+    "rasterio._filepath": "WARNING"
 }

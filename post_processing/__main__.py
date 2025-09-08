@@ -309,12 +309,19 @@ def main() -> int:
                         f"    - {(os.linesep + '    - ').join(map(str, outputs))}"
                     )
 
-                    if settings.debug or arguments.peek:
+                    if arguments.peek:
                         for output in outputs:
                             from post_processing.utilities.netcdf import load_netcdf
                             from post_processing.utilities.netcdf import peek
                             representation: str = peek(output)
                             LOGGER.info(f"Output: {output}:{os.linesep}{representation}")
+                    elif settings.debug:
+                        for output in outputs[:5]:
+                            from post_processing.utilities.netcdf import load_netcdf
+                            from post_processing.utilities.netcdf import peek
+                            representation: str = peek(output)
+                            LOGGER.info(f"Output: {output}:{os.linesep}{representation}")
+
                 except:
                     if profile.raw_configuration:
                         LOGGER.debug(

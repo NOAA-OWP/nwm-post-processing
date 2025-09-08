@@ -516,6 +516,52 @@ class ReprojectionOperation(PathToPathOperation, FileOutputMixin):
     def operation(cls) -> OperationType:
         return OperationType.REPROJECT
 
+    def _reproject_file(
+        self,
+        input_path: pathlib.Path,
+        reference_data: "xarray.Dataset",
+        work_directory: pathlib.Path,
+        metadata: dict[str, typing.Any],
+    ) -> pathlib.Path:
+        import xarray
+        import tempfile
+        import shutil
+        from post_processing.transform import reproject
+        from post_processing.utilities import netcdf
+
+        target_path: pathlib.Path = self.get_output_path(
+            work_directory=work_directory,
+            input_path=input_path,
+            **metadata
+        )
+
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            temporary_directory_path: pathlib.Path = pathlib.Path(temporary_directory)
+            temporary_output_path: pathlib.Path = temporary_directory_path / target_path.name
+
+            LOGGER.debug(f"Opening '{input_path}' for reprojecting")
+            with netcdf.load_netcdf(input_path, full_load=True) as netcdf_file:  # type: xarray.Dataset
+                reprojected_data: xarray.Dataset = reproject.reproject_data(
+                    dataset=netcdf_file,
+                    reprojection_dataset=reference_data,
+                    crs_variable_name=self.crs_variable,
+                    reprojection_crs_variable_name=self.reference_crs_variable,
+                    projection_string_attribute=self.crs_string_attribute,
+                    x_coordinate_name=self.x_variable,
+                    y_coordinate_name=self.y_variable,
+                    reprojection_x_coordinate_name=self.reference_x_variable,
+                    reprojection_y_coordinate_name=self.reference_y_variable,
+                )
+                LOGGER.debug(f"Saving the reprojected data temporarily to '{temporary_output_path}'")
+                netcdf.save_netcdf(
+                    path=temporary_output_path,
+                    dataset=reprojected_data
+                )
+                reprojected_data.close()
+                netcdf_file.close()
+            shutil.move(temporary_output_path, target_path)
+        return target_path
+
     def __call__(
         self,
         profile: "Profile",
@@ -537,9 +583,7 @@ class ReprojectionOperation(PathToPathOperation, FileOutputMixin):
         :returns: Paths to updated data
         """
         import xarray
-        from post_processing.transform import reproject
         from post_processing.utilities import netcdf
-        updated_paths: list[pathlib.Path] = []
 
         reference_path: pathlib.Path = pathlib.Path(
             str(self.reference_dataset_path).format_map(metadata)
@@ -549,43 +593,34 @@ class ReprojectionOperation(PathToPathOperation, FileOutputMixin):
             raise FileNotFoundError(
                 f"Could not find a reference path for reprojection at '{reference_path}'"
             )
-        with netcdf.load_netcdf(reference_path) as reference_file:  # type: xarray.Dataset
-            for input_path_index, input_path in enumerate(data):  # type: int, pathlib.Path
-                try:
-                    with netcdf.load_netcdf(input_path) as netcdf_file:  # type: xarray.Dataset
 
-                        reprojected_data: xarray.Dataset = reproject.reproject_data(
-                            dataset=netcdf_file,
-                            reprojection_dataset=reference_file,
-                            crs_variable_name=self.crs_variable,
-                            reprojection_crs_variable_name=self.reference_crs_variable,
-                            projection_string_attribute=self.crs_string_attribute,
-                            x_coordinate_name=self.x_variable,
-                            y_coordinate_name=self.y_variable,
-                            reprojection_x_coordinate_name=self.reference_x_variable,
-                            reprojection_y_coordinate_name=self.reference_y_variable,
-                        )
+        reference_file: xarray.Dataset = netcdf.load_netcdf(reference_path, full_load=True, chunks=None)
+        kwargs: list[dict[str, typing.Any]] = [
+            {
+                "input_path": input_path,
+                "reference_data": reference_file.copy(deep=True),
+                "work_directory": work_directory,
+                "metadata": metadata,
+            }
+            for input_path in data
+        ]
 
-                    target_path: pathlib.Path = self.get_output_path(
-                        work_directory=work_directory,
-                        input_path=input_path,
-                        **metadata
-                    )
-                    netcdf.save_netcdf(
-                        path=target_path,
-                        dataset=reprojected_data
-                    )
-                    updated_paths.append(target_path)
-                except Exception as exception:
-                    LOGGER.error(
-                        f"[{input_path_index} files reprojected out of {len(data)}] Failed to reproject {input_path} to match "
-                        f"{self.reference_dataset_path} on {self.x_variable}={self.reference_x_variable} and "
-                        f"{self.y_variable}={self.reference_y_variable}, from the CRS described in "
-                        f"{input_path.name}::{self.crs_variable}::{self.crs_string_attribute} to the CRS described in "
-                        f"{self.reference_dataset_path.name}::{self.reference_crs_variable}::{self.reference_crs_string_attribute} "
-                        f"due to {exception}"
-                    )
-                    raise
+        try:
+            updated_paths: generic.Sequence[pathlib.Path] = starmap_threaded(
+                function=self._reproject_file,
+                args=kwargs,
+                thread_count=settings.maximum_additional_threads
+            )
+        except Exception as exception:
+            LOGGER.error(
+                f"Failed to reproject files to match "
+                f"{self.reference_dataset_path} on {self.x_variable}={self.reference_x_variable} and "
+                f"{self.y_variable}={self.reference_y_variable}, from the CRS described in "
+                f"{self.crs_variable}::{self.crs_string_attribute} to the CRS described in "
+                f"{self.reference_dataset_path.name}::{self.reference_crs_variable}::{self.reference_crs_string_attribute} "
+                f"due to {exception}"
+            )
+            raise
 
         return updated_paths
 
@@ -1730,7 +1765,6 @@ class SaveOperation(PathToPathOperation):
                             LOGGER.debug(
                                 f"'{file}' does not meet the metadata requirements for saving. It will be skipped."
                             )
-                            saved_files.append(file)
                         exclude = True
                         break
                 if exclude:

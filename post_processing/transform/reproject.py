@@ -592,11 +592,13 @@ def reproject_data(
         dataset[original_crs.name].attrs.update(reprojection_crs_variable.attrs)
 
         # Ensure that all coordinates have any sort of updated spatial references
-        for coordinate in dataset.coordinates.values():
+        for coordinate in dataset.coords.values():
             for attribute_name, attribute_value in coordinate.attrs.items():
                 if attribute_name in ('esri_pe_string', 'spatial_ref'):
                     new_spatial_ref = crs_attributes.get('esri_pe_string', crs_attributes.get("spatial_ref"))
                     coordinate.attrs[attribute_name] = new_spatial_ref
+                elif attribute_name == 'grid_mapping':
+                    coordinate.attrs[attribute_name] = reprojection_crs_variable.name
 
         # Ensure that all data variables have any sort of updated spatial references and that all spatial variables
         # reference the CRS
@@ -606,7 +608,7 @@ def reproject_data(
                     new_spatial_ref = crs_attributes.get('esri_pe_string', crs_attributes.get("spatial_ref"))
                     variable.attrs[attribute_name] = new_spatial_ref
             if original_x_variable.name in variable.dims and original_y_variable.name in variable.dims:
-                variable.attrs['grid_mapping'] = original_crs.name
+                variable.attrs['grid_mapping'] = reprojection_crs_variable.name
 
         # Ensure the all global attributes referencing a spatial reference reference the correct one
         for attribute_name, attribute_value in dataset.attrs.items():
@@ -671,11 +673,11 @@ def reproject_data(
             elif attribute_name.lower() == 'proj4':
                 variable.attrs[attribute_name] = reprojection_crs.to_proj4()
         if original_x_variable.name in variable.dims and original_y_variable.name in variable.dims:
-            variable.attrs['grid_mapping'] = original_crs.name
+            variable.attrs['grid_mapping'] = reprojection_crs_variable.name
 
     # Add a new variable defining the updated coordinate reference system
     new_variables.append(xarray.DataArray(
-        name=original_crs.name,
+        name=reprojection_crs_variable.name,
         data=reprojection_crs_variable.data,
         dims=reprojection_crs_variable.dims,
         attrs=reprojection_crs_variable.attrs,
