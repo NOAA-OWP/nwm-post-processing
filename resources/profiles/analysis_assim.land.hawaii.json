@@ -18,18 +18,34 @@
             ]
         },
         {
-            "operation": "save",
-            "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.tm{tminus}.hawaii.nc",
-            "directory": "{output_path}/",
-            "include_conditions": {
-                "tminus": "0000"
-            },
-            "return_new_paths": false
-        },
-        {
-            "operation": "save",
-            "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.tm{tminus}.aprfc.nc",
-            "directory": "{output_path}/"
+            "operation": "branch",
+            "branches": {
+                "WMS": [
+                    {
+                        "operation": "reproject",
+                        "reference_dataset_path": "{resource_path}/projections/hawaii_mercator.nc"
+                    },
+                    {
+                        "operation": "save",
+                        "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.tm{tminus}.hawaii.nc",
+                        "directory": "{output_path}/",
+                        "include_conditions": {
+                            "tminus": "0000"
+                        }
+                    }
+                ],
+                "RFC": [
+                    {
+                        "operation": "reproject",
+                        "reference_dataset_path": "{resource_path}/projections/hawaii_sphere_lambert.nc"
+                    },
+                    {
+                        "operation": "save",
+                        "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.f{frame}.aprfc.nc",
+                        "directory": "{output_path}/"
+                    }
+                ]
+            }
         }
     ],
     "configuration": "analysis_assim",

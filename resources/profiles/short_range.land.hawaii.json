@@ -13,6 +13,10 @@
             ]
         },
         {
+            "operation": "reproject",
+            "reference_dataset_path": "{resource_path}/projections/hawaii_sphere_lambert.nc"
+        },
+        {
             "operation": "save",
             "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.f{frame}.aprfc.nc",
             "directory": "{output_path}/"

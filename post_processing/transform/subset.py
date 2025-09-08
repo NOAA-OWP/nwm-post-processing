@@ -1,6 +1,7 @@
 """
 Contains logic for subsetting netcdf files
 """
+import os
 import shutil
 import typing
 import pathlib
@@ -77,12 +78,21 @@ def mask_dataset(
                             identifiers['RFC_ABBREVIATION'] = rfc_abbreviation
                     identifiers['rfc'] = identifiers['rfc'].lower()
 
-                output_name: str = output_pattern.format_map({
+                formatting_options: dict[str, typing.Any] = {
                     **metadata,
                     "mask_variable": mask_variable,
                     "mask_name": mask_path.stem,
                     **identifiers,
-                })
+                }
+                try:
+                    output_name: str = output_pattern.format_map(formatting_options)
+                except KeyError as key_error:
+                    LOGGER.error(
+                        f"Could not substitute values when building an output name: {key_error}{os.linesep}"
+                        f"Available Keys:{os.linesep}"
+                        f"    - {(os.linesep + '    - ').join(map(lambda kv: str(kv[0]) + '=' + str(kv[1]), formatting_options.items()))}"
+                    )
+                    raise
 
                 temporary_output_path: pathlib.Path = temporary_directory_path / output_name
                 if settings.this_is_very_verbose:

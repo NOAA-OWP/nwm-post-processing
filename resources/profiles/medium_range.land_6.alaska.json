@@ -15,6 +15,10 @@
         },
         {
             "operation": "save",
+            "reference_dataset_path": "{resource_path}/projections/alaska_sphere_stereographic.nc"
+        },
+        {
+            "operation": "save",
             "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}_{member}.f{frame}.alaska.aprfc.nc",
             "directory": "{output_path}/"
         }
