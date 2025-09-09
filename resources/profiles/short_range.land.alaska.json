@@ -13,7 +13,7 @@
             ]
         },
         {
-            "operation": "save",
+            "operation": "reproject",
             "reference_dataset_path": "{resource_path}/projections/alaska_sphere_stereographic.nc"
         },
         {
