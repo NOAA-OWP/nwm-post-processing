@@ -119,7 +119,6 @@ def run_command(command: str, *positional_args, prevent_history: bool = True) ->
     if positional_args:
         command = f"{command} {' '.join(map(str, positional_args))}"
 
-    start: datetime = datetime.now()
     command_result: subprocess.CompletedProcess = subprocess.run(
         command,
         capture_output=True,

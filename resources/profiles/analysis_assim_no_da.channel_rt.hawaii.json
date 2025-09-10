@@ -15,7 +15,7 @@
                     "comment": "This should end up calling `calculate_upstream_flow(input_path=data, output_path=data, routelink_path='{application_path}/RouteLink_CONUS.nc')`",
                     "kwargs": {
                         "routelink_path": "{routelink_path}/RouteLink_HI.nc",
-                        "routelink_from_variable": "from",
+                        "routelink_from_variable": "link",
                         "output_path": "{work_directory}/upstream.{input_name}"
                     },
                     "argument_mapping": {
@@ -23,6 +23,13 @@
                     }
                 }
             ]
+        },
+        {
+            "operation": "adjust_dimensions",
+            "mapping": {
+                "upstreamflow": ["feature_id", "time"],
+                "streamflow": ["feature_id", "time"]
+            }
         },
         {
             "operation": "rename",

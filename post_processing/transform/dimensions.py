@@ -1,0 +1,59 @@
+"""
+Functions and objects used to change dimensions on netcdf variables
+"""
+import typing
+import collections.abc as generic
+import pathlib
+
+from post_processing.utilities import logging
+from post_processing.configuration import settings
+from post_processing.utilities.common import timed_function
+
+
+LOGGER: logging.Logger = logging.get_logger(__file__)
+
+# NOTE: The basic NCO operators aren't being used here because ncap2 drops encoding
+@timed_function()
+def adjust_dimensions(
+    input_path: pathlib.Path,
+    output_path: pathlib.Path,
+    mapping: generic.Mapping[str, generic.Sequence[str]],
+) -> pathlib.Path:
+    """
+    Change the dimensions of variables within a netcdf file
+
+    :param input_path: The path to the netcdf file to change
+    :param output_path: Where to write the output
+    :param mapping: The mapping of variables with their new variable orders
+    :returns: The path to the new netcdf file
+    """
+    import xarray
+    import tempfile
+    import shutil
+
+    from post_processing.utilities import netcdf
+
+    with tempfile.TemporaryDirectory() as temporary_directory:
+        temporary_directory_path: pathlib.Path = pathlib.Path(temporary_directory)
+        temporary_output_path: pathlib.Path = temporary_directory_path / output_path.name
+
+        # NOTE: If you don't run with full_load=True, you run the risk of file handles being left open, causing segfaults
+        with netcdf.load_netcdf(input_path, full_load=True) as input_dataset:
+            for variable_name, new_dimensions in mapping.items():
+                variable: xarray.DataArray = input_dataset[variable_name]
+                axis_mapping: dict[str, int] = {
+                    new_dimension: intended_index
+                    for intended_index, new_dimension in enumerate(new_dimensions)
+                    if new_dimension not in variable.dims
+                }
+                if axis_mapping:
+                    original_encoding: dict[str, typing.Any] = variable.encoding.copy()
+                    input_dataset[variable_name] = variable.expand_dims(dim=list(axis_mapping.keys()), axis=list(axis_mapping.values()))
+                    input_dataset[variable_name].encoding = original_encoding
+            netcdf.save_netcdf(path=temporary_output_path, dataset=input_dataset)
+        shutil.move(temporary_output_path, output_path)
+
+    if settings.this_is_verbose:
+        LOGGER.debug(f"Variables from '{input_path}' have had their dimensions altered and saved in '{output_path}'")
+
+    return output_path

@@ -81,6 +81,11 @@ def transform_variable(
     :param expr: The arithmetic expression to perform
     :returns: The path to the new or updated file
     """
+    if "'" not in expr and not expr.startswith('"') and not expr.endswith('"'):
+        expr = f"'{expr}'"
+    elif '"' not in expr and not expr.startswith("'") and not expr.endswith("'"):
+        expr = f'"{expr}"'
+
     run_command(
         NCOFunction.PERFORM_ARITHMETIC,
         "-O",
