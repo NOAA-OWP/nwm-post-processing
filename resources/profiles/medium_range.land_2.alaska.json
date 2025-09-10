@@ -19,7 +19,7 @@
         },
         {
             "operation": "save",
-            "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}_{member}.{frame}.alaska.aprfc.nc",
+            "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}_{member}.f{frame}.alaska.aprfc.nc",
             "directory": "{output_path}/"
         }
     ],

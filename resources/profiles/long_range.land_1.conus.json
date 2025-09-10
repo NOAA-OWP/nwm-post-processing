@@ -15,7 +15,7 @@
         },
         {
             "operation": "reproject",
-            "reference_dataset_path": "{resource_path}/projections/sphere_lambert"
+            "reference_dataset_path": "{resource_path}/projections/sphere_lambert.nc"
         },
         {
             "operation": "subset",
