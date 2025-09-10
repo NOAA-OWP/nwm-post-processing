@@ -6,6 +6,8 @@ import typing
 import logging
 import pathlib
 
+from logging import Logger
+
 class OnlyErrorFilter(logging.Filter):
     """
     Only allows critical and error messages
@@ -314,6 +316,36 @@ def override_log_levels(log_level_override_path: pathlib.Path = None):
         level: int = get_level(level=level)
         logging.getLogger(logger_name).setLevel(level)
 
+
+def get_logger(module_path: pathlib.Path | str) -> Logger:
+    """
+    Get a logger for the module at the path
+
+    :param module_path: The path to the module to get a logger for
+    :returns: A logger named after the module in this library
+    """
+    if isinstance(module_path, str):
+        module_path = pathlib.Path(module_path)
+
+    module_path = module_path.resolve()
+    package_path: pathlib.Path = module_path.parent
+
+    module_parts: list[str] = [module_path.stem]
+
+    # Element 0 will be '/', so exclude it
+    package_path_parts: list[str] = list(package_path.parts)[1:]
+
+    package_path_part: str = package_path_parts.pop(-1)
+
+    module_parts.insert(0, package_path_part)
+
+    while package_path_part != "post_processing" and len(package_path_parts) > 0:
+        package_path_part = package_path_parts.pop(-1)
+        module_parts.insert(0, package_path_part)
+
+    logger: Logger = logging.getLogger('.'.join(module_parts))
+    return logger
+
     
 def setup_logging(log_path: typing.Union[pathlib.Path, str] = None):
     """
@@ -362,7 +394,7 @@ def setup_logging(log_path: typing.Union[pathlib.Path, str] = None):
         root_logger.addHandler(handler)
 
     for logger_name in settings.loggers_to_quiet:
-        logger: logging.Logger = logging.getLogger(logger_name)
+        logger: Logger = logging.getLogger(logger_name)
         logger.setLevel(logging.WARNING)
 
     if settings.debug:

@@ -128,6 +128,10 @@ class OperationType(enum.StrEnum):
     """Reproject a grid into another coordinate reference system or size"""
     UNIT_CONVERSION = "unit_conversion"
     """Convert the units for a variable into a different unit"""
+    TOTAL_OVER_TIME = "total_over_time"
+    """Take the total of a rate over time"""
+    ADJUST_DIMENSIONS = "adjust_dimensions"
+    """Change the dimensions on a netcdf file"""
 
 
 @dataclasses.dataclass
@@ -505,6 +509,84 @@ class PathToPathOperation(ProfileOperation[typing.Sequence[pathlib.Path], typing
         metadata: dict[str, typing.Any]
     ) -> typing.Sequence[pathlib.Path]:
         raise NotImplementedError(f"Cannot execute a plain {self.__class__.__qualname__}")
+
+
+@dataclasses.dataclass
+class DimensionAdjustmentOperation(PathToPathOperation, FileOutputMixin):
+    @classmethod
+    def operation(cls) -> OperationType:
+        return OperationType.ADJUST_DIMENSIONS
+
+    def __call__(
+        self,
+        profile: "Profile",
+        process_identifier: str,
+        work_directory: pathlib.Path,
+        data: typing.Sequence[pathlib.Path],
+        previous_operations: list[ProfileOperation],
+        metadata: dict[str, typing.Any]
+    ) -> typing.Sequence[pathlib.Path]:
+        # TODO: Extract this into its own function
+        frame_pattern: re.Pattern = re.compile(r"(?<=\.)(tm|f)\d+(?=\.)")
+        def get_frame_identifier(filename: str) -> str:
+            match: typing.Optional[re.Match] = frame_pattern.search(filename)
+            if match:
+                return match.group(0)
+            return ""
+
+        arguments: list[dict[str, typing.Any]] = []
+
+        for input_path in data:
+            output_path: pathlib.Path = self.get_output_path(
+                work_directory=work_directory,
+                input_path=input_path,
+                **{
+                    **metadata,
+                    'frame': get_frame_identifier(filename=input_path.name),
+                    "input_name": input_path.name
+                }
+            )
+            arguments.append({
+                "input_path": input_path,
+                "output_path": output_path,
+                "mapping": self.mapping.copy()
+            })
+
+        from post_processing.transform.dimensions import adjust_dimensions
+
+        try:
+            output_paths: generic.Sequence[pathlib.Path] = starmap_threaded(
+                function=adjust_dimensions,
+                args=arguments,
+                thread_count=settings.maximum_additional_threads
+            )
+        except BaseException as e:
+            LOGGER.error(f"Could not change the dimensions on NetCDF variables: {e}")
+            raise e
+
+        return output_paths
+
+    def __eq__(self, other):
+        if not isinstance(other, self.__class__):
+            return False
+
+        return hash(self) == hash(other)
+
+    def __hash__(self) -> int:
+        try:
+            parent_hash: int = super().__hash__()
+        except:
+            parent_hash: int = 0
+
+        return hash((
+            parent_hash,
+            *map(
+                lambda mapping_pair: f"{mapping_pair[0]}[{','.join(mapping_pair[1])}]",
+                self.mapping.items()
+            )
+        ))
+
+    mapping: dict[str, list[str]]
 
 
 @dataclasses.dataclass(unsafe_hash=True)
@@ -1510,8 +1592,7 @@ class UnitConversionOperation(PathToPathOperation, FileOutputMixin):
         :param metadata: Metadata provided from previous operations that may be used as helpful hints
         :returns: The Paths for each created object
         """
-        from post_processing.transform.convert import convert_file
-
+        from post_processing.transform.unit_conversion import convert_file
         arguments: list[dict[str, typing.Any]] = [
             {
                 "input_path": file,
