@@ -21,7 +21,13 @@ import pandas
 
 from dateutil.parser import parse as parse_date
 
-from post_processing.configuration import settings
+try:
+    from post_processing.configuration import settings
+except ImportError:
+    from types import SimpleNamespace
+    settings: SimpleNamespace = SimpleNamespace()
+    settings.logging_config_path = None
+    settings.application_path = pathlib.Path.cwd()
 
 
 ISO_8601_DURATION_PATTERN: re.Pattern = re.compile(r"P((?P<days>\d+)D)?(T((?P<hours>\d+)H)?((?P<minutes>\d+)M)?((?P<seconds>\d+(\.\d+)?)S)?)?")

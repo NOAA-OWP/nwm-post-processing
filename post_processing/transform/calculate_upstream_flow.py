@@ -10,13 +10,15 @@ import dataclasses
 
 import collections.abc as generic
 
+from threading import RLock
+
+import xarray
+import numpy
+
 from post_processing.configuration import settings
 from post_processing.enums import Verbosity
 from post_processing.utilities.common import timed_function
 from post_processing.schema.base import member
-
-if typing.TYPE_CHECKING:
-    import numpy
 
 LOGGER: logging.Logger = logging.getLogger(pathlib.Path(__file__).stem)
 
@@ -36,6 +38,8 @@ class Linkage:
     to_: typing.Optional["numpy.ndarray"] = member(default=None)
     from_: typing.Optional["numpy.ndarray"] = member(default=None)
     format: RoutelinkFormat = dataclasses.field(default=RoutelinkFormat.NETCDF)
+    _lock: RLock = dataclasses.field(default_factory=RLock, init=False, repr=False, hash=False, compare=False)
+    _last_alignment: typing.Optional[int] = dataclasses.field(default=None, init=False, repr=False, hash=False, compare=False)
 
     def __post_init__(self):
         if isinstance(self.path, str):
@@ -52,7 +56,6 @@ class Linkage:
             from_values = routelink[self.from_key].values
             to_values = routelink[self.to_key].values
         elif self.format == RoutelinkFormat.NETCDF:
-            from post_processing.utilities.netcdf import load_variable
             from post_processing.utilities.netcdf import operate_on_variable
             LOGGER.debug(f"Loading the '{self.from_key}' variable from '{self.path}'")
             from_values = operate_on_variable(
@@ -74,6 +77,31 @@ class Linkage:
 
         self.to_ = to_values
         self.from_ = from_values
+
+    @property
+    def to_values(self) -> numpy.ndarray:
+        with self._lock:
+            return self.to_
+
+    @property
+    def from_values(self) -> numpy.ndarray:
+        with self._lock:
+            return self.from_
+
+    def realign(self, features: numpy.ndarray | xarray.DataArray):
+        if isinstance(features, xarray.DataArray):
+            features = features.data
+
+        import pandas
+        index: pandas.Index = pandas.Index(self.from_values)
+        index_to_features = index.get_indexer(features)
+        with self._lock:
+            feature_hash: int = hash(tuple(features))
+            if self._last_alignment is not None and feature_hash == self._last_alignment:
+                return
+            self.to_ = self.to_[index_to_features]
+            self.from_ = self.from_[index_to_features]
+            self._last_alignment = feature_hash
 
     def __del__(self):
         del self.to_
@@ -202,6 +230,11 @@ def calculate_upstream_flow_binned(
 
             input_variable: xarray.DataArray = input_data[variable]
             input_feature_ids: numpy.typing.NDArray = input_variable[list(input_variable.sizes)[0]].to_numpy()
+
+            # TODO: This should ideally return a new linkage rather than a mutated one for safety (linkage.to_
+            #  could theoretically change between realignment and use), but in practice (for now) that's not going to
+            #  happen
+            linkage.realign(features=input_feature_ids)
             data: numpy.typing.NDArray[numpy.floating] = input_variable.to_numpy()
 
             if len(data.shape) > 2:
