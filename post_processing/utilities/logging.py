@@ -352,7 +352,7 @@ def setup_logging(log_path: typing.Union[pathlib.Path, str] = None):
     Common setup logic for log configurations
     """
     if logging.getLogger().hasHandlers():
-        logging.info(f"No need to setup logging. It has already been done.")
+        logging.warning(f"No need to setup logging. It has already been done.")
         return
 
     from post_processing.configuration import settings
@@ -371,7 +371,7 @@ def setup_logging(log_path: typing.Union[pathlib.Path, str] = None):
             for handler in logging.root.handlers:
                 from logging import handlers
                 if isinstance(handler, logging.FileHandler) or isinstance(handler, handlers.RotatingFileHandler):
-                    logging.info(f"The '{handler.name}' saves its data in {pathlib.Path(handler.baseFilename).resolve()}")
+                    logging.debug(f"The '{handler.name}' saves its data in {pathlib.Path(handler.baseFilename).resolve()}")
     else:
         logging.basicConfig(
             level=logging.DEBUG if settings.debug else logging.INFO,

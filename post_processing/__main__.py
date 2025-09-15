@@ -10,6 +10,8 @@ import pathlib
 import sys
 import faulthandler
 
+import collections.abc as generic
+
 from datetime import datetime
 
 from post_processing.configuration import settings
@@ -50,6 +52,8 @@ class Arguments:
         """Print the version rather than run a profile"""
         self.settings: bool = False
         """Print available settings rather than run a profile"""
+        self.validate: bool = False
+        """Just validate to make sure that all profiles are valid"""
         self.analyze: bool = False
         """Whether to analyze performance"""
         self.env_file: pathlib.Path | None = None
@@ -68,7 +72,7 @@ class Arguments:
         elif isinstance(self.env_file, pathlib.Path) and self.env_file.is_file():
             settings.apply_env(self.env_file)
 
-        if self.settings or self.version:
+        if self.settings or self.version or self.validate:
             return
 
         if not self.source_file.exists():
@@ -94,6 +98,9 @@ class Arguments:
         elif len(sys.argv) > 1 and sys.argv[1].lower() == 'version':
             self.version = True
             return
+        if len(sys.argv) > 1 and sys.argv[1].lower() == 'validate':
+            self.validate = True
+            return
 
         parser: argparse.ArgumentParser = argparse.ArgumentParser(
             description="Process National Water Model output for easier use",
@@ -101,6 +108,7 @@ class Arguments:
                 f"Subcommands:{os.linesep}"
                 f"  settings :  Print out all configured settings{os.linesep}"
                 f"  version  :  Print out version information about the application and what commit is in use"
+                f"  validate :  Make sure all profiles are valid"
             ),
             formatter_class=argparse.RawDescriptionHelpFormatter,
         )
@@ -210,6 +218,16 @@ def show_settings():
     pprint(settings.to_dict())
 
 
+def find_invalid_profiles() -> generic.Sequence[str]:
+    """
+    Find profiles that can't be deserialized
+
+    :returns: Descriptions of each profile that could not be deserialized
+    """
+    from post_processing.schema.profile import find_invalid_profiles
+    return find_invalid_profiles()
+
+
 def main() -> int:
     """
     The entry point of the script
@@ -242,6 +260,21 @@ def main() -> int:
         try:
             show_version()
             return 0
+        except Exception as e:
+            LOGGER.critical(str(e))
+            return 1
+
+    if arguments.validate:
+        try:
+            invalid_profiles: generic.Sequence[str] = find_invalid_profiles()
+            if invalid_profiles:
+                LOGGER.critical(
+                    f"Invalid profiles were discovered:{os.linesep}"
+                    f"    - {(os.linesep + '    - ').join(invalid_profiles)}"
+                )
+                return 1
+            else:
+                return 0
         except Exception as e:
             LOGGER.critical(str(e))
             return 1

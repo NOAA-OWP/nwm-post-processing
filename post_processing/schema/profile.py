@@ -152,6 +152,19 @@ class FileOutputMixin:
         if self.in_place:
             return input_path
 
+        from post_processing.utilities.common import NWM_FILENAME_PATTERN
+
+        name_match: re.Match | None = NWM_FILENAME_PATTERN.search(input_path.name)
+
+        if name_match:
+            filename_values: dict[str, str | None] = name_match.groupdict()
+
+            for key, value in filename_values.items():
+                if not value:
+                    continue
+                if key not in context or context[key] in (None, ''):
+                    context[key] = value
+
         context['input_path'] = input_path
         context['input_name'] = STAGE_PATTERN.sub("", input_path.name)
         context['operation_name'] = self.__class__.__name__
@@ -2514,26 +2527,6 @@ class AnomalyOperation(PathToPathOperation):
                 args=arguments,
                 thread_count=settings.maximum_additional_threads,
             )
-            """
-            for input_path in data:
-                desired_path: pathlib.Path = work_directory / self.output_pattern.format(**file_specific_metadata)
-                anomaly.calculate_anomaly(
-                    input_path=input_path,
-                    output_path=desired_path,
-                    variable_to_bin=self.variable_name,
-                    thresholds=self.thresholds,
-                    default_score=self.default_score,
-                    time_variable=self.time_variable,
-                    dimension_names=self.dimension_names,
-                    output_variable_name=self.output_variable_name,
-                    field_metadata=self.anomaly_metadata,
-                    encoding=self.encoding,
-                    operational_metadata=file_specific_metadata,
-                )
-                if not desired_path.exists():
-                    raise OSError(f"There is no generated anomaly data at {desired_path}")
-                output_paths.append(desired_path)
-            """
         except Exception as exception:
             if 'failure in' not in str(exception):
                 exception.args = (f"Failure in:{os.linesep}{self}{os.linesep}{exception.args[0]}", *exception.args[1:])
@@ -3009,6 +3002,50 @@ def load_profiles(profile_path: typing.Union[str, pathlib.Path] = settings.profi
         raise FileNotFoundError(f"No profiles found in {profile_path}")
 
     return profiles
+
+
+def find_invalid_profiles(
+    profile_path: typing.Union[str, pathlib.Path] = settings.profile_path
+) -> generic.Sequence[str]:
+    """
+    Get descriptions of each profile that cannot be used
+
+    :params profile_path: The path to where profiles are stored
+    :returns: Messages explaining each unusable profile
+    """
+    if not isinstance(profile_path, pathlib.Path):
+        profile_path = pathlib.Path(profile_path)
+
+    if not profile_path.is_dir():
+        raise NotADirectoryError(f"Cannot read profiles from '{profile_path}' - it is not a directory")
+
+    unreadable_profiles: list[str] = []
+
+    for directory_member in profile_path.iterdir():
+        if not directory_member.is_file():
+            LOGGER.debug(f"Not loading {directory_member} since it is not a file")
+            continue
+
+        if directory_member.suffix == ".md":
+            # This is a markdown used for documentation, don't play with it, don't log it
+            continue
+
+        if not directory_member.suffix == ".json":
+            LOGGER.debug(f"Not loading {directory_member} since it is not a JSON file")
+            continue
+        try:
+            Profile.from_json(directory_member)
+        except Exception as e:
+            if 'return lists of paths' in str(e):
+                LOGGER.error(e)
+                continue
+
+            message: str = f"Could not load the profile from {directory_member}: {e}"
+            unreadable_profiles.append(message)
+            continue
+
+    return unreadable_profiles
+
 
 
 def get_function_by_name(
