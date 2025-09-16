@@ -504,8 +504,14 @@ def save_netcdf(
         raise
 
     try:
+        args = {
+            "path": path,
+            "engine": engine,
+            "compute": compute,
+            **kwargs,
+        }
         with OPEN_LOCK:
-            delayed_write: typing.Optional = dataset.to_netcdf(path=path, engine=engine, **kwargs, compute=compute)
+            delayed_write: typing.Optional = dataset.to_netcdf(**args)
     except BaseException as e:
         LOGGER.error(f"Could not write to '{path}' - {e}")
         raise

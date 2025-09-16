@@ -250,17 +250,12 @@ def calculate_upstream_flow_binned(
                 (target_feature_index_position >= 0)
             )
 
-            if '_FillValue' in input_variable.encoding:
-                fill_value = input_variable.encoding['_FillValue']
-            elif "missing_value" in input_variable.encoding:
-                fill_value = input_variable.encoding['missing_value']
-            else:
-                fill_value = numpy.nan
+            fill_value = numpy.nan
 
             output_array: numpy.typing.NDArray = numpy.full(
                 shape=data.shape,
                 fill_value=fill_value,
-                dtype=input_variable.dtype
+                dtype=numpy.float32
             )
 
             if len(data.shape) == 2:
@@ -403,9 +398,6 @@ def calculate_upstream_flow(
             series: pandas.Series = pandas.Series(raw_data)
             upstream_values: pandas.Series = series.groupby(to_linkage).sum()
             upstream_values = upstream_values.reindex(from_linkage).sort_index()
-            upstream_values = upstream_values.fillna(
-                data_to_transform[variable].encoding['_FillValue']
-            )
 
             encoding: dict[str, typing.Any] = {**data_to_transform[variable].encoding, **encoding}
 
@@ -417,32 +409,7 @@ def calculate_upstream_flow(
                 attrs={**data_to_transform[variable].attrs, **attributes},
             )
 
-            # Make sure that there aren't any 'None' values from the above 'get' operation and instead hold
-            # the missing_value or '_FillValue' encoding value
-            fill_value: typing.Union[int, float] = encoding.get("missing_value")
-
-            if fill_value is None:
-                fill_value = encoding.get("_FillValue")
-
-            if fill_value is None:
-                raise ValueError(
-                    f"A fill value could not be found on '{input_path}::{variable}' - "
-                    f"'{target_variable}' cannot be encoded and written to '{output_path}'"
-                )
-
-            # Add the 'add_offset' encoding value to the resulting value. This often ensures that the stored data is of the
-            # correct data type
-            add_offset: typing.Optional[float] = encoding.get('add_offset')
-
-            if add_offset is None:
-                LOGGER.warning(
-                    f"No 'add_offset' encoding was found on '{target_variable}' - it may not be encoded as the right type"
-                )
-            else:
-                fill_value += add_offset
-
-            upstreamflow_variable = upstreamflow_variable.fillna(fill_value)
-            data_to_transform[target_variable] = upstreamflow_variable
+            data_to_transform[target_variable] = upstreamflow_variable.astype(numpy.float32)
             data_to_transform[target_variable].encoding.update({
                 **data_to_transform[variable].encoding,
                 **encoding,
