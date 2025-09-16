@@ -132,26 +132,30 @@ CONVERSIONS: _Conversions = _Conversions()
 
 def convert_variable_unit(
     variable: "xarray.DataArray",
-    to_unit: str
+    to_unit: str,
+    from_unit: str = None
 ) -> "xarray.DataArray":
     """
     Convert the values in the variable to the new unit
 
     :param variable: The variable to convert
     :param to_unit: The desired unit for the data
+    :param from_unit: The name of the unit that the data is already in
     :return: The converted variable
     """
     if UNIT_NAME_ATTRIBUTE not in variable.attrs and UNIT_NAME_ATTRIBUTE not in variable.encoding:
         raise KeyError(f"Cannot convert the values in '{variable.name}' to '{to_unit}' - there are no defined units.")
 
-    unit_name: str = str((variable.attrs | variable.encoding)[UNIT_NAME_ATTRIBUTE])
-    if unit_name.isdigit():
+    if not from_unit:
+        from_unit: str = str((variable.attrs | variable.encoding)[UNIT_NAME_ATTRIBUTE])
+
+    if from_unit.isdigit():
         raise ValueError(
-            f"Cannot convert the values in '{variable.name}' from '{unit_name}' to '{to_unit}' - "
+            f"Cannot convert the values in '{variable.name}' from '{from_unit}' to '{to_unit}' - "
             f"it uses a categorical unit, not a physical unit"
         )
 
-    conversion_factor: ConversionFactor = CONVERSIONS.find(from_unit=unit_name, to_unit=to_unit)
+    conversion_factor: ConversionFactor = CONVERSIONS.find(from_unit=from_unit, to_unit=to_unit)
 
     import xarray
     converted_values: xarray.DataArray = conversion_factor.convert(variable, target_unit_name=to_unit)

@@ -48,13 +48,17 @@
             ]
         },
         {
-            "operation": "echo",
-            "message": "Calculated Anomaly, now calculating upstreamflow",
-            "level": "INFO"
-        },
-        {
             "operation": "merge",
             "file_name_pattern": "nwm.t{cycle}z.{ModelOutputType}.{Configuration}.{Region}.nc"
+        },
+        {
+            "operation": "unit_conversion",
+            "conversions": [
+                {
+                    "variable_name": "streamflow",
+                    "target_unit": "ft3 s-1"
+                }
+            ]
         },
         {
             "operation": "save",

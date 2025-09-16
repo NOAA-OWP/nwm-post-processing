@@ -33,12 +33,17 @@
             "branches": {
                 "WMS": [
                     {
-                        "operation": "echo",
-                        "message": "Dropping upstreamflow. Operations need to be rearranged to allow upstreamflow to only be calculated on the RFC branch"
-                    },
-                    {
                         "operation": "drop",
                         "fields": ["upstreamflow"]
+                    },
+                    {
+                        "operation": "unit_conversion",
+                        "conversions": [
+                            {
+                                "variable_name": "streamflow",
+                                "target_unit": "ft3 s-1"
+                            }
+                        ]
                     },
                     {
                         "operation": "save",

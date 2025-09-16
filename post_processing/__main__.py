@@ -107,7 +107,7 @@ class Arguments:
             epilog=(
                 f"Subcommands:{os.linesep}"
                 f"  settings :  Print out all configured settings{os.linesep}"
-                f"  version  :  Print out version information about the application and what commit is in use"
+                f"  version  :  Print out version information about the application and what commit is in use{os.linesep}"
                 f"  validate :  Make sure all profiles are valid"
             ),
             formatter_class=argparse.RawDescriptionHelpFormatter,

@@ -48,11 +48,6 @@
             ]
         },
         {
-            "operation": "echo",
-            "message": "Calculated Anomaly, now calculating upstreamflow",
-            "level": "INFO"
-        },
-        {
             "operation": "on_each",
             "comment": "Add upstreamflow to each input file by calling 'post_processing.transform.calculate_upstream_flow.calculate_upstream_flow' on each",
             "on_each": [
@@ -83,6 +78,15 @@
                         "operation": "drop",
                         "fields": ["upstreamflow"],
                         "output_pattern": "no_upstream.nwm.t{cycle}z.{Configuration}.{ModelOutputType}_{member}.{Region}.nc"
+                    },
+                    {
+                        "operation": "unit_conversion",
+                        "conversions": [
+                            {
+                                "variable_name": "streamflow",
+                                "target_unit": "ft3 s-1"
+                            }
+                        ]
                     },
                     {
                         "operation": "save",

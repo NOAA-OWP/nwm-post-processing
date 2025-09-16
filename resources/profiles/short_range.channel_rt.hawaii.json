@@ -44,10 +44,6 @@
                 ],
                 "RFC": [
                     {
-                        "operation": "drop",
-                        "fields": ["streamflow_anomaly"]
-                    },
-                    {
                         "operation": "rename",
                         "mapping": {
                             "feature_id": "station_id"
