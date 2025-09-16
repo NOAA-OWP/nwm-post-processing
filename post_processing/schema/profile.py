@@ -1386,18 +1386,42 @@ class DropOperation(PathToPathOperation, FileOutputMixin):
         :param output_file: Where to save the result
         :returns: The path to the updated data
         """
-        if self.exclude:
-            drop_function = nco.keep_only_variables
-        else:
-            drop_function = nco.remove_variables
+        import tempfile
+        import shutil
 
-        result: pathlib.Path = drop_function(
-            input_file=input_file,
-            output_file=output_file,
-            variables=self.fields
-        )
+        from post_processing.utilities import netcdf
 
-        return result
+        with tempfile.TemporaryDirectory(dir=settings.intermediate_directory) as temporary_directory:
+            temporary_directory_path: pathlib.Path = pathlib.Path(temporary_directory)
+            temporary_output_path: pathlib.Path = temporary_directory_path / output_file.name
+
+            with netcdf.load_netcdf(path=input_file, full_load=True) as netcdf_data:
+                if self.exclude:
+                    variables_to_drop: list[str] = [
+                        variable_name
+                        for variable_name in netcdf_data.variables.keys()
+                        if variable_name not in self.fields
+                    ]
+                else:
+                    missing_variables: list[str] = [
+                        field_name
+                        for field_name in self.fields
+                        if field_name not in netcdf_data.variables.keys()
+                    ]
+                    if missing_variables:
+                        raise KeyError(
+                            f"Cannot remove variables - '{input_file}' is missing the following variables: "
+                            f"'{', '.join(missing_variables)}'"
+                        )
+                    variables_to_drop: list[str] = list(self.fields)
+
+                updated_data = netcdf_data.drop_vars(variables_to_drop)
+                netcdf.save_netcdf(path=temporary_output_path, dataset=updated_data, compute=True)
+                updated_data.close()
+                netcdf_data.close()
+            shutil.move(temporary_output_path, output_file)
+
+        return output_file
 
     def __call__(
         self,

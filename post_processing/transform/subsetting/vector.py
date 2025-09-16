@@ -243,25 +243,43 @@ def _subset_by_label(
                 )
                 for name, variable in input_data.coords.items()
             }
-            subset_data: xarray.Dataset = xarray.Dataset(
-                data_vars={
-                    name: xarray.DataArray(
-                        data=select_via_numpy(
-                            input_data=variable,
-                            selectors={
-                                context.input_coordinate: context.mask_ids
-                            }
-                        ),
+
+            data_variables: dict[str, xarray.DataArray] = {}
+            for name, variable in input_data.data_vars.items():
+                data = select_via_numpy(
+                    input_data=variable,
+                    selectors={
+                        context.input_coordinate: context.mask_ids
+                    }
+                )
+                dimensions: tuple[typing.Hashable, ...] = tuple(list(variable.dims))
+                coordinates: list[xarray.DataArray] = [
+                    new_coordinates[str(dimension)] for dimension in dimensions
+                ]
+
+                for coordinate_name in variable.coords.keys():
+                    if len([coordinate for coordinate in coordinates if coordinate.name == coordinate_name]) == 0:
+                        coordinates.append(new_coordinates[str(coordinate_name)])
+
+                attributes: dict[str, typing.Any] = variable.attrs.copy()
+
+                try:
+                    data_variables[name] = xarray.DataArray(
                         name=name,
-                        dims=tuple(list(variable.dims)),
-                        coords=[
-                            new_coordinates[str(coordinate)]
-                            for coordinate in variable.coords.keys()
-                        ],
-                        attrs=variable.attrs.copy()
+                        data=data,
+                        dims=dimensions,
+                        coords=coordinates,
+                        attrs=attributes
                     )
-                    for name, variable in input_data.data_vars.items()
-                },
+                except Exception as error:
+                    LOGGER.error(
+                        f"Could not copy a subset of the '{name}' variable from {context.input_path}: {error}. "
+                        f"Dimensions=[{', '.join(map(lambda dim: str(dim) + '=' + str(new_coordinates[dim].shape), dimensions))}]. "
+                        f"Data Shape: {data.shape}"
+                    )
+                    raise
+            subset_data: xarray.Dataset = xarray.Dataset(
+                data_vars=data_variables,
                 coords=new_coordinates,
                 attrs=input_data.attrs.copy(),
             )
