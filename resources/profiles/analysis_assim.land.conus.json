@@ -22,6 +22,16 @@
             "branches": {
                 "WMS": [
                     {
+                        "operation": "drop",
+                        "fields": [
+                            "ACCET",
+                            "FSNO",
+                            "SNEQV",
+                            "SNOWH",
+                            "SNOWT_AVG"
+                        ]
+                    },
+                    {
                         "operation": "reproject",
                         "reference_dataset_path": "{resource_path}/projections/mercator.nc"
                     },

@@ -401,7 +401,7 @@ def reproject_variable(
     # spatial coordinates for the target projection
     reprojected_data: numpy.ndarray = numpy.full(
         shape=tuple(output_shape),
-        fill_value=fill_value,
+        fill_value=numpy.nan,
         dtype=source_variable.dtype
     )
     """The matrix that will contain all of the values from the source in the new projection"""
@@ -454,8 +454,8 @@ def reproject_variable(
             dst_transform=target_transform,
             src_crs=source_crs,
             dst_crs=target_crs,
-            src_nodata=fill_value,
-            dst_nodata=fill_value,
+            src_nodata=numpy.nan,
+            dst_nodata=numpy.nan,
             resampling=resampling_strategy,
             parallel=True
         )
@@ -464,7 +464,7 @@ def reproject_variable(
             updated_data = updated_data.T
 
         reprojected_data[index_combination] = updated_data.copy()
-        reprojected_slice_buffer.fill(fill_value)
+        reprojected_slice_buffer.fill(numpy.nan)
 
     reprojected_variable: xarray.DataArray = xarray.DataArray(
         name=source_variable.name,
