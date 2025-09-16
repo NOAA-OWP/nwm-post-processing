@@ -37,6 +37,15 @@
                         "fields": ["upstreamflow"]
                     },
                     {
+                        "operation": "unit_conversion",
+                        "conversions": [
+                            {
+                                "variable_name": "streamflow",
+                                "target_unit": "ft3 s-1"
+                            }
+                        ]
+                    },
+                    {
                         "operation": "save",
                         "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.puertorico.nc",
                         "directory": "{output_path}/"

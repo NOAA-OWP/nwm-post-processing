@@ -6,6 +6,15 @@
             "fields": ["feature_id", "time", "reference_time", "streamflow", "crs"]
         },
         {
+            "operation": "unit_conversion",
+            "conversions": [
+                {
+                    "variable_name": "streamflow",
+                    "target_unit": "ft3 s-1"
+                }
+            ]
+        },
+        {
             "operation": "anomaly",
             "variable_name": "streamflow",
             "default_score": 3,

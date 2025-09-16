@@ -1408,12 +1408,16 @@ class DropOperation(PathToPathOperation, FileOutputMixin):
                         for field_name in self.fields
                         if field_name not in netcdf_data.variables.keys()
                     ]
-                    if missing_variables:
-                        raise KeyError(
+                    if missing_variables and settings.this_is_verbose:
+                        LOGGER.debug(
                             f"Cannot remove variables - '{input_file}' is missing the following variables: "
                             f"'{', '.join(missing_variables)}'"
                         )
-                    variables_to_drop: list[str] = list(self.fields)
+                    variables_to_drop: list[str] = list(
+                        field
+                        for field in self.fields
+                        if field in netcdf_data.variables.keys()
+                    )
 
                 updated_data = netcdf_data.drop_vars(variables_to_drop)
                 netcdf.save_netcdf(path=temporary_output_path, dataset=updated_data, compute=True)
