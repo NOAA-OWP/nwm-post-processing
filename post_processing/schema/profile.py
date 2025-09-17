@@ -1525,7 +1525,11 @@ class RenameOperation(PathToPathOperation, FileOutputMixin):
         :returns: The Paths for each created object
         """
         if isinstance(data, pathlib.Path):
-            LOGGER.warning(f"For some reason, a path was sent to {self.__class__.__name__} instead of a list of paths.")
+            if settings.debug:
+                LOGGER.warning(
+                    f"For some reason, a path was sent to {self.__class__.__name__} instead of a list of paths."
+                )
+
             arguments: list[dict[str, typing.Any]] = [
                 {
                     "input_path": data,
