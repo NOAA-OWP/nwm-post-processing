@@ -614,7 +614,7 @@ class ReprojectionOperation(PathToPathOperation, FileOutputMixin):
     def _reproject_file(
         self,
         input_path: pathlib.Path,
-        reference_data: "xarray.Dataset",
+        reprojection_dataset_path: pathlib.Path,
         work_directory: pathlib.Path,
         metadata: dict[str, typing.Any],
     ) -> pathlib.Path:
@@ -633,27 +633,24 @@ class ReprojectionOperation(PathToPathOperation, FileOutputMixin):
         with tempfile.TemporaryDirectory() as temporary_directory:
             temporary_directory_path: pathlib.Path = pathlib.Path(temporary_directory)
             temporary_output_path: pathlib.Path = temporary_directory_path / target_path.name
-
-            LOGGER.debug(f"Opening '{input_path}' for reprojecting")
-            with netcdf.load_netcdf(input_path, full_load=True) as netcdf_file:  # type: xarray.Dataset
-                reprojected_data: xarray.Dataset = reproject.reproject_data(
-                    dataset=netcdf_file,
-                    reprojection_dataset=reference_data,
-                    crs_variable_name=self.crs_variable,
-                    reprojection_crs_variable_name=self.reference_crs_variable,
-                    projection_string_attribute=self.crs_string_attribute,
-                    x_coordinate_name=self.x_variable,
-                    y_coordinate_name=self.y_variable,
-                    reprojection_x_coordinate_name=self.reference_x_variable,
-                    reprojection_y_coordinate_name=self.reference_y_variable,
-                )
-                LOGGER.debug(f"Saving the reprojected data temporarily to '{temporary_output_path}'")
-                netcdf.save_netcdf(
-                    path=temporary_output_path,
-                    dataset=reprojected_data
-                )
-                reprojected_data.close()
-                netcdf_file.close()
+            netcdf_file: xarray.Dataset = netcdf.load_netcdf(input_path, full_load=True)
+            reprojected_data: xarray.Dataset = reproject.reproject_data(
+                dataset=netcdf_file,
+                reprojection_dataset_path=reprojection_dataset_path,
+                crs_variable_name=self.crs_variable,
+                reprojection_crs_variable_name=self.reference_crs_variable,
+                projection_string_attribute=self.crs_string_attribute,
+                x_coordinate_name=self.x_variable,
+                y_coordinate_name=self.y_variable,
+                reprojection_x_coordinate_name=self.reference_x_variable,
+                reprojection_y_coordinate_name=self.reference_y_variable,
+            )
+            netcdf.save_netcdf(
+                path=temporary_output_path,
+                dataset=reprojected_data
+            )
+            reprojected_data.close()
+            netcdf_file.close()
             shutil.move(temporary_output_path, target_path)
         return target_path
 
@@ -689,11 +686,10 @@ class ReprojectionOperation(PathToPathOperation, FileOutputMixin):
                 f"Could not find a reference path for reprojection at '{reference_path}'"
             )
 
-        reference_file: xarray.Dataset = netcdf.load_netcdf(reference_path, full_load=True, chunks=None)
         kwargs: list[dict[str, typing.Any]] = [
             {
                 "input_path": input_path,
-                "reference_data": reference_file.copy(deep=True),
+                "reprojection_dataset_path": reference_path,
                 "work_directory": work_directory,
                 "metadata": metadata,
             }
@@ -777,7 +773,7 @@ class SubsetOperation(PathToPathOperation):
                     return match.group(0)
                 return ""
 
-            from post_processing.enums import RFC
+            from post_processing.data_enums import RFC
 
             from post_processing.transform.subset import mask_dataset
 
@@ -1002,7 +998,7 @@ class ExtractOperation(PathToPathOperation):
                     return match.group(0)
                 return ""
 
-            from post_processing.enums import RFC
+            from post_processing.data_enums import RFC
 
             subset_arguments: list[dict[str, typing.Any]] = [
                 {
@@ -1840,7 +1836,7 @@ class SaveOperation(PathToPathOperation):
         """
         import shutil
         from post_processing.configuration import settings
-        from post_processing.enums import Verbosity
+        from post_processing.data_enums import Verbosity
         from post_processing.utilities.netcdf import load_metadata
         from post_processing.utilities.common import NWM_FILENAME_PATTERN
 
@@ -1879,7 +1875,7 @@ class SaveOperation(PathToPathOperation):
                         )
 
                 if 'rfc' in file_specific_metadata and not file_specific_metadata.get("RFC", None):
-                    from post_processing.enums import RFC
+                    from post_processing.data_enums import RFC
                     rfc_abbreviation: typing.Optional[RFC] = RFC.from_string(file_specific_metadata['rfc'], strict=False)
                     if rfc_abbreviation:
                         file_specific_metadata["RFC"] = rfc_abbreviation
@@ -3229,7 +3225,7 @@ def call_generic_operations(
 
         if not any(op.operation_id == operation.operation_id for op in previous_operations):
             previous_operations.append(operation)
-        elif settings.verbosity >= enums.Verbosity.LOUD:
+        elif settings.verbosity >= data_enums.Verbosity.LOUD:
             LOGGER.debug(
                 f"Not adding a record of a call to '{operation.operation_id}) {operation.__class__.__qualname__}' - "
                 f"there is already a record"
@@ -3380,7 +3376,7 @@ def load_operation(specification: typing.Mapping[str, typing.Any]) -> ProfileOpe
             f"The following extra fields were encountered in the specification for a {operation_class.__qualname__}: "
             f"{', '.join(extra_fields)}"
         )
-        if settings.verbosity >= enums.Verbosity.LOUD:
+        if settings.verbosity >= data_enums.Verbosity.LOUD:
             LOGGER.debug(message)
 
     constructor_arguments: dict[str, typing.Any] = {
