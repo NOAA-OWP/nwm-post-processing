@@ -634,7 +634,7 @@ class ReprojectionOperation(PathToPathOperation, FileOutputMixin):
             temporary_directory_path: pathlib.Path = pathlib.Path(temporary_directory)
             temporary_output_path: pathlib.Path = temporary_directory_path / target_path.name
             netcdf_file: xarray.Dataset = netcdf.load_netcdf(input_path, full_load=True)
-            reprojected_data: xarray.Dataset = reproject.reproject_data(
+            reprojected_data: xarray.Dataset = reproject.reproject_dataset(
                 dataset=netcdf_file,
                 reprojection_dataset_path=reprojection_dataset_path,
                 crs_variable_name=self.crs_variable,
@@ -773,7 +773,7 @@ class SubsetOperation(PathToPathOperation):
                     return match.group(0)
                 return ""
 
-            from post_processing.data_enums import RFC
+            from post_processing.enums import RFC
 
             from post_processing.transform.subset import mask_dataset
 
@@ -919,7 +919,11 @@ class SubsetOperation(PathToPathOperation):
         if len(errors) == 1:
             raise errors[0]
         elif errors:
-            raise ExceptionGroup(f"Encountered an invalid {self.__class__.__qualname__}", errors)
+            from post_processing.utilities.common import condense_exceptions
+            raise condense_exceptions(
+                message=f"Encountered an invalid {self.__class__.__qualname__}",
+                exceptions=errors
+            )
 
     def __hash__(self):
         try:
@@ -998,7 +1002,7 @@ class ExtractOperation(PathToPathOperation):
                     return match.group(0)
                 return ""
 
-            from post_processing.data_enums import RFC
+            from post_processing.enums import RFC
 
             subset_arguments: list[dict[str, typing.Any]] = [
                 {
@@ -1150,7 +1154,11 @@ class ExtractOperation(PathToPathOperation):
         if len(errors) == 1:
             raise errors[0]
         elif errors:
-            raise ExceptionGroup(f"Encountered an invalid {self.__class__.__qualname__}", errors)
+            from post_processing.utilities.common import condense_exceptions
+            raise condense_exceptions(
+                message=f"Encountered an invalid {self.__class__.__qualname__}",
+                exceptions=errors
+            )
 
     def __hash__(self):
         try:
@@ -1769,7 +1777,11 @@ class AttributeOperation(PathToPathOperation, FileOutputMixin):
         if len(errors) == 1:
             raise errors[0]
         elif errors:
-            raise ExceptionGroup(f"Encountered an invalid {self.__class__.__qualname__}", errors)
+            from post_processing.utilities.common import condense_exceptions
+            raise condense_exceptions(
+                message=f"Encountered an invalid {self.__class__.__qualname__}",
+                exceptions=errors
+            )
 
     attribute_name: str
     field: typing.Optional[str] = dataclasses.field(default="global")
@@ -1813,7 +1825,11 @@ class SaveOperation(PathToPathOperation):
         if len(errors) == 1:
             raise errors[0]
         elif errors:
-            raise ExceptionGroup(f"Encountered an invalid {self.__class__.__qualname__}", errors)
+            from post_processing.utilities.common import condense_exceptions
+            raise condense_exceptions(
+                message=f"Encountered an invalid {self.__class__.__qualname__}",
+                exceptions=errors
+            )
 
     def __call__(
         self,
@@ -1836,7 +1852,7 @@ class SaveOperation(PathToPathOperation):
         """
         import shutil
         from post_processing.configuration import settings
-        from post_processing.data_enums import Verbosity
+        from post_processing.enums import Verbosity
         from post_processing.utilities.netcdf import load_metadata
         from post_processing.utilities.common import NWM_FILENAME_PATTERN
 
@@ -1875,7 +1891,7 @@ class SaveOperation(PathToPathOperation):
                         )
 
                 if 'rfc' in file_specific_metadata and not file_specific_metadata.get("RFC", None):
-                    from post_processing.data_enums import RFC
+                    from post_processing.enums import RFC
                     rfc_abbreviation: typing.Optional[RFC] = RFC.from_string(file_specific_metadata['rfc'], strict=False)
                     if rfc_abbreviation:
                         file_specific_metadata["RFC"] = rfc_abbreviation
@@ -2064,7 +2080,11 @@ class BranchOperation(ProfileOperation[InputType, typing.Sequence[pathlib.Path]]
         if len(errors) == 1:
             raise errors[0]
         elif errors:
-            raise ExceptionGroup(f"Encountered an invalid {self.__class__.__qualname__}", errors)
+            from post_processing.utilities.common import condense_exceptions
+            raise condense_exceptions(
+                message=f"Encountered an invalid {self.__class__.__qualname__}",
+                exceptions=errors
+            )
 
     def branch_concurrently(
         self,
@@ -2323,7 +2343,11 @@ class OnEachOperation(
         if len(errors) == 1:
             raise errors[0]
         elif errors:
-            raise ExceptionGroup(f"Encountered an invalid {self.__class__.__qualname__} operation", errors)
+            from post_processing.utilities.common import condense_exceptions
+            raise condense_exceptions(
+                message=f"Encountered an invalid {self.__class__.__qualname__} operation",
+                exceptions=errors
+            )
 
     def __call__(
         self,
@@ -2448,7 +2472,11 @@ class AnomalyOperation(PathToPathOperation):
         if len(errors) == 1:
             raise errors[0]
         elif errors:
-            raise ExceptionGroup(f"Encountered an invalid {self.__class__.__qualname__}", errors)
+            from post_processing.utilities.common import condense_exceptions
+            raise condense_exceptions(
+                message=f"Encountered an invalid {self.__class__.__qualname__}",
+                exceptions=errors
+            )
 
     def __call__(
         self,
@@ -3225,7 +3253,7 @@ def call_generic_operations(
 
         if not any(op.operation_id == operation.operation_id for op in previous_operations):
             previous_operations.append(operation)
-        elif settings.verbosity >= data_enums.Verbosity.LOUD:
+        elif settings.verbosity >= enums.Verbosity.LOUD:
             LOGGER.debug(
                 f"Not adding a record of a call to '{operation.operation_id}) {operation.__class__.__qualname__}' - "
                 f"there is already a record"
@@ -3376,7 +3404,7 @@ def load_operation(specification: typing.Mapping[str, typing.Any]) -> ProfileOpe
             f"The following extra fields were encountered in the specification for a {operation_class.__qualname__}: "
             f"{', '.join(extra_fields)}"
         )
-        if settings.verbosity >= data_enums.Verbosity.LOUD:
+        if settings.verbosity >= enums.Verbosity.LOUD:
             LOGGER.debug(message)
 
     constructor_arguments: dict[str, typing.Any] = {
