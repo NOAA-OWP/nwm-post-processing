@@ -144,11 +144,21 @@ class BaseModel:
             import os
             from post_processing.utilities.common import to_json
             try:
-                message: str = (
-                    f"Could not construct a {cls.__qualname__} from the following configuration:{os.linesep}"
-                    f"{to_json(kwargs)}{os.linesep*2}"
-                    f"Due to: {e}"
-                )
+                if isinstance(e, ExceptionGroup):
+                    submessages: set[str] = {
+                        getattr(exception, "message", str(exception))
+                        for exception in e.exceptions
+                    }
+                    message: str = (
+                        f"Could not construct a {cls.__qualname__} due to the following errors:{os.linesep}"
+                        f"    - {(os.linesep + '    - ').join(submessages)}{os.linesep}"
+                    )
+                else:
+                    message: str = (
+                        f"Could not construct a {cls.__qualname__} from the following configuration:{os.linesep}"
+                        f"{to_json(kwargs)}{os.linesep*2}"
+                        f"Due to: {e}"
+                    )
                 raise RuntimeError(message) from e
             except Exception as json_exception:
                 LOGGER.error(

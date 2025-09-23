@@ -21,27 +21,10 @@ from post_processing.configuration import settings
 from post_processing.transform import reproject
 from post_processing.utilities import netcdf
 
-def get_test_logging_config_path() -> pathlib.Path:
-    """
-    Get the path to the config json for tests. This will help prevent testing information bloating regular run information
-    """
-    configured_path: typing.Optional[str] = os.environ.get(f'{settings.prefix}_test_logging_config_path')
-
-    if configured_path:
-        path = pathlib.Path(configured_path)
-        if path.is_file():
-            return path
-
-    test_config_path: pathlib.Path = settings.resource_path / "stream_only_log_config.json"
-    if test_config_path.is_file():
-        return test_config_path
-
-    return settings.logging_config_path
-
 LOGGER: logging.Logger = logging.getLogger()
 LOGGER.setLevel(logging.DEBUG)
 
-TIME_LENGTH: int = 18
+TIME_LENGTH: int = 8
 TIME_OFFSET: numpy.timedelta64 = numpy.timedelta64(timedelta(hours=1))
 START_TIME: numpy.datetime64 = numpy.datetime64(datetime(year=2025, month=1, day=1))
 
@@ -162,6 +145,8 @@ class ReprojectionTest(unittest.TestCase):
                 "standard_time": "time"
             }
         )
+
+        # Numbers chose randomly - length is short due to encountered SEGKILLs
         lambert_seeds: list[int] = [6825, 5530, 5130]
         mercator_seeds: list[int] = [5860, 6474, 7005]
 
@@ -207,7 +192,7 @@ class ReprojectionTest(unittest.TestCase):
         Test that arbitrary data can be transformed from the lambert projection to the mercator projection
         """
         start = datetime.now()
-        mercator_array: xarray.DataArray = reproject.form_and_regrid_band(
+        mercator_array: xarray.DataArray = reproject.reproject_variable(
             source_variable=self.lambert_arrays['lambert_1'],
             input_projection=self.lambert_projection,
             target_projection=self.mercator_projection,
@@ -238,7 +223,7 @@ class ReprojectionTest(unittest.TestCase):
         Test that arbitrary data can be transformed from the mercator projection to the lambert projection
         """
         start = datetime.now()
-        lambert_array: xarray.DataArray = reproject.form_and_regrid_band(
+        lambert_array: xarray.DataArray = reproject.reproject_variable(
             source_variable=self.mercator_arrays['mercator_1'],
             input_projection=self.mercator_projection,
             target_projection=self.lambert_projection,
@@ -250,19 +235,6 @@ class ReprojectionTest(unittest.TestCase):
         Test that arbitrary data can maintain a projection for mercator
         """
         ...
-
-    def test_reproject_variable(self):
-        """
-        Test the 'official' variable reprojection function
-        """
-        start = datetime.now()
-        reproject.reproject_variable(
-            source_variable=self.lambert_arrays['lambert_1'],
-            input_projection=self.lambert_projection,
-            target_projection=self.mercator_projection,
-        )
-        print(f"One Lambert variable converted to mercator using the classical approach took {datetime.now() - start}")
-        #self.assertTrue(True)
 
     def test_reproject_dataset(self):
         overall_dataset: xarray.Dataset = xarray.Dataset(
@@ -283,6 +255,10 @@ class ReprojectionTest(unittest.TestCase):
         )
 
         start = datetime.now()
+        print(f"Saving the lambert dataset for later testing...")
+        netcdf.save_netcdf(path=pathlib.Path.home() / "lambert_test.nc", dataset=overall_dataset)
+        print(f"It took {datetime.now() - start} to save the lambert dataset")
+        start = datetime.now()
         reprojected_data: xarray.Dataset = reproject.reproject_dataset(
             dataset=overall_dataset,
             reprojection_dataset_path=self.mercator_projection.path,
@@ -295,38 +271,10 @@ class ReprojectionTest(unittest.TestCase):
             reprojection_x_coordinate_name=self.mercator_projection.x_values.name,
             reprojection_y_coordinate_name=self.mercator_projection.y_values.name,
         )
-        print(f"It took {datetime.now() - start} to convert a full data set from lambert to mercator using the new method")
-
-    def test_multiple_reprojection(self):
-        """
-        Test if multiple arrays may be converted at once
-        """
-        overall_dataset: xarray.Dataset = xarray.Dataset(
-            coords={
-                "x": self.lambert_projection.x_values,
-                "y": self.lambert_projection.y_values,
-                "time": self.time
-            },
-            data_vars={
-                **self.lambert_arrays,
-                self.lambert_projection.crs_variable_name: xarray.DataArray(
-                    name=self.lambert_projection.crs_variable_name,
-                    data=b"",
-                    dims=tuple(),
-                    attrs=self.lambert_projection.crs_attributes.copy()
-                )
-            }
-        )
-
+        print(f"It took {datetime.now() - start} to reproject the dataset to mercator")
         start = datetime.now()
-        mercator_dataset: xarray.Dataset = reproject.reproject_data(
-            dataset=overall_dataset,
-            reprojection_dataset_path=ProjectionPath.Mercator
-        )
-        print(f"A whole dataset converted from lambert to mercator using the classic approach took {datetime.now() - start}")
-
-        #overall_dataset.to_netcdf(pathlib.Path.home() / "lambert_test.nc")
-        #mercator_dataset.to_netcdf(pathlib.Path.home() / "mercator_test.nc")
+        netcdf.save_netcdf(path=pathlib.Path.home() / "mercator_test.nc", dataset=reprojected_data)
+        print(f"It took {datetime.now() - start} to save the mercator dataset")
 
 
 if __name__ == '__main__':
