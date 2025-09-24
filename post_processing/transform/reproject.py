@@ -12,6 +12,7 @@ import pathlib
 import logging
 import collections.abc as generic
 import dataclasses
+import warnings
 
 from threading import RLock
 
@@ -467,18 +468,23 @@ def reproject_variable(
         dtype=source_variable.dtype
     )
 
-    rasterio.warp.reproject(
-        source=source_variable.data,
-        destination=output_array,
-        src_transform=input_projection.transformation,
-        src_crs=input_projection.crs,
-        src_nodata=fill_value,
-        dst_transform=target_projection.transformation,
-        dst_crs=target_projection.crs,
-        dst_nodata=fill_value,
-        resampling_strategy=resampling_strategy,
-        warp_worker_threads=warp_worker_threads
-    )
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            action="ignore",
+            category=rasterio.errors.NotGeoreferencedWarning
+        )
+        rasterio.warp.reproject(
+            source=source_variable.data,
+            destination=output_array,
+            src_transform=input_projection.transformation,
+            src_crs=input_projection.crs,
+            src_nodata=fill_value,
+            dst_transform=target_projection.transformation,
+            dst_crs=target_projection.crs,
+            dst_nodata=fill_value,
+            resampling=resampling_strategy,
+            num_threads=warp_worker_threads
+        )
 
     transformed_array: xarray.DataArray = xarray.DataArray(
         name=source_variable.name,

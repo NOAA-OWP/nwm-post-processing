@@ -72,7 +72,7 @@ class ConversionFactor:
                 f"the input variable doesn't have a unit"
             )
 
-        if variable.attrs[UNIT_NAME_ATTRIBUTE] not in self.from_unit:
+        if variable.attrs[UNIT_NAME_ATTRIBUTE].lower() not in self.from_unit:
             raise TypeError(
                 f"Cannot convert the values in the '{variable.name}' variable to '{target_unit_name}' - "
                 f"this may only convert from the following units, not '{variable.attrs[UNIT_NAME_ATTRIBUTE]}': "
@@ -110,6 +110,12 @@ class _Conversions:
                 to_unit=["cfs", "ft3/s", "ft^3/s", "ft3 s-1"],
                 from_unit=["cms", "m3/s", "m^3/s", "m3 s-1"],
                 factor=35.3146667,
+            ),
+            ConversionFactor(
+                to_unit=["C", "c"],
+                from_unit=["K", "k"],
+                factor=1.0,
+                final_adjustment=-272.15,
             )
         ])
 

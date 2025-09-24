@@ -23,7 +23,7 @@ from post_processing.utilities.netcdf import save_netcdf
 from post_processing.configuration import settings
 
 
-LOGGER: logging.Logger = logging.getLogger(pathlib.Path(__file__).name)
+LOGGER: logging.Logger = logging.getLogger(pathlib.Path(__file__).stem)
 
 T = typing.TypeVar("T")
 
@@ -35,6 +35,7 @@ def mask_array(
 ) -> xarray.DataArray:
     encoding: dict[str, typing.Any] = input_data.encoding.copy()
     masked_data: xarray.DataArray = input_data * mask
+    masked_data.attrs = input_data.attrs.copy()
     masked_data.encoding = encoding
 
     if settings.this_is_very_verbose:
@@ -99,7 +100,7 @@ def mask_dataset(
                     LOGGER.debug(f"Retrieving the mask at '{mask_path}' for '{input_path}'")
                 mask_data: numpy.ndarray = MASK_PROVIDER.get_mask(path=mask_path, variable=mask_variable)
                 mask_data[mask_data == 0] = numpy.nan
-                if settings.this_is_verbose:
+                if settings.this_is_very_verbose:
                     LOGGER.debug(f"Retrieved the mask at '{mask_path}' for '{input_path}'")
 
                 masked_variables: dict[str, xarray.DataArray] = {

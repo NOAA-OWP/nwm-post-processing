@@ -1864,6 +1864,10 @@ class SaveOperation(PathToPathOperation):
 
                 if file_name_match:
                     file_specific_metadata.update(file_name_match.groupdict())
+                    if file_specific_metadata.get("frame", False):
+                        file_specific_metadata['slice'] = f"f{file_specific_metadata['frame']}"
+                    else:
+                        file_specific_metadata['slice'] = f"tm{file_specific_metadata['tminus']}"
 
                 file_specific_metadata.update({
                     **load_metadata(path=file),
@@ -1954,7 +1958,8 @@ class SaveOperation(PathToPathOperation):
                     LOGGER.error(f"Could not copy '{file}' ({'exists' if file.is_file() else 'does not exist'}) to '{path}'")
                     raise
                 saved_files.append(path)
-                LOGGER.debug(f"Wrote {file} to {path}")
+                if settings.this_is_very_verbose:
+                    LOGGER.debug(f"Wrote {file} to {path}")
         except Exception as exception:
             if 'failure in' not in str(exception):
                 exception.args = (f"Failure in:{os.linesep}{self}{os.linesep}{exception.args[0]}", *exception.args[1:])
@@ -3426,6 +3431,8 @@ def get_profile_operation_types(
     :param root: The base object whose concrete subclasses to look for
     :returns: All non-abstract implementations of the root ProfileOperation
     """
+    from post_processing.operations import TotalOverTimeOperation
+
     subclasses: dict[typing.Optional[OperationType], typing.Type[ProfileOperation]] = {
         subclass.operation(): subclass
         for subclass in root.__subclasses__()

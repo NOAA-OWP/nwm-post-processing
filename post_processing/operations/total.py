@@ -24,6 +24,24 @@ from post_processing.transform.unit_conversion import convert_variable_unit
 LOGGER: logging.Logger = logging.get_logger(__file__)
 
 
+AccumulationFunction = typing.Callable[
+    [
+        pathlib.Path,
+        pathlib.Path,
+        str,
+        str,
+        timedelta,
+        timedelta,
+        str,
+        str,
+        dict[str, typing.Any],
+        pathlib.Path
+    ],
+    pathlib.Path
+]
+"""A function that will read a file, convert its rate to a total, and save to disk"""
+
+
 def accumulate_variable(
     input_path: pathlib.Path,
     output_path: pathlib.Path,
@@ -75,6 +93,8 @@ def accumulate_variable(
                 key: f"Accumulated {value}" if isinstance(value, str) and 'name' in key.lower() else value
                 for key, value in variable.attrs.items()
             }
+            accumulated_data['cell_methods'] = "time: sum"
+            accumulated_data.attrs['units'] = target_unit
 
             accumulated_data.attrs.update(attributes)
 
@@ -83,6 +103,7 @@ def accumulate_variable(
                 **variable.encoding,
                 "units": target_unit,
             }
+            netcdf_data[output_variable_name].attrs.update(attributes)
             netcdf.save_netcdf(path=temporary_output_path, dataset=netcdf_data)
 
         shutil.move(temporary_output_path, output_path)
@@ -111,7 +132,7 @@ class TotalOverTimeOperation(base_profiles.PathToPathOperation, base_profiles.Fi
         if isinstance(data, pathlib.Path):
             data = [data]
 
-        function: typing.Callable[[pathlib.Path, pathlib.Path, str, str, timedelta, timedelta, str, str, dict[str, typing.Any], pathlib.Path], pathlib.Path] = accumulate_variable
+        function: AccumulationFunction = accumulate_variable
 
         arguments: list[dict[str, typing.Any]] = []
         aggregation_period: timedelta = timedelta(**{self.time_unit: self.amount_of_time})
@@ -149,7 +170,12 @@ class TotalOverTimeOperation(base_profiles.PathToPathOperation, base_profiles.Fi
 
             arguments.append(path_arguments)
 
+        files_with_accumulated_rates: generic.Sequence[pathlib.Path] = starmap_threaded(
+            function=function,
+            args=arguments
+        )
 
+        return files_with_accumulated_rates
 
 
     def __hash__(self) -> int:
@@ -166,7 +192,7 @@ class TotalOverTimeOperation(base_profiles.PathToPathOperation, base_profiles.Fi
             self.input_time_unit,
             self.time_unit,
             self.amount_of_time,
-            self.total_variable_attributes
+            *[f"{key}={value}" for key, value in self.total_variable_attributes.items()]
         ))
 
     def __eq__(self, other):

@@ -18,7 +18,6 @@ LOGGER: logging.Logger = logging.getLogger(pathlib.Path(__file__).stem)
 if typing.TYPE_CHECKING:
     import numpy
     import numpy.typing
-    import xarray
     from concurrent.futures import Future
 
 T = typing.TypeVar("T")
@@ -81,16 +80,16 @@ def is_nan_safe(value: typing.Any) -> bool:
 
 
 def starmap(
-    function: generic.Callable[[FunctionParameters], RT],
+    function: generic.Callable[FunctionParameters, RT],
     args: generic.Iterable[ArgsAndKwargs],
     thread_count: int = 0
 ) -> generic.Sequence[RT]:
     """
-    Call the given function with each of sequence of positional arguments
+    Eagerly call the given function with each of sequence of positional arguments
 
     :param function: The function to call
     :param args: Each set of arguments to pass
-    :param thread_count: If true, process each item in its own thread
+    :param thread_count: The number of threads to use if threading is enabled
     :returns: The result of each function call
     """
     results: list[RT] = []
@@ -111,7 +110,7 @@ def starmap(
                 LOGGER.debug(f"Running through iteration {argument_index + 1} of {function}")
             if isinstance(arg, generic.Mapping):
                 result: RT = function(**arg)
-            elif isinstance(arg, generic.Sequence) and len(arg) == 2 and isinstance(args[0], generic.Sequence) and isinstance(args[1], generic.Mapping):
+            elif isinstance(arg, generic.Sequence) and len(arg) == 2 and isinstance(arg[0], generic.Sequence) and isinstance(arg[1], generic.Mapping):
                 result: RT = function(*arg[0], **arg[1])
             elif isinstance(arg, generic.Sequence) and not isinstance(arg, str):
                 result: RT = function(*arg)
@@ -289,7 +288,8 @@ def starmap_threaded(
     thread_count: int = None,
 ) -> generic.Sequence[RT]:
     """
-    Call the given function with each of sequence of positional arguments
+    Eagerly call the given function with each of sequence of positional arguments within a thread pool for a
+    degree of concurrency
 
     :param function: The function to call
     :param args: Each set of arguments to pass
@@ -299,7 +299,7 @@ def starmap_threaded(
     from post_processing.configuration import settings
     from post_processing.enums import Verbosity
 
-    if not settings.allow_threading and settings.this_is_verbose:
+    if not settings.allow_threading and settings.this_is_very_verbose:
         LOGGER.warning(f"Threading is being called directly even though it is supposed to be disabled")
 
     if thread_count is None:
@@ -802,96 +802,6 @@ def format_identifier_to_title(raw_string: str) -> str:
     cleaned = re.sub(r'(?<=\d)(?=[a-zA-Z])', ' ', cleaned)
 
     return cleaned
-
-
-def datetime64_to_datetime(numpy_date: "numpy.datetime64") -> datetime:
-    """
-    Convert a numpy datetime to the vanilla python datetime object
-
-    :param numpy_date: The numpy datetime to convert
-    :returns: The vanilla python datetime object
-    """
-    import numpy
-    if not isinstance(numpy_date, numpy.datetime64):
-        raise TypeError(f"{numpy_date} is not a numpy datetime64")
-
-    # Convert the resolution to seconds if it isn't already -
-    # otherwise converting it to a datetime instead converts it to a timestamp integer, not a python datetime
-    resolution: str = get_datetime64_resolution(numpy_date=numpy_date)
-
-    if resolution != 's':
-        numpy_date = numpy_date.astype('datetime64[s]')
-
-    python_date: datetime = numpy_date.astype(datetime)
-    return python_date
-
-
-def get_datetime64_resolution(numpy_date: "numpy.datetime64") -> str:
-    """
-    Get the time resolution of a datetime64
-
-    :param numpy_date: The numpy datetime64 to interpret
-    :returns: The time resolution, either "s" for seconds, "us" for microseconds, "ms" for milliseconds, "ns" for nanoseconds
-    """
-    import numpy
-    if not isinstance(numpy_date, numpy.datetime64):
-        raise TypeError(f"{numpy_date} is not a numpy datetime64")
-
-    # Get the dtype name - it'll either be:
-    # - 'datetime64[us]'
-    # - 'datetime64[ns]'
-    # - 'datetime64[ms]'
-    # - 'datetime64[s]'
-    dtype_name: str = numpy_date.dtype.name
-    resolution: str = dtype_name.replace("datetime64[", "").replace("]", "")
-
-    return resolution
-
-
-def get_time_from_nwm_file(path: pathlib.Path, variable_name: str = 'time') -> tuple[pathlib.Path, "numpy.datetime64"]:
-    """
-
-    """
-    import xarray
-    import numpy
-    import numpy.typing
-    from post_processing.utilities.netcdf import load_netcdf
-    dataset: xarray.Dataset = load_netcdf(path)
-    if variable_name not in dataset.variables:
-        raise KeyError(f"{variable_name} is not a valid variable name within {path}")
-
-    time_values: numpy.typing.NDArray[1, numpy.datetime64] = dataset[variable_name].values
-
-    if len(time_values) != 1:
-        raise ValueError(
-            f"Cannot get the time from an NWM file - "
-            f"it must only have a single time value but instead has {len(time_values)}"
-        )
-    return path, time_values[0]
-
-def sort_nwm_filepaths(filepaths: generic.Sequence[pathlib.Path]) -> generic.Sequence[pathlib.Path]:
-    """
-    Sort all nwm files by their time variable
-
-    :param filepaths: The list of filepaths to sort
-    :returns: A list of sorted filepaths
-    """
-    import concurrent.futures
-    import numpy
-
-    with concurrent.futures.ProcessPoolExecutor() as executor:
-        paths_and_times: list[tuple[pathlib.Path, numpy.datetime64]] = list(
-                executor.map(
-                get_time_from_nwm_file,
-                filepaths
-            )
-        )
-    sorted_paths_and_times: list[tuple[pathlib.Path, numpy.datetime64]] = sorted(
-        paths_and_times,
-        key=lambda pair: pair[1]
-    )
-    sorted_paths: list[pathlib.Path] = [path for path, time in sorted_paths_and_times]
-    return sorted_paths
 
 def program_exists(program_name: str) -> bool:
     """
