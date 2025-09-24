@@ -132,6 +132,8 @@ class OperationType(enum.StrEnum):
     """Take the total of a rate over time"""
     ADJUST_DIMENSIONS = "adjust_dimensions"
     """Change the dimensions on a netcdf file"""
+    TIME_BOUND = "calculate_time_bound"
+    """Form a time bound for the input"""
 
 
 @dataclasses.dataclass
@@ -3421,9 +3423,10 @@ def load_operation(specification: typing.Mapping[str, typing.Any]) -> ProfileOpe
     return operation_class(**constructor_arguments)
 
 
-@functools.cache
+#@functools.cache
 def get_profile_operation_types(
-    root: typing.Type[ProfileOperation] = ProfileOperation
+    root: typing.Type[ProfileOperation] = ProfileOperation,
+    encountered_types: list[typing.Type[ProfileOperation]] = None
 ) -> dict[OperationType, typing.Type[ProfileOperation]]:
     """
     Get all the concrete operation types
@@ -3431,17 +3434,33 @@ def get_profile_operation_types(
     :param root: The base object whose concrete subclasses to look for
     :returns: All non-abstract implementations of the root ProfileOperation
     """
-    from post_processing.operations import TotalOverTimeOperation
+    #from post_processing.operations import get_operations
+    import post_processing.operations
+
+    if encountered_types is None:
+        encountered_types = []
 
     subclasses: dict[typing.Optional[OperationType], typing.Type[ProfileOperation]] = {
         subclass.operation(): subclass
         for subclass in root.__subclasses__()
+        if subclass not in encountered_types
     }
+
+    #subclasses.update({
+    #    operation_class.operation(): operation_class
+    #    for operation_class in get_operations()
+    #    if operation_class.operation() not in subclasses
+    #       and operation_class != root
+    #       and operation_class not in encountered_types
+    #})
 
     immediate_subclasses: typing.Sequence[typing.Type[ProfileOperation]] = list(subclasses.values())
 
     for subclass in immediate_subclasses:
-        sub_subclasses: dict[OperationType, typing.Type[ProfileOperation]] = get_profile_operation_types(subclass)
+        sub_subclasses: dict[OperationType, typing.Type[ProfileOperation]] = get_profile_operation_types(
+            root=subclass,
+            encountered_types=list(subclasses.values())
+        )
         preexisting_operations: list[tuple[OperationType, typing.Type[ProfileOperation], typing.Type[ProfileOperation]]] = []
 
         for operation_type, operation_class in sub_subclasses.items():

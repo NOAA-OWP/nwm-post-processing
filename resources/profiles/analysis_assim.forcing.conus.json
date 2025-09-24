@@ -28,6 +28,9 @@
             }
         },
         {
+            "operation": "calculate_time_bound"
+        },
+        {
             "operation": "drop",
             "fields": [
                 "RAINRATE"
