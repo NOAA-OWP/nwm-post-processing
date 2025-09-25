@@ -646,6 +646,7 @@ class ReprojectionOperation(PathToPathOperation, FileOutputMixin):
                 y_coordinate_name=self.y_variable,
                 reprojection_x_coordinate_name=self.reference_x_variable,
                 reprojection_y_coordinate_name=self.reference_y_variable,
+                output_crs_variable_name=self.output_crs_variable_name
             )
             netcdf.save_netcdf(
                 path=temporary_output_path,
@@ -728,6 +729,9 @@ class ReprojectionOperation(PathToPathOperation, FileOutputMixin):
 
         self.reference_dataset_path = self.reference_dataset_path.resolve()
 
+        if not self.output_crs_variable_name:
+            self.output_crs_variable_name = self.reference_crs_variable
+
     reference_dataset_path: typing.Union[pathlib.Path, str]
     crs_variable: str = dataclasses.field(default="crs")
     crs_string_attribute: str = dataclasses.field(default="esri_pe_string")
@@ -737,6 +741,7 @@ class ReprojectionOperation(PathToPathOperation, FileOutputMixin):
     reference_crs_string_attribute: str = dataclasses.field(default="esri_pe_string")
     reference_x_variable: str = dataclasses.field(default="x")
     reference_y_variable: str = dataclasses.field(default="y")
+    output_crs_variable_name: typing.Optional[str] = dataclasses.field(default=None)
 
 @dataclasses.dataclass
 class SubsetOperation(PathToPathOperation):

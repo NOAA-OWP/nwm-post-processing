@@ -93,7 +93,7 @@ def accumulate_variable(
                 key: f"Accumulated {value}" if isinstance(value, str) and 'name' in key.lower() else value
                 for key, value in variable.attrs.items()
             }
-            accumulated_data['cell_methods'] = "time: sum"
+            accumulated_data.attrs['cell_methods'] = "time: sum"
             accumulated_data.attrs['units'] = target_unit
 
             accumulated_data.attrs.update(attributes)
