@@ -6,6 +6,7 @@ import typing
 import dataclasses
 import pathlib
 import logging
+import enum
 
 import collections.abc as generic
 
@@ -277,6 +278,10 @@ def to_dict(obj: typing.Any) -> typing.Union[dict[str, typing.Any], typing.Any]:
     :return: The converted dictionary
     """
     if not dataclasses.is_dataclass(obj=obj):
+        if hasattr(obj, "to_dict") and callable(obj.to_dict):
+            return obj.to_dict()
+        if isinstance(obj, enum.Enum):
+            return obj.value
         return obj
 
     dictionary: dict[str, typing.Any] = {
