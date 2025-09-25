@@ -561,6 +561,7 @@ def update_coordinate_references(
     dataset: xarray.Dataset,
     input_projection: Projection,
     output_projection: Projection,
+    output_crs_variable_name: str = None
 ) -> xarray.Dataset:
     """
     Update coordinates and variables to match the possibly new metadata
@@ -568,15 +569,26 @@ def update_coordinate_references(
     :param dataset: The dataset to update
     :param input_projection: The projection to update from
     :param output_projection: The projection to update to
+    :param output_crs_variable_name: An optional name for the output crs variable if it needs to differ from the output projection
     :returns: A copy of the dataset with appropriate metadata
     """
     # Copy all the values in order to divorce it from the source
     dataset = dataset.copy(deep=True)
 
+    if output_crs_variable_name is None:
+        output_crs_variable_name = output_projection.crs_variable_name
+
     # Update the metadata on the coordinates - the values may be the same but the metadata may not
     dataset[input_projection.x_values.name].attrs.update(output_projection.x_values.attrs)
     dataset[input_projection.y_values.name].attrs.update(output_projection.y_values.attrs)
-    dataset[input_projection.crs_variable_name].attrs.update(output_projection.crs_attributes)
+
+    crs_attributes: dict[str, typing.Any] = input_projection.crs_attributes.copy()
+    crs_attributes.update(output_projection.crs_attributes)
+
+    if input_projection.crs_variable_name != output_crs_variable_name:
+        dataset = dataset.rename({input_projection.crs_variable_name: output_crs_variable_name})
+
+    dataset[output_crs_variable_name].attrs.update(crs_attributes)
 
     # Ensure that all coordinates have any sort of updated spatial references
     for coordinate in dataset.coords.values():
@@ -588,7 +600,7 @@ def update_coordinate_references(
                 )
                 coordinate.attrs[attribute_name] = new_spatial_ref
             elif attribute_name == 'grid_mapping':
-                coordinate.attrs[attribute_name] = output_projection.crs_variable_name
+                coordinate.attrs[attribute_name] = output_crs_variable_name
 
     # Ensure that all data variables have any sort of updated spatial references and that all spatial variables
     # reference the CRS
@@ -601,7 +613,7 @@ def update_coordinate_references(
                 )
                 variable.attrs[attribute_name] = new_spatial_ref
         if input_projection.x_values.name in variable.dims and input_projection.y_values.name in variable.dims:
-            variable.attrs['grid_mapping'] = output_projection.crs_variable_name
+            variable.attrs['grid_mapping'] = output_crs_variable_name
 
     # Ensure the all global attributes referencing a spatial reference reference the correct one
     for attribute_name, attribute_value in dataset.attrs.items():
@@ -626,6 +638,7 @@ def reproject_gridded_variables(
     input_projection: Projection,
     output_projection: Projection,
     resampling_strategy: rasterio.warp.Resampling,
+    output_crs_variable_name: str = None
 ) -> xarray.Dataset:
     """
     Force gridded variables to comply with a new projection
@@ -634,8 +647,11 @@ def reproject_gridded_variables(
     :param input_projection: The projection that the data was originally in
     :param output_projection: The projection that the data should move to
     :param resampling_strategy: How to determine what values should occupy coordinates that weren't in the original data
+    :param output_crs_variable_name: The CRS variable name if it needs to differ from the output projection
     :returns: A new dataset containing the old data within a new grid projection
     """
+    if not output_crs_variable_name:
+        output_crs_variable_name = output_projection.crs_variable_name
 
     new_coordinates: dict[str, xarray.DataArray] = reproject_variable_group(
         group=dataset.coords,
@@ -654,8 +670,8 @@ def reproject_gridded_variables(
     """The new variables that will contain the actual data in the reprojected dataset"""
 
     # Add a new variable defining the updated coordinate reference system
-    new_variables[output_projection.crs_variable_name] = xarray.DataArray(
-        name=output_projection.crs_variable_name,
+    new_variables[output_crs_variable_name] = xarray.DataArray(
+        name=output_crs_variable_name,
         data=b"",
         dims=tuple(),
         attrs=output_projection.crs_attributes
@@ -713,6 +729,7 @@ def reproject_dataset(
     reprojection_x_coordinate_name: str = None,
     reprojection_y_coordinate_name: str = None,
     resampling_strategy: rasterio.warp.Resampling = None,
+    output_crs_variable_name: str = None
 ) -> xarray.Dataset:
     """
     Reprojects a 3D dataset based on another coordinate reference system
@@ -730,6 +747,9 @@ def reproject_dataset(
     :param resampling_strategy: How to determine what values to put into potentially new grid cells
     :returns: The reprojected dataset
     """
+    if not output_crs_variable_name:
+        output_crs_variable_name = reprojection_crs_variable_name
+
     input_projection: Projection = Projection.read_dataset(
         projection_dataset=dataset,
         x_variable_name=x_coordinate_name,
@@ -756,6 +776,7 @@ def reproject_dataset(
             dataset=dataset,
             input_projection=input_projection,
             output_projection=target_projection,
+            output_crs_variable_name=output_crs_variable_name
         )
     else:
         reprojected_data: xarray.Dataset = reproject_gridded_variables(
@@ -763,5 +784,6 @@ def reproject_dataset(
             input_projection=input_projection,
             output_projection=target_projection,
             resampling_strategy=resampling_strategy,
+            output_crs_variable_name=output_crs_variable_name
         )
     return reprojected_data
