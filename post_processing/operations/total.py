@@ -21,6 +21,8 @@ from post_processing.utilities.common import starmap_threaded
 from post_processing.utilities.common import NWM_FILENAME_PATTERN
 from post_processing.transform.unit_conversion import convert_variable_unit
 
+from post_processing.enums import TimeUnit
+
 LOGGER: logging.Logger = logging.get_logger(__file__)
 
 
@@ -47,7 +49,7 @@ def accumulate_variable(
     output_path: pathlib.Path,
     input_variable_name: str,
     output_variable_name: str,
-    temporal_unit: timedelta,
+    temporal_unit: TimeUnit,
     aggregation_period: timedelta,
     quantity_unit: str,
     target_unit: str,
@@ -120,6 +122,13 @@ class TotalOverTimeOperation(base_profiles.PathToPathOperation, base_profiles.Fi
     def operation(cls) -> base_profiles.OperationType:
         return base_profiles.OperationType.TOTAL_OVER_TIME
 
+    def __post_init__(self):
+        if isinstance(self.time_unit, str):
+            self.time_unit = TimeUnit(self.time_unit)
+
+        if isinstance(self.input_time_unit, str):
+            self.input_time_unit = TimeUnit(self.input_time_unit)
+
     def __call__(
         self,
         profile: base_profiles.Profile,
@@ -135,8 +144,7 @@ class TotalOverTimeOperation(base_profiles.PathToPathOperation, base_profiles.Fi
         function: AccumulationFunction = accumulate_variable
 
         arguments: list[dict[str, typing.Any]] = []
-        aggregation_period: timedelta = timedelta(**{self.time_unit: self.amount_of_time})
-        temporal_unit: timedelta = timedelta(**{self.input_time_unit: 1})
+        aggregation_period: timedelta = self.time_unit * self.amount_of_time
 
         for path in data:
             path_metadata: dict[str, typing.Any] = metadata.copy()
@@ -160,7 +168,7 @@ class TotalOverTimeOperation(base_profiles.PathToPathOperation, base_profiles.Fi
                 "output_path": output_path,
                 "input_variable_name": self.rate_variable_name,
                 "output_variable_name": self.total_variable_name,
-                "temporal_unit": temporal_unit,
+                "temporal_unit": self.input_time_unit,
                 "aggregation_period": aggregation_period,
                 "quantity_unit": self.input_quantity_unit,
                 "target_unit": self.output_unit,
@@ -208,11 +216,11 @@ class TotalOverTimeOperation(base_profiles.PathToPathOperation, base_profiles.Fi
     """The unit that the value should be converted to"""
     input_quantity_unit: str
     """The unit of quantity (the unit over time) that the rate was measured in"""
-    input_time_unit: str = dataclasses.field(default="seconds")
+    input_time_unit: TimeUnit = dataclasses.field(default=TimeUnit.SECONDS)
     """
     The unit of time that the rate spans. For instance, if the input rate was mm/s, the input time unit would be 'seconds'
     """
-    time_unit: str = dataclasses.field(default="hours")
+    time_unit: TimeUnit = dataclasses.field(default=TimeUnit.HOURS)
     """
     The unit of time over which the rate value was established. For instance, 'hours' if the rate was calculated 
     as the mean rate over 1 hour.

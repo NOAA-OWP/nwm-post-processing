@@ -19,7 +19,7 @@ from post_processing.schema import profile as base_profiles
 from post_processing.utilities import netcdf
 from post_processing.utilities.common import starmap_threaded
 from post_processing.utilities.common import NWM_FILENAME_PATTERN
-from post_processing.transform.unit_conversion import convert_variable_unit
+from post_processing.enums import TimeUnit
 
 LOGGER: logging.Logger = logging.get_logger(__file__)
 
@@ -116,7 +116,7 @@ class TimeBoundOperation(base_profiles.PathToPathOperation, base_profiles.FileOu
             data = [data]
 
         arguments: list[dict[str, typing.Any]] = []
-        duration: timedelta = timedelta(**{self.time_unit: self.amount_of_time})
+        duration: timedelta = self.time_unit * self.amount_of_time
 
         for path in data:
             path_metadata: dict[str, typing.Any] = metadata.copy()
@@ -179,7 +179,7 @@ class TimeBoundOperation(base_profiles.PathToPathOperation, base_profiles.FileOu
 
     time_variable: str = dataclasses.field(default="time")
     """The variable the specifies the times of the values"""
-    time_unit: str = dataclasses.field(default="hours")
+    time_unit: TimeUnit = dataclasses.field(default=TimeUnit.HOURS)
     """
     The unit of time over which the rate value was established. For instance, 'hours' if the rate was calculated 
     as the mean rate over 1 hour.
