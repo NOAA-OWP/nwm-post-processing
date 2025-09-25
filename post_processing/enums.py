@@ -4,6 +4,11 @@ Enumerations used to describe data
 import typing
 import enum
 
+from datetime import timedelta
+from datetime import datetime
+
+import numpy
+
 
 _PRINT_REPLACEMENTS: dict[str, str] = {
     "no_da": "No Data Assimilation",
@@ -238,4 +243,181 @@ class Verbosity(enum.IntEnum):
             if clean_string in (member_name, member_value):
                 return member
         raise KeyError(f"'{string}' is not a valid value for '{cls.__name__}'")
+
+
+class TimeUnit(enum.Enum):
+    """
+    Represents a single unit of time rather than a duration
+
+    An hour before now, for example, would be:
+        >>> datetime.now() - TimeUnit.HOURS
+    """
+    SECONDS = "seconds"
+    MINUTES = "minutes"
+    HOURS = "hours"
+    DAYS = "days"
+
+    def __new__(cls, name: str):
+        obj = object.__new__(cls)
+        obj._value_ = name
+
+        obj._timedelta = timedelta(**{name: 1})
+        obj._seconds = obj._timedelta.total_seconds()
+        obj._alias = name[0]
+
+        return obj
+
+    @property
+    def seconds(self) -> float:
+        return self._seconds
+
+    @property
+    def delta(self) -> timedelta:
+        return self._timedelta
+
+    def __str__(self):
+        return self.value
+
+    def to_numpy(self) -> numpy.timedelta64:
+        return numpy.timedelta64(self.delta)
+
+    def __int__(self) -> int:
+        return int(self.seconds)
+
+    def __float__(self) -> float:
+        return self.seconds
+
+    def __hash__(self) -> int:
+        return hash(self.delta)
+
+    def __eq__(self, other) -> bool:
+        if not isinstance(other, (TimeUnit, str, float, int, numpy.number, timedelta, numpy.timedelta64)):
+            return False
+
+        if isinstance(other, str):
+            return self.value.lower() == other.lower() or self._alias.lower() == other.lower()
+        elif isinstance(other, timedelta):
+            return self.delta == other
+        elif isinstance(other, numpy.timedelta64):
+            return self.to_numpy() == other
+        elif isinstance(other, (int, numpy.integer)):
+            return int(self.seconds) == other
+        return self.seconds == other
+
+    def __ne__(self, other) -> bool:
+        return not self.__eq__(other)
+
+    def __gt__(self, other) -> bool:
+        if not isinstance(other, (TimeUnit, float, int, numpy.number, timedelta, numpy.timedelta64)):
+            raise TypeError(f"Cannot tell if '{self}' (type={self.__class__.__name__}) is greater than '{other}' (type={type(other)}).")
+
+        if isinstance(other, timedelta):
+            return self.delta > other
+        elif isinstance(other, numpy.timedelta64):
+            return self.to_numpy() > other
+        elif isinstance(other, (int, numpy.integer)):
+            return int(self.seconds) > other
+        return self.seconds > other
+
+    def __lt__(self, other) -> bool:
+        if not isinstance(other, (TimeUnit, float, int, numpy.number, timedelta, numpy.timedelta64)):
+            raise TypeError(f"Cannot tell if '{self}' (type={self.__class__.__name__}) is greater than '{other}' (type={type(other)}).")
+
+        if isinstance(other, timedelta):
+            return self.delta < other
+        elif isinstance(other, numpy.timedelta64):
+            return self.to_numpy() < other
+        elif isinstance(other, (int, numpy.integer)):
+            return int(self.seconds) < other
+        return self.seconds < other
+
+    def __ge__(self, other) -> bool:
+        return self == other or self > other
+
+    def __le__(self, other) -> bool:
+        return self == other or self < other
+
+    def __add__(self, other) -> timedelta | numpy.timedelta64 | datetime | numpy.datetime64:
+        if not isinstance(other, (timedelta, numpy.timedelta64, datetime, numpy.datetime64)):
+            return NotImplemented
+
+        if isinstance(other, (numpy.datetime64, numpy.timedelta64)):
+            return self.to_numpy() + other
+
+        return self.delta + other
+
+    def __sub__(self, other) -> timedelta | numpy.timedelta64 | datetime | numpy.datetime64:
+        if not isinstance(other, (timedelta, numpy.timedelta64, datetime, numpy.datetime64)):
+            return NotImplemented
+
+        if isinstance(other, (numpy.datetime64, numpy.timedelta64)):
+            return self.to_numpy() - other
+
+        return self.delta - other
+
+    def __radd__(self, other):
+        if not isinstance(other, (timedelta, numpy.timedelta64, datetime, numpy.datetime64)):
+            return NotImplemented
+
+        if isinstance(other, (numpy.datetime64, numpy.timedelta64)):
+            return other + self.to_numpy()
+
+        return other + self.delta
+
+    def __rsub__(
+        self,
+        other: timedelta | numpy.timedelta64 | datetime | numpy.datetime64,
+    ) -> timedelta | numpy.timedelta64 | datetime | numpy.datetime64:
+        if not isinstance(other, (timedelta, numpy.timedelta64, datetime, numpy.datetime64)):
+            return NotImplemented
+
+        if isinstance(other, (numpy.datetime64, numpy.timedelta64)):
+            return other - self.to_numpy()
+
+        return other - self.delta
+
+    def __mul__(self, other: int | float | numpy.number) -> timedelta | numpy.timedelta64:
+        if not isinstance(other, (int, float, numpy.number)):
+            return NotImplemented
+
+        if isinstance(other, numpy.number):
+            return self.to_numpy() * other
+
+        return self.delta * other
+
+    def __truediv__(
+        self,
+        other: typing.Union[int, float, "TimeUnit", numpy.number, timedelta, numpy.timedelta64],
+    ) -> timedelta | numpy.timedelta64 | float:
+        if not isinstance(other, (int, float, TimeUnit, numpy.number, timedelta, numpy.timedelta64)):
+            return NotImplemented
+
+        if numpy.isnan(other):
+            return self.to_numpy() / other
+        if isinstance(other, (numpy.number, numpy.datetime64)):
+            return self.to_numpy() / other
+        if isinstance(other, TimeUnit):
+            return self.seconds / other.seconds
+
+        return self.delta / other
+
+    def __rmul__(self, other: int | float | numpy.number) -> timedelta:
+        if not isinstance(other, (int, float, numpy.number)):
+            return NotImplemented
+
+        if isinstance(other, numpy.number):
+            return other * self.to_numpy()
+
+        return other * self.delta
+
+    def __rtruediv__(
+        self, other: int | float | numpy.number | timedelta | numpy.timedelta64
+    ) -> timedelta | float | numpy.timedelta64 | numpy.floating:
+        if not isinstance(other, (int, float, numpy.number, timedelta, numpy.timedelta64)):
+            return NotImplemented
+
+        if isinstance(other, (numpy.number, numpy.timedelta64)):
+            return other / self.to_numpy()
+
+        return other / self.delta
 
