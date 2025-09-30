@@ -228,6 +228,11 @@ def find_invalid_profiles() -> generic.Sequence[str]:
     return find_invalid_profiles()
 
 
+def shutdown():
+    from post_processing.utilities import netcdf
+    netcdf.close_gateway()
+
+
 def main() -> int:
     """
     The entry point of the script
@@ -344,13 +349,11 @@ def main() -> int:
 
                     if arguments.peek:
                         for output in outputs:
-                            from post_processing.utilities.netcdf import load_netcdf
                             from post_processing.utilities.netcdf import peek
                             representation: str = peek(output)
                             LOGGER.info(f"Output: {output}:{os.linesep}{representation}")
                     elif settings.debug:
                         for output in outputs[:5]:
-                            from post_processing.utilities.netcdf import load_netcdf
                             from post_processing.utilities.netcdf import peek
                             representation: str = peek(output)
                             LOGGER.info(f"Output: {output}:{os.linesep}{representation}")
@@ -381,4 +384,10 @@ def main() -> int:
 if __name__ == "__main__":
     if settings.debug:
         LOGGER.warning("Debug mode is enabled. Stop and disable if this is a testing or production environment.")
-    sys.exit(main())
+    exit_code: int = main()
+    try:
+        shutdown()
+    except BaseException as exception:
+        LOGGER.error(exception, exc_info=True)
+        exit_code = 1 if exit_code == 0 else exit_code
+    sys.exit(exit_code)

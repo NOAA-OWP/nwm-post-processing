@@ -20,20 +20,20 @@ def merge_files_into_file(
     files: typing.Sequence[typing.Union[str, pathlib.Path]],
     output_file: typing.Union[str, pathlib.Path]
 ) -> None:
-    from post_processing.utilities.netcdf import save_netcdf
+    from post_processing.utilities.netcdf import write
     with merge_files(files=files) as merged_files:
-        save_netcdf(path=output_file, dataset=merged_files)
+        write(target=output_file, dataset=merged_files)
 
 @timed_function()
 def merge_files(files: typing.Sequence[str | pathlib.Path]) -> xarray.Dataset:
-    from post_processing.utilities.netcdf import load_netcdf
+    from post_processing.utilities.netcdf import load
     files: generic.Sequence[pathlib.Path] = [
         file if isinstance(file, pathlib.Path) else pathlib.Path(file)
         for file in files
     ]
 
     LOGGER.debug(f"Merging {len(files)} files")
-    combined_files: xarray.Dataset = load_netcdf(path=files)
+    combined_files: xarray.Dataset = load(target=files)
     LOGGER.debug(f"Data from {len(files)} have been merged. Now they are being encoded.")
     for coordinate_name, variable in combined_files.coords.items():
         new_dtype = variable.dtype

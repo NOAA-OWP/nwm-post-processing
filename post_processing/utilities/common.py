@@ -102,7 +102,7 @@ def starmap(
 
     if settings.allow_threading and thread_count is not None and thread_count > 0:
         results.extend(
-            starmap_threaded(function=function, args=args, thread_count=thread_count)
+            starmap_threaded(function=function, args=args, thread_count=thread_count, thread_prefix="starmap")
         )
     else:
         for argument_index, arg in enumerate(args):
@@ -286,6 +286,8 @@ def starmap_threaded(
     function: generic.Callable[[FunctionParameters], RT],
     args: generic.Iterable[ArgsAndKwargs],
     thread_count: int = None,
+    *,
+    thread_prefix: str = "starmap-threaded"
 ) -> generic.Sequence[RT]:
     """
     Eagerly call the given function with each of sequence of positional arguments within a thread pool for a
@@ -294,6 +296,7 @@ def starmap_threaded(
     :param function: The function to call
     :param args: Each set of arguments to pass
     :param thread_count: The maximum amount of threads to process at once
+    :param thread_prefix: A prefix used to identify common threads
     :returns: The result of each function call
     """
     from post_processing.configuration import settings
@@ -307,7 +310,7 @@ def starmap_threaded(
 
     results: list[RT] = []
     import concurrent.futures
-    with concurrent.futures.ThreadPoolExecutor(max_workers=thread_count) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=thread_count, thread_name_prefix=thread_prefix) as executor:
         future_results: list[concurrent.futures.Future[RT]] = []
         for arg in args:
             arguments_are_keyword: bool = isinstance(arg, generic.Mapping)
@@ -432,7 +435,7 @@ def last(
 
 @typing.overload
 def cycle_future_list(
-    values: list["Future[T]"],
+    futures: list["Future[T]"],
     *,
     block_seconds: float = 1.0,
     backoff_seconds: float = 1.0,
@@ -661,6 +664,69 @@ def cycle_futures(
     assert isinstance(results, generic.Sequence)
     assert isinstance(exceptions, generic.Sequence)
     return results, exceptions
+
+@typing.overload
+def cycle_future(
+    future: "Future[T]",
+    *,
+    block_seconds: float = 1.0,
+    backoff_seconds: int = 1.0,
+    exception_handler: generic.Callable[[Exception], Exception] = None,
+) -> tuple[typing.Optional[T], typing.Optional[Exception]]:
+    ...
+
+@typing.overload
+def cycle_future(
+    future: "Future[T]",
+    *,
+    transform: generic.Callable[[T, generic.Sequence[T]], VT],
+    block_seconds: float = 1.0,
+    backoff_seconds: float = 1.0,
+    exception_handler: generic.Callable[[Exception], Exception] = None
+) -> tuple[typing.Optional[VT], typing.Optional[Exception]]:
+    ...
+
+def cycle_future(
+    future: "Future[T]",
+    *,
+    transform: generic.Callable[[T], VT] = None,
+    block_seconds: float = 1.0,
+    backoff_seconds: float = 1.0,
+    exception_handler: generic.Callable[[Exception], Exception] = None,
+) -> tuple[typing.Optional[typing.Union[T, VT]], typing.Optional[BaseException]]:
+    """
+    Cycle through the list of values and apply and transforms as the contents are generated
+
+    :param futures: The list of values to cycle through
+    :param transform: The function to apply to each value
+    :param block_seconds: The number of seconds to wait for a result
+    :param backoff_seconds: The number of seconds to wait after timing out while waiting for a result that just timed out
+    :param exception_handler: Special handling for exceptions
+    :returns: The results from all the futures
+    """
+    from concurrent.futures import Future
+    import time
+
+    if transform is not None and not callable(transform):
+        raise TypeError("transform must be callable")
+
+    if exception_handler is not None and not callable(exception_handler):
+        raise ValueError(f"{exception_handler} (type={type(exception_handler)}) is not callable")
+
+    while True:
+        try:
+            result: T = future.result(timeout=block_seconds)
+            if transform is not None:
+                result = transform(result)
+            return result, None
+        except TimeoutError:
+            continue
+        except Exception as exception:
+            if exception_handler is not None:
+                exception = exception_handler(exception)
+            return None, exception
+        except BaseException as exception:
+            return None, exception
 
 
 def get_property_values(obj: object) -> dict[str, typing.Any]:

@@ -21,7 +21,7 @@ import affine
 import xarray
 import numpy
 
-from post_processing.utilities.netcdf import load_netcdf
+from post_processing.utilities import netcdf
 
 LOGGER: logging.Logger = logging.getLogger(pathlib.Path(__file__).stem)
 _LOAD_LOCK: RLock = RLock()
@@ -121,7 +121,8 @@ class Projection:
         projection_attribute_name: str = None
     ) -> "Projection":
         with _LOAD_LOCK:
-            with load_netcdf(path, full_load=True) as projection_dataset:
+            #with load_netcdf(path, full_load=True) as projection_dataset:
+            with netcdf.load(target=path, full_load=True) as projection_dataset:
                 projection: Projection = cls.read_dataset(
                     projection_dataset=projection_dataset,
                     x_variable_name=x_variable_name,

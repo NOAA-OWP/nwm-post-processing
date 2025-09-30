@@ -27,50 +27,41 @@ def rename_variable(
     if not mapping:
         raise ValueError(f"No name mapping was passed when attempting to rename elements within '{input_path}'")
 
-    import tempfile
-    import shutil
-    from post_processing.utilities.netcdf import load_netcdf
-    from post_processing.utilities.netcdf import save_netcdf
+    from post_processing.utilities.netcdf import write
+    from post_processing.utilities.netcdf import load
 
     if output_path.is_dir():
         output_path = output_path / input_path.name
 
-    with tempfile.TemporaryDirectory() as temporary_directory:
-        temporary_path: pathlib.Path = pathlib.Path(temporary_directory)
-        temporary_output_path: pathlib.Path = temporary_path / output_path.name
+    with load(input_path) as input_file:
+        coordinates_to_assign: typing.Sequence[str] = [
+            new_name
+            for original_name, new_name in mapping.items()
+            if original_name in input_file.coords
+        ]
 
-        with load_netcdf(path=input_path) as input_file:
-            coordinates_to_assign: typing.Sequence[str] = [
-                new_name
-                for original_name, new_name in mapping.items()
-                if original_name in input_file.coords
+        try:
+            input_file = input_file.rename_vars(name_dict=mapping)
+        except:
+            import os
+            LOGGER.error(
+                f"Could not rename a variable in '{input_path}'. Available Variables:{os.linesep}"
+                f"    - {(os.linesep + '    - ').join([str(variable) for variable in input_file.variables])}"
+            )
+            raise
+
+        input_file = input_file.set_coords(coordinates_to_assign)
+
+        for key, value in mapping.items():
+            keys_to_update: list[str] = [
+                attribute_key
+                for attribute_key, attribute_value in input_file.attrs.items()
+                if attribute_value == key
             ]
+            for key_to_update in keys_to_update:
+                input_file.attrs[key_to_update] = value
 
-            try:
-                input_file = input_file.rename_vars(name_dict=mapping)
-            except:
-                import os
-                LOGGER.error(
-                    f"Could not rename a variable in '{input_path}'. Available Variables:{os.linesep}"
-                    f"    - {(os.linesep + '    - ').join([str(variable) for variable in input_file.variables])}"
-                )
-                raise
-
-            input_file = input_file.set_coords(coordinates_to_assign)
-
-            for key, value in mapping.items():
-                keys_to_update: list[str] = [
-                    attribute_key
-                    for attribute_key, attribute_value in input_file.attrs.items()
-                    if attribute_value == key
-                ]
-                for key_to_update in keys_to_update:
-                    input_file.attrs[key_to_update] = value
-
-            save_netcdf(temporary_output_path, input_file)
-
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        shutil.move(temporary_output_path, output_path)
+        write(dataset=input_file, target=output_path)
 
     return output_path
 
@@ -94,34 +85,18 @@ def rename_dimension(
     if not input_path.exists():
         raise FileNotFoundError(f"Cannot rename dimensions in '{input_path}' - it doesn't exist")
 
-    import tempfile
-    import shutil
-    from post_processing.utilities.netcdf import load_netcdf
-    from post_processing.utilities.netcdf import save_netcdf
+    from post_processing.utilities.netcdf import load
+    from post_processing.utilities.netcdf import write
 
     if output_path.is_dir():
         output_path = output_path / input_path.name
 
-    with tempfile.TemporaryDirectory() as temporary_directory:
-        temporary_path: pathlib.Path = pathlib.Path(temporary_directory)
-        temporary_output_path: pathlib.Path = temporary_path / output_path.name
-
-        try:
-            with load_netcdf(path=input_path) as input_file:
-                previous_indices: set[str] = set(input_file.indexes.keys())
-                input_file = input_file.rename_dims(dims_dict=mapping)
-                missing_indexes: set[str] = set(input_file.indexes.keys()).difference(previous_indices)
-                if missing_indexes:
-                    input_file = input_file.set_xindex(missing_indexes)
-                save_netcdf(temporary_output_path, input_file)
-        except:
-            from post_processing.configuration import settings
-            new_path: pathlib.Path = settings.application_path / "failed" / input_path.name
-            shutil.copy(input_path, new_path)
-            LOGGER.error(f"Copied the broken file at '{input_path}' to '{new_path}'")
-            raise
-
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        shutil.move(temporary_output_path, output_path)
+    with load(input_path) as input_file:
+        previous_indices: set[str] = set(input_file.indexes.keys())
+        input_file = input_file.rename_dims(dims_dict=mapping)
+        missing_indexes: set[str] = set(input_file.indexes.keys()).difference(previous_indices)
+        if missing_indexes:
+            input_file = input_file.set_xindex(list(missing_indexes))
+        write(dataset=input_file, target=output_path)
 
     return output_path

@@ -277,14 +277,14 @@ def calculate_anomaly(
 ) -> "pathlib.Path":
     import xarray
     import numpy
-    from post_processing.utilities.netcdf import load_netcdf
+    from post_processing.utilities.netcdf import load
 
     if operational_metadata is None:
         operational_metadata = {}
 
     try:
         with LOAD_LOCK:
-            dataset = load_netcdf(path=input_path, full_load=True, chunks=False)
+            dataset = load(input_path, full_load=True, chunks=False)
     except:
         LOGGER.error(f"Could not load the netcdf data at '{input_path.resolve()}'")
         raise
@@ -409,9 +409,9 @@ def calculate_anomaly(
         updated_dataset.attrs['process_step'] = field_metadata["stage"]
 
     try:
-        from post_processing.utilities.netcdf import save_netcdf
+        from post_processing.utilities.netcdf import write
         updated_dataset[output_array.name].encoding.update(encoding)
-        save_netcdf(path=output_path, dataset=updated_dataset)
+        write(dataset=updated_dataset, target=output_path)
         updated_dataset.close()
     except:
         LOGGER.error(f"Could not save the dataset with the newly calculated anomaly data to '{output_path.resolve()}'")

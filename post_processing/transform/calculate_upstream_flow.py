@@ -199,16 +199,11 @@ def calculate_upstream_flow_binned(
 
     import xarray
     import numpy
-    import tempfile
-    import shutil
 
     import pandas
 
-    from post_processing.utilities.netcdf import load_netcdf
-    from post_processing.utilities.netcdf import save_netcdf
-
-    if work_directory is None:
-        work_directory = settings.intermediate_directory
+    from post_processing.utilities.netcdf import load
+    from post_processing.utilities.netcdf import write
 
     if encoding is None:
         encoding = {}
@@ -216,222 +211,93 @@ def calculate_upstream_flow_binned(
     if isinstance(output_path, str):
         output_path = pathlib.Path(output_path)
 
-    with tempfile.TemporaryDirectory(dir=work_directory) as temporary_directory:
-        temporary_path: pathlib.Path = pathlib.Path(temporary_directory)
-        temporary_output: pathlib.Path = temporary_path / output_path.name
-
-        with load_netcdf(input_path, chunks="auto") as input_data:
-            linkage: Linkage = ROUTELINKS.get_linkage(
-                path=routelink_path,
-                format=routelink_format,
-                to_key=routelink_to_variable,
-                from_key=routelink_feature_variable
-            )
-
-            input_variable: xarray.DataArray = input_data[variable]
-            input_feature_ids: numpy.typing.NDArray = input_variable[list(input_variable.sizes)[0]].to_numpy()
-
-            # TODO: This should ideally return a new linkage rather than a mutated one for safety (linkage.to_
-            #  could theoretically change between realignment and use), but in practice (for now) that's not going to
-            #  happen
-            linkage.realign(features=input_feature_ids)
-            data: numpy.typing.NDArray[numpy.floating] = input_variable.to_numpy()
-
-            if len(data.shape) > 2:
-                raise ValueError(f"Only 1 and 2 dimensional upstreamflow calculation is currently supported")
-
-            LOGGER.debug(f"Creating a specialized index to link feature ids with the 'to' array")
-            target_feature_index_position: numpy.typing.NDArray[numpy.integer] = pandas.Index(input_feature_ids).get_indexer(linkage.to_)
-            LOGGER.debug(f"Specialized index has been created")
-
-            inflow_mask: numpy.typing.NDArray[numpy.bool_] = (
-                (linkage.to_ >= input_feature_ids.min()) &
-                (linkage.to_ <= input_feature_ids.max()) &
-                (target_feature_index_position >= 0)
-            )
-
-            fill_value = numpy.nan
-
-            output_array: numpy.typing.NDArray = numpy.full(
-                shape=data.shape,
-                fill_value=fill_value,
-                dtype=numpy.float32
-            )
-
-            if len(data.shape) == 2:
-                LOGGER.debug(f"Starting to perform the upstream bincount")
-                for second_dimension_position in range(data.shape[1]):
-                    output_array[:, second_dimension_position] = numpy.bincount(
-                        target_feature_index_position[inflow_mask],
-                        weights=data[inflow_mask, second_dimension_position],
-                        minlength=data.shape[0]
-                    )
-                LOGGER.debug(f"Upstream bincount is complete")
-            else:
-                LOGGER.debug(f"Starting to perform the upstream bincount")
-                output_array[:] = numpy.bincount(
-                    target_feature_index_position[inflow_mask],
-                    weights=data[inflow_mask],
-                    minlength=data.shape[0],
-                )
-                LOGGER.debug(f"Upstream bincount is complete")
-
-            LOGGER.debug(f"Finding locations that need to have the fill value applied")
-            inbound_count: numpy.typing.NDArray[numpy.integer] = numpy.bincount(
-                target_feature_index_position[inflow_mask],
-                minlength=data.shape[0]
-            )
-            has_inbound_flow: numpy.typing.NDArray[numpy.bool_] = inbound_count > 0
-
-            LOGGER.debug(f"Creating the fill value mask")
-            overwrite: numpy.typing.NDArray = numpy.asarray(fill_value, dtype=output_array.dtype)
-            LOGGER.debug(f"Overwriting values with the fill value...")
-            output_array[~has_inbound_flow] = overwrite
-
-            LOGGER.debug("Adding everything to the upstream value array")
-            upstreamflow: xarray.DataArray = xarray.DataArray(
-                name=target_variable,
-                data=output_array,
-                dims=input_variable.dims,
-                attrs={
-                    **input_variable.attrs,
-                    "long_name": "Upstream River Flow",
-                    **attributes
-                },
-            )
-
-            input_data[target_variable] = upstreamflow
-            input_data[target_variable].encoding = {
-                **input_variable.encoding,
-                **encoding
-            }
-            LOGGER.debug(f"Upstream value array created, added to the input data, and encoded.")
-            save_netcdf(path=temporary_output, dataset=input_data)
-            LOGGER.debug(f"Upstream flow data has been saved")
-        shutil.move(temporary_output, output_path)
-    return output_path
-
-
-@timed_function()
-def calculate_upstream_flow(
-    input_path: typing.Union[pathlib.Path, str],
-    output_path: typing.Union[pathlib.Path, str],
-    routelink_path: typing.Union[pathlib.Path, str],
-    variable: str = "streamflow",
-    target_variable: str = "upstreamflow",
-    routelink_to_variable: str = "to",
-    routelink_feature_variable: str = "link",
-    routelink_format: RoutelinkFormat = RoutelinkFormat.NETCDF,
-    *,
-    encoding: typing.Mapping[str, typing.Any] = None,
-    **attributes
-) -> pathlib.Path:
-    """
-    Add an upstream flow variable
-
-    The sum of all streamflow leading into a feature. Requires a routelink.
-
-    :param input_path: Path to the file containing streamflows to base upstream flow off of
-    :param output_path: Where to put the resulting data
-    :param routelink_path: The location of the routelink file. A routelink contains mappings from a feature to its downstream location
-    :param variable: The name of the variable within the file at `input_path` that contains streamflow values
-    :param target_variable: What to name the upstream flow variable
-    :param routelink_to_variable: The name of the field that details where a feature_id leads
-    :param routelink_feature_variable: The name of the field that details the ids of the features that lead to the
-        downstream feature. The feature_id variable is not guaranteed to contain the actual values.
-    :param routelink_format: The file format of the routelink
-    :param encoding: Values used to dictate how the new variable is written to the resulting value
-    :param attributes: Specialized attributes to add to the resulting variable
-    :returns: The path to the generated data
-    """
-    if isinstance(input_path, str):
-        input_path = pathlib.Path(input_path)
-    if isinstance(output_path, str):
-        output_path = pathlib.Path(output_path)
-    if isinstance(routelink_path, str):
-        routelink_path = pathlib.Path(routelink_path)
-    if input_path == output_path:
-        raise ValueError(
-            f"Upstreamflow calculation is not an inplace operation - the input path and output path cannot match"
+    with load(input_path, chunks="auto") as input_data:
+        linkage: Linkage = ROUTELINKS.get_linkage(
+            path=routelink_path,
+            format=routelink_format,
+            to_key=routelink_to_variable,
+            from_key=routelink_feature_variable
         )
 
-    if settings.verbosity >= Verbosity.VERBOSE:
-        LOGGER.debug(f"Calculating upstream flow on '{input_path}'")
-    import xarray
-    import pandas
-    import numpy
+        input_variable: xarray.DataArray = input_data[variable]
+        input_feature_ids: numpy.typing.NDArray = input_variable[list(input_variable.sizes)[0]].to_numpy()
 
-    import tempfile
-    import shutil
-    from dask import array
+        # TODO: This should ideally return a new linkage rather than a mutated one for safety (linkage.to_
+        #  could theoretically change between realignment and use), but in practice (for now) that's not going to
+        #  happen
+        linkage.realign(features=input_feature_ids)
+        data: numpy.typing.NDArray[numpy.floating] = input_variable.to_numpy()
 
-    if "long_name" not in attributes:
-        attributes['long_name'] = "Upstream River Flow"
+        if len(data.shape) > 2:
+            raise ValueError(f"Only 1 and 2 dimensional upstreamflow calculation is currently supported")
 
-    from post_processing.utilities.netcdf import load_netcdf
-    from post_processing.utilities.netcdf import save_netcdf
+        LOGGER.debug(f"Creating a specialized index to link feature ids with the 'to' array")
+        target_feature_index_position: numpy.typing.NDArray[numpy.integer] = pandas.Index(input_feature_ids).get_indexer(linkage.to_)
+        LOGGER.debug(f"Specialized index has been created")
 
-    if encoding is None:
-        encoding = {}
+        inflow_mask: numpy.typing.NDArray[numpy.bool_] = (
+            (linkage.to_ >= input_feature_ids.min()) &
+            (linkage.to_ <= input_feature_ids.max()) &
+            (target_feature_index_position >= 0)
+        )
 
-    with tempfile.TemporaryDirectory(dir=settings.intermediate_directory) as temporary_directory:
-        temporary_path: pathlib.Path = pathlib.Path(temporary_directory)
-        temporary_output_path: pathlib.Path = temporary_path / output_path.name
-        with load_netcdf(input_path) as data_to_transform:
-            raw_data = data_to_transform[variable].data
-            linkage: Linkage = ROUTELINKS.get_linkage(
-                path=routelink_path,
-                to_key=routelink_to_variable,
-                from_key=routelink_feature_variable,
-                format=routelink_format,
-            )
+        fill_value = numpy.nan
 
-            to_linkage = linkage.to_.compute() if isinstance(linkage.to_, array.Array) else linkage.to_
-            from_linkage = linkage.from_.compute() if isinstance(linkage.from_, array.Array) else linkage.from_
+        output_array: numpy.typing.NDArray = numpy.full(
+            shape=data.shape,
+            fill_value=fill_value,
+            dtype=numpy.float32
+        )
 
-            # TODO: This may lead to issues if the length of the arrays aren't the same - it's linking on array index,
-            #  not index value
-
-            # Create a series containing the raw data, then group it by where the values lead
-            #   * Based on the routelink structure, a single feature may have multiple features pointing at it,
-            #       but will only ever point to, at most, one feature
-            series: pandas.Series = pandas.Series(raw_data)
-            upstream_values: pandas.Series = series.groupby(to_linkage).sum()
-            upstream_values = upstream_values.reindex(from_linkage).sort_index()
-
-            encoding: dict[str, typing.Any] = {**data_to_transform[variable].encoding, **encoding}
-
-            # Create the upstreamflow variable and add it to the dataset
-            upstreamflow_variable: xarray.DataArray = xarray.DataArray(
-                name=target_variable,
-                dims=data_to_transform[variable].dims,
-                data=upstream_values.to_numpy(),
-                attrs={**data_to_transform[variable].attrs, **attributes},
-            )
-
-            data_to_transform[target_variable] = upstreamflow_variable.astype(numpy.float32)
-            data_to_transform[target_variable].encoding.update({
-                **data_to_transform[variable].encoding,
-                **encoding,
-            })
-
-            try:
-                save_netcdf(path=temporary_output_path, dataset=data_to_transform)
-            except:
-                from post_processing.utilities.netcdf import describe_netcdf
-                import os
-
-                description: str = describe_netcdf(data_to_transform, variable_name=target_variable)
-                LOGGER.error(
-                    f"Could not write the modified version of '{input_path}' with the new '{target_variable}' "
-                    f"variable to '{output_path}'. '{target_variable}':{os.linesep}"
-                    f"{description}"
+        if len(data.shape) == 2:
+            LOGGER.debug(f"Starting to perform the upstream bincount")
+            for second_dimension_position in range(data.shape[1]):
+                output_array[:, second_dimension_position] = numpy.bincount(
+                    target_feature_index_position[inflow_mask],
+                    weights=data[inflow_mask, second_dimension_position],
+                    minlength=data.shape[0]
                 )
-                raise
+            LOGGER.debug(f"Upstream bincount is complete")
+        else:
+            LOGGER.debug(f"Starting to perform the upstream bincount")
+            output_array[:] = numpy.bincount(
+                target_feature_index_position[inflow_mask],
+                weights=data[inflow_mask],
+                minlength=data.shape[0],
+            )
+            LOGGER.debug(f"Upstream bincount is complete")
 
-        shutil.move(temporary_output_path, output_path)
+        LOGGER.debug(f"Finding locations that need to have the fill value applied")
+        inbound_count: numpy.typing.NDArray[numpy.integer] = numpy.bincount(
+            target_feature_index_position[inflow_mask],
+            minlength=data.shape[0]
+        )
+        has_inbound_flow: numpy.typing.NDArray[numpy.bool_] = inbound_count > 0
 
-        if settings.verbosity >= Verbosity.VERBOSE:
-            LOGGER.debug(f"Saved the updated version of '{input_path}' to '{output_path}'")
+        LOGGER.debug(f"Creating the fill value mask")
+        overwrite: numpy.typing.NDArray = numpy.asarray(fill_value, dtype=output_array.dtype)
+        LOGGER.debug(f"Overwriting values with the fill value...")
+        output_array[~has_inbound_flow] = overwrite
 
+        LOGGER.debug("Adding everything to the upstream value array")
+        upstreamflow: xarray.DataArray = xarray.DataArray(
+            name=target_variable,
+            data=output_array,
+            dims=input_variable.dims,
+            attrs={
+                **input_variable.attrs,
+                "long_name": "Upstream River Flow",
+                **attributes
+            },
+        )
+
+        input_data[target_variable] = upstreamflow
+        input_data[target_variable].encoding = {
+            **input_variable.encoding,
+            **encoding
+        }
+        LOGGER.debug(f"Upstream value array created, added to the input data, and encoded.")
+        write(target=output_path, dataset=input_data)
+        LOGGER.debug(f"Upstream flow data has been saved")
     return output_path
+

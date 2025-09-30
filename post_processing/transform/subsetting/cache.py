@@ -58,14 +58,14 @@ class _MaskProvider:
         self.__variables: dict[pathlib.Path, generic.Mapping[str, str]] = {}
 
     def __load_mask(self, path: pathlib.Path, variable: str):
-        from post_processing.utilities.netcdf import load_netcdf
+        from post_processing.utilities.netcdf import load
         key: MaskKey = MaskKey(path=path, variable_name=variable)
 
         with self.__lock:
             if key in self.__masks and path in self.__mask_metadata:
                 return
 
-            with load_netcdf(path=path, full_load=True, chunks=None) as mask_source:
+            with load(target=path, full_load=True, load_kwargs=dict(chunks=None)) as mask_source:
                 if variable not in mask_source:
                     raise KeyError(f"'{variable}' is not a variable within '{path}'. It may not be used as a mask")
 

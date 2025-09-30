@@ -6,9 +6,9 @@ import logging
 import pathlib
 import os
 from threading import RLock
+from concurrent.futures import Future
 import collections.abc as generic
 
-from post_processing import enums
 from post_processing.configuration import settings
 from post_processing.enums import Verbosity
 
@@ -17,14 +17,187 @@ from post_processing.utilities.common import timed_function
 if typing.TYPE_CHECKING:
     import xarray
     import numpy
+    from post_processing.utilities.writer import NetcdfGateway
 
 
 LOGGER: logging.Logger = logging.getLogger(pathlib.Path(__file__).stem)
 
+_DEFAULT_ENCODING: generic.Mapping["numpy.dtype", dict[str, typing.Any]] | None = None
+
+WRITER_QUEUE_LENGTH: int = int(float(os.environ.get(f"{settings.prefix}_WRITER_QUEUE_LENGTH", 5)))
+WRITER_WAIT_SECONDS: float = float(os.environ.get(f"{settings.prefix}_WRITER_WAIT_SECONDS", 1.5))
+
 OPEN_LOCK: RLock = RLock()
 """Lock to help secure file opening"""
 
+__IO_GATEWAY: typing.Optional["NetcdfGateway"] = None
+
 os.environ.setdefault("HDF5_USE_FILE_LOCKING", "FALSE")
+
+def close_gateway():
+    """
+    Shut down the thread handler for Netcdf IO
+    """
+    global __IO_GATEWAY
+    if __IO_GATEWAY is not None:
+        with OPEN_LOCK:
+            if __IO_GATEWAY is not None:
+                __IO_GATEWAY.shutdown()
+                del __IO_GATEWAY
+                __IO_GATEWAY = None
+
+def _open_gateway():
+    """
+    Open up the pathway for NetCDF IO
+    """
+    from post_processing.utilities.writer import NetcdfGateway
+    global __IO_GATEWAY
+    if __IO_GATEWAY is None or not __IO_GATEWAY.running:
+        with OPEN_LOCK:
+            if __IO_GATEWAY is None or not __IO_GATEWAY.running:
+                __IO_GATEWAY = NetcdfGateway(
+                    queue_length=WRITER_QUEUE_LENGTH,
+                    wait_seconds=WRITER_WAIT_SECONDS,
+                )
+                __IO_GATEWAY.start()
+
+def submit_write(
+    dataset: "xarray.Dataset",
+    target: pathlib.Path,
+    write_arguments: dict[str, typing.Any] = None,
+    *,
+    compute: bool = True,
+    **kwargs
+) -> Future[pathlib.Path]:
+    """
+    Submit a task to the Netcdf gateway to write a dataset to disk
+
+    :param dataset: The data to write to disk
+    :param target: Where to write the data
+    :param write_arguments: Keyword arguments to feed to the netcdf writer
+    :param compute: Whether to compute writes because the data is a dask dataset with unevaluated expressions
+    :returns: The future reference to the written path
+    """
+    _open_gateway()
+    if compute and hasattr(dataset, "compute") and callable(dataset.compute):
+        dataset = dataset.compute()
+
+    try:
+        default_encodings: dict[numpy.dtype, dict[str, typing.Any]] = get_default_encoding()
+        for variable_name, variable in [*dataset.coords.items(), *dataset.data_vars.items()]:
+            if variable.encoding:
+                continue
+            default_encoding: dict[str, typing.Any] = default_encodings.get(variable.dtype, {})
+            for encoding_key, encoding_value in default_encoding.items():
+                if encoding_key not in dataset[variable_name].encoding:
+                    dataset[variable_name].encoding[encoding_key] = encoding_value
+    except BaseException as e:
+        LOGGER.error(f"Ran into issues when configuring encoding settings for '{target.name}': {e}")
+        raise
+
+    if write_arguments is None:
+        write_arguments = {}
+
+    write_arguments.update(kwargs)
+
+    future_result: Future[pathlib.Path] = __IO_GATEWAY.save(
+        dataset=dataset,
+        target=target,
+        write_kwargs=write_arguments,
+    )
+    return future_result
+
+def submit_load(
+    target: pathlib.Path,
+    load_kwargs: dict[str, typing.Any] = None,
+    full_load: bool = False,
+    engine: str = settings.default_netcdf_engine,
+    **kwargs
+) -> Future["xarray.Dataset"]:
+    """
+    Submit a task to the IO Gateway that will return a reference to an xarray Dataset
+
+    :param target: Where the data to load lives
+    :param load_kwargs: Keyword arguments to feed to the netcdf load function
+    :param full_load: Whether to load the data fully into memory and disconnect it from the source file
+    :param engine: Which engine to use to interpret the netcdf data
+    """
+    _open_gateway()
+    if load_kwargs is None:
+        load_kwargs = {}
+
+    load_kwargs.update(kwargs)
+
+    future_result: Future["xarray.Dataset"] = __IO_GATEWAY.load(
+        target=target,
+        load_kwargs=load_kwargs,
+        full_load=full_load,
+        engine=engine
+    )
+
+    return future_result
+
+@timed_function()
+def write(
+    dataset: "xarray.Dataset",
+    target: pathlib.Path,
+    write_arguments: dict[str, typing.Any] = None,
+    *,
+    compute: bool = True,
+    **kwargs
+) -> pathlib.Path:
+    """
+    Submit a request to save a netcdf dataset to disk and wait until completion
+
+    :param dataset: The data to write to disk
+    :param target: Where to write the data
+    :param write_arguments: Keyword arguments to feed to the netcdf writer
+    :param compute: Whether to compute writes because the data is a dask dataset with unevaluated expressions
+    :returns: The path to where data was written
+    """
+    from post_processing.utilities.common import cycle_future
+    future_result: Future[pathlib.Path] = submit_write(
+        dataset=dataset,
+        target=target,
+        write_arguments=write_arguments,
+        compute=compute,
+        **kwargs
+    )
+
+    result, error = cycle_future(future_result)
+
+    if error:
+        raise error
+    elif result is None:
+        raise RuntimeError(f"Could not save '{target.name}'")
+
+    return result
+
+@timed_function()
+def load(
+    target: pathlib.Path | generic.Sequence[pathlib.Path],
+    load_kwargs: dict[str, typing.Any] = None,
+    full_load: bool = False,
+    engine: str = settings.default_netcdf_engine,
+    **kwargs
+) -> "xarray.Dataset":
+    from post_processing.utilities.common import cycle_future
+    future_result: Future["xarray.Dataset"] = submit_load(
+        target=target,
+        load_kwargs=load_kwargs,
+        full_load=full_load,
+        engine=engine,
+        **kwargs
+    )
+    result, error = cycle_future(future_result)
+
+    if error is not None:
+        raise error
+    elif result is None:
+        raise RuntimeError(f"Could not load '{target.name}'")
+
+    return result
+
 
 def get_default_encoding() -> dict["numpy.dtype", dict[str, typing.Any]]:
     """
@@ -33,19 +206,22 @@ def get_default_encoding() -> dict["numpy.dtype", dict[str, typing.Any]]:
     TODO: It might be more appropriate to add a configuration for this
     :returns: A dictionary mapping dtypes to default configuration values
     """
-    import numpy
-    encodings: dict[numpy.dtype, dict[str, typing.Any]] = {}
-    encodings[numpy.dtype("float32")] = {
-        "_FillValue": numpy.int32(-99_900),
-        "scale_factor": numpy.float32(0.01),
-        "missing_value": numpy.int32(-99_900),
-        "zlib": True,
-        "shuffle": True,
-        "complevel": 3,
-        "dtype": numpy.int32,
-    }
-    encodings[numpy.dtype("float64")] = encodings[numpy.dtype("float32")].copy()
-    return encodings
+    global _DEFAULT_ENCODING
+    if not _DEFAULT_ENCODING:
+        import numpy
+        encodings: dict[numpy.dtype, dict[str, typing.Any]] = {}
+        encodings[numpy.dtype("float32")] = {
+            "_FillValue": numpy.int32(-99_900),
+            "scale_factor": numpy.float32(0.01),
+            "missing_value": numpy.int32(-99_900),
+            "zlib": True,
+            "shuffle": True,
+            "complevel": 3,
+            "dtype": numpy.int32,
+        }
+        encodings[numpy.dtype("float64")] = encodings[numpy.dtype("float32")].copy()
+        _DEFAULT_ENCODING = encodings
+    return _DEFAULT_ENCODING
 
 @timed_function()
 def operate_on_variable(
@@ -113,86 +289,6 @@ def load_variable(
             return variable
 
 
-# NOTE: The SimpleCache is no longer used here due to memory bloat and stagnation; most files will only be loaded once
-@timed_function()
-def load_netcdf(
-    path: typing.Union[pathlib.Path, str, typing.Sequence[typing.Union[pathlib.Path, str]]],
-    engine: typing.Union[str, typing.Literal["h5netcdf", "zarr", "netcdf4"]] = settings.default_netcdf_engine,
-    chunks: typing.Optional[typing.Union[typing.Mapping[str, typing.Any], typing.Literal['auto', 'force']]] = None,
-    full_load: bool = False,
-    **kwargs
-) -> "xarray.Dataset":
-    """
-    Load a thread-safe, lazy netcdf file
-
-    :param path: path to netcdf file
-    :param engine: The engine to use to load the netcdf data into memory
-    :param chunks: The chunks to load into memory. Use 'force' to force a lazy load.
-    :param kwargs: Keyword arguments to pass to xarray.open_dataset. See: https://docs.xarray.dev/en/stable/generated/xarray.open_dataset.html
-    """
-    if settings.lazy_load_netcdf and chunks is None:
-        chunks = "auto"
-    elif isinstance(chunks, str) and chunks.lower() == 'force':
-        chunks = 'auto'
-    elif not settings.lazy_load_netcdf:
-        chunks = None
-
-    if engine not in ("h5netcdf", "zarr", "netcdf4"):
-        raise ValueError(f"{engine} is not a supported engine - only 'h5netcdf', 'netcdf4', and 'zarr' are supported")
-
-    import xarray
-
-    if isinstance(path, xarray.Dataset):
-        LOGGER.warning("A dataset was passed to 'load_netcdf' instead of a path - this was an unneeded operation")
-        return path
-
-    if isinstance(path, typing.Sequence) and len(path) == 1:
-        path = path[0]
-
-    import time
-    if isinstance(path, (pathlib.Path, str)):
-        maximum_retries: int = 5
-        attempts: int = 0
-        dataset: typing.Optional[xarray.Dataset] = None
-        last_exception: typing.Optional[Exception] = None
-        while attempts < maximum_retries and dataset is None:
-            try:
-                if settings.verbosity >= enums.Verbosity.LOUD:
-                    LOGGER.debug(f"Loading '{path}'", stack_info=True)
-
-                with OPEN_LOCK:
-                    dataset: xarray.Dataset = xarray.open_dataset(path, engine=engine, chunks=chunks, **kwargs)
-                    if full_load:
-                        dataset = dataset.load()
-                        dataset.close()
-                    return dataset
-
-                # NOTE: It would be safer to load everything in full and move on, but that adds a significant
-                # performance cost. For now, full loads won't be performed by default.
-            except Exception as e:
-                last_exception = e
-                last_exception.args = (f"Could not load data at '{path}'. {e.args[0]}", *e.args[1:])
-            attempts += 1
-            LOGGER.error(
-                f"Failed to load {path}{' due to ' + str(last_exception) if last_exception else ''}. "
-                f"Waiting and trying again..."
-            )
-            time.sleep(1)
-        if dataset is None:
-            raise (last_exception or RuntimeError(f"Could not load '{path}'"))
-    else:
-        # Your IDE may complain about the `data` parameter - it is a false positive. A sequence of paths is fine
-        dataset: xarray.Dataset = xarray.open_mfdataset(
-            paths=path,
-            chunks=chunks,
-            combine="by_coords",
-            engine=engine,
-            **kwargs
-        )
-
-    return dataset
-
-
 def load_metadata(
     path: typing.Union[pathlib.Path, str, typing.Sequence[typing.Union[pathlib.Path, str]]],
     engine: typing.Union[str, typing.Literal["h5netcdf", "zarr", "netcdf4"]] = settings.default_netcdf_engine,
@@ -237,7 +333,7 @@ def _get_variable_metadata(variable: "xarray.DataArray") -> dict[str, typing.Any
     :returns: The variable's metadata in the form of a dictionary
     """
     import numpy
-    metadata = {
+    metadata: dict[str, typing.Any] = {
         f"{variable.name}.{attribute_name}": format_value(attribute_value)
         for attribute_name, attribute_value in variable.attrs.items()
     }
@@ -459,73 +555,3 @@ def peek(
                 variable_name=variable_name,
                 max_line_length=max_line_length
             )
-
-@timed_function()
-def save_netcdf(
-    path: typing.Union[str, pathlib.Path],
-    dataset: "xarray.Dataset",
-    engine: typing.Literal["h5netcdf", "netcdf4"] = settings.default_netcdf_engine,
-    **kwargs
-) -> bool:
-    """
-    Safely save an xarray dataset to netcdf. Only saves locally.
-
-    :param path: The path to where the data should be saved
-    :param dataset: The data to save
-    :param engine: The name of the netcdf engine to use to write the data
-    :param kwargs: Arguments to pass to the xarray.Dataset.to_netcdf function. See: https://docs.xarray.dev/en/stable/generated/xarray.Dataset.to_netcdf.html
-    :returns: Whether the netcdf file that was supposed to be saved exists
-    """
-    import numpy
-    if isinstance(path, str):
-        path = pathlib.Path(path)
-
-    if isinstance(path, pathlib.Path):
-        path.parent.mkdir(parents=True, exist_ok=True)
-    else:
-        raise TypeError(f"{path} (type={type(path)}) is not a valid path. It must be a str or pathlib.Path")
-
-    if engine not in ("h5netcdf", "netcdf4"):
-        raise ValueError(f"{engine} is not a supported engine - only 'h5netcdf' and 'netcdf4' are supported")
-
-    compute = str(kwargs.get('compute', True)).lower() in ('true', 'yes', 't', 'y', '1')
-
-    try:
-        default_encodings: dict[numpy.dtype, dict[str, typing.Any]] = get_default_encoding()
-        for variable_name, variable in [*dataset.coords.items(), *dataset.data_vars.items()]:
-            if variable.encoding:
-                continue
-            default_encoding: dict[str, typing.Any] = default_encodings.get(variable.dtype, {})
-            for encoding_key, encoding_value in default_encoding.items():
-                if encoding_key not in dataset[variable_name].encoding:
-                    dataset[variable_name].encoding[encoding_key] = encoding_value
-    except BaseException as e:
-        LOGGER.error(f"Ran into issues when configuring encoding settings for '{path.name}': {e}")
-        raise
-
-    try:
-        args = {
-            "path": path,
-            "engine": engine,
-            "compute": compute,
-            **kwargs,
-        }
-        with OPEN_LOCK:
-            delayed_write: typing.Optional = dataset.to_netcdf(**args)
-    except BaseException as e:
-        LOGGER.error(f"Could not write to '{path}' - {e}")
-        raise
-
-    if delayed_write is not None:
-        import dask
-        dask.compute(delayed_write)
-
-    if settings.verbosity >= Verbosity.LOUD:
-        LOGGER.debug(f"Saved netcdf data to: {path}")
-
-    if hasattr(peek, "add"):
-        description: str = describe_netcdf(netcdf_file=dataset)
-        peek.add(args=(path,), result=description)
-        peek.add(kwargs={"path": path}, result=description)
-
-    return path.is_file()

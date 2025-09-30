@@ -635,7 +635,8 @@ class ReprojectionOperation(PathToPathOperation, FileOutputMixin):
         with tempfile.TemporaryDirectory() as temporary_directory:
             temporary_directory_path: pathlib.Path = pathlib.Path(temporary_directory)
             temporary_output_path: pathlib.Path = temporary_directory_path / target_path.name
-            netcdf_file: xarray.Dataset = netcdf.load_netcdf(input_path, full_load=True)
+            #netcdf_file: xarray.Dataset = netcdf.load_netcdf(input_path, full_load=True)
+            netcdf_file: xarray.Dataset = netcdf.load(input_path, full_load=True)
             reprojected_data: xarray.Dataset = reproject.reproject_dataset(
                 dataset=netcdf_file,
                 reprojection_dataset_path=reprojection_dataset_path,
@@ -648,6 +649,20 @@ class ReprojectionOperation(PathToPathOperation, FileOutputMixin):
                 reprojection_y_coordinate_name=self.reference_y_variable,
                 output_crs_variable_name=self.output_crs_variable_name
             )
+            import concurrent.futures as futures
+            write_task: futures.Future[pathlib.Path] = netcdf.submit_write(
+                target=target_path,
+                dataset=reprojected_data
+            )
+
+            while True:
+                try:
+                    target_path: pathlib.Path = write_task.result(timeout=1.5)
+                    break
+                except TimeoutError:
+                    continue
+
+            """
             netcdf.save_netcdf(
                 path=temporary_output_path,
                 dataset=reprojected_data
@@ -655,6 +670,7 @@ class ReprojectionOperation(PathToPathOperation, FileOutputMixin):
             reprojected_data.close()
             netcdf_file.close()
             shutil.move(temporary_output_path, target_path)
+            """
         return target_path
 
     def __call__(
@@ -1354,35 +1370,35 @@ class DropOperation(PathToPathOperation, FileOutputMixin):
         :param output_path: Where to save the new dataset
         :returns: The path to the updated data
         """
-        import tempfile
         from post_processing.utilities import netcdf
         import xarray
-        import shutil
 
-        with tempfile.TemporaryDirectory(settings.intermediate_directory) as temporary_directory:
-            temporary_path: pathlib.Path = pathlib.Path(temporary_directory)
-            temporary_output: pathlib.Path = temporary_path / output_path.name
+        with netcdf.load(target=input_path) as netcdf_data:
+            if self.exclude:
+                dimensions_to_remove: list[str] = [
+                    str(dimension)
+                    for dimension in netcdf_data.sizes.keys()
+                    if dimension not in self.fields
+                ]
+            else:
+                dimensions_to_remove: list[str] = list(self.fields)
 
-            with netcdf.load_netcdf(path=input_path) as netcdf_data:
-                if self.exclude:
-                    dimensions_to_remove: list[str] = [
-                        str(dimension)
-                        for dimension in netcdf_data.sizes.keys()
-                        if dimension not in self.fields
-                    ]
-                else:
-                    dimensions_to_remove: list[str] = list(self.fields)
+            netcdf_without_dimensions: xarray.Dataset = netcdf_data.drop_dims(drop_dims=dimensions_to_remove)
 
-                netcdf_without_dimensions: xarray.Dataset = netcdf_data.drop_dims(drop_dims=dimensions_to_remove)
-                successfully_saved: bool = netcdf.save_netcdf(path=temporary_output, dataset=netcdf_without_dimensions)
+            from concurrent.futures import Future
+            future_output_path: Future[pathlib.Path] = netcdf.submit_write(
+                dataset=netcdf_without_dimensions,
+                target=output_path
+            )
 
-                if not successfully_saved:
-                    raise RuntimeError(
-                        f"The netcdf file with the following dimensions could not be saved to '{temporary_output}': "
-                        f"{', '.join(dimensions_to_remove)}"
-                    )
+            from post_processing.utilities.common import cycle_future
+            result, error = cycle_future(future_output_path)
 
-            shutil.move(temporary_output, output_path)
+            if error is not None:
+                raise error
+            elif result is None:
+                raise FileNotFoundError(f"Could not find the path to the written data in {output_path}")
+            output_path = result
         return output_path
 
     def _remove_variables(
@@ -1398,18 +1414,15 @@ class DropOperation(PathToPathOperation, FileOutputMixin):
         :returns: The path to the updated data
         """
         import tempfile
-        import shutil
 
         from post_processing.utilities import netcdf
 
         with tempfile.TemporaryDirectory(dir=settings.intermediate_directory) as temporary_directory:
             temporary_directory_path: pathlib.Path = pathlib.Path(temporary_directory)
-            temporary_output_path: pathlib.Path = temporary_directory_path / output_file.name
-
-            with netcdf.load_netcdf(path=input_file, full_load=True) as netcdf_data:
+            with netcdf.load(target=input_file, full_load=True) as netcdf_data:
                 if self.exclude:
                     variables_to_drop: list[str] = [
-                        variable_name
+                        str(variable_name)
                         for variable_name in netcdf_data.variables.keys()
                         if variable_name not in self.fields
                     ]
@@ -1431,10 +1444,25 @@ class DropOperation(PathToPathOperation, FileOutputMixin):
                     )
 
                 updated_data = netcdf_data.drop_vars(variables_to_drop)
-                netcdf.save_netcdf(path=temporary_output_path, dataset=updated_data, compute=True)
+
+                from concurrent.futures import Future
+                future_path: Future[pathlib.Path] = netcdf.submit_write(
+                    dataset=updated_data,
+                    target=output_file,
+                    compute=True
+                )
+
+                from post_processing.utilities.common import cycle_future
+                result, error = cycle_future(future_path)
+
+                if error is not None:
+                    raise error
+                if result is None:
+                    raise FileNotFoundError(f"Did not get a reference to data written to '{output_file}'")
+
+                output_file = result
                 updated_data.close()
                 netcdf_data.close()
-            shutil.move(temporary_output_path, output_file)
 
         return output_file
 
@@ -1661,8 +1689,7 @@ class UnitConversionOperation(PathToPathOperation, FileOutputMixin):
                 "conversions": [
                     (mapping.variable_name, mapping.target_unit)
                     for mapping in self.conversions
-                ],
-                "work_directory": work_directory,
+                ]
             }
             for file in (data if isinstance(data, generic.Sequence) else [data])
         ]
@@ -1849,6 +1876,9 @@ class SaveOperation(PathToPathOperation):
     ) -> typing.Sequence[pathlib.Path]:
         """
         Save the given files in another location
+
+        **NOTE:** This is more of a copy than a save - it just moves data from the working area to the 'official' area.
+        Might want to have a branching path for if data is a dataset or collection of datasets.
 
         :param profile: The profile that called for this operation
         :param process_identifier: An identifier tying together other output for this post processing task
@@ -2303,10 +2333,10 @@ class LoadOperation(ProfileOperation[typing.Sequence[pathlib.Path], typing.Itera
         if not data:
             raise ValueError(f"No files were given to load within a load operation in '{profile}'")
 
-        from post_processing.utilities.netcdf import load_netcdf
+        from post_processing.utilities.netcdf import load
 
         try:
-            data: xarray.Dataset = load_netcdf(data, **self.load_arguments)
+            data: xarray.Dataset = load(data, **self.load_arguments)
         except Exception as exception:
             if 'failure in' not in str(exception):
                 exception.args = (f"Failure in:{os.linesep}{self}{os.linesep}{exception.args[0]}", *exception.args[1:])
@@ -2909,6 +2939,8 @@ class Profile(BaseModel):
         }
 
         input_metadata.update(metadata)
+
+        # TODO: Make the identifier deterministic
         process_identifier: str = str(hash((
             cycle,
             self.configuration,
@@ -2918,6 +2950,7 @@ class Profile(BaseModel):
             *files,
             *self.operations
         )))
+
         work_directory: pathlib.Path = self.intermediate_directory / process_identifier
         work_directory.mkdir(parents=True, exist_ok=True)
 
@@ -3246,22 +3279,46 @@ def call_generic_operations(
     previous_operations: list[ProfileOperation],
     metadata: dict[str, typing.Any]
 ) -> OutputType:
+    """
+    Call operations sequentially without regard for input and output data
+
+    :param operations: The ProfileOperations to carry out
+    :param profile: The profile requesting the work
+    :param process_identifier: The identifier for the work being executed
+    :param work_directory: Where to store intermediate data
+    :param data: The data that should flow into the operations
+    :param previous_operations: A record of what operations have been performed
+    :param metadata: Decorative metadata that may be used to generate names
+    :returns: The result of the last operation after the input data has been pushed through each ProfileOperation
+    """
     current_data = data
 
     for operation in operations:
         metadata['stage'] = operation.operation_id
+
         if operation.disable:
             LOGGER.warning(f"{operation.__class__.__qualname__} disabled:{os.linesep}{operation}")
             continue
 
+        stage_working_directory: pathlib.Path = work_directory / operation.operation_id
+        stage_working_directory.mkdir(parents=True, exist_ok=True)
+
         current_data = operation(
             profile=profile,
             process_identifier=process_identifier,
-            work_directory=work_directory,
+            work_directory=stage_working_directory,
             data=current_data,
             previous_operations=previous_operations,
             metadata=metadata
         )
+
+        # This will eventually be used to track completed work and allow a restart
+        with open(stage_working_directory / "complete.txt", 'a') as completion_file:
+            completion_file.write(
+                f"[{datetime.now().astimezone().strftime(settings.date_format)}] Stage {operation.operation_id} "
+                f"complete with {data}{os.linesep}"
+            )
+            completion_file.flush()
 
         if not any(op.operation_id == operation.operation_id for op in previous_operations):
             previous_operations.append(operation)
@@ -3428,18 +3485,18 @@ def load_operation(specification: typing.Mapping[str, typing.Any]) -> ProfileOpe
     return operation_class(**constructor_arguments)
 
 
-#@functools.cache
 def get_profile_operation_types(
     root: typing.Type[ProfileOperation] = ProfileOperation,
+    *,
     encountered_types: list[typing.Type[ProfileOperation]] = None
 ) -> dict[OperationType, typing.Type[ProfileOperation]]:
     """
     Get all the concrete operation types
 
     :param root: The base object whose concrete subclasses to look for
+    :param encountered_types: A list of types that have already been encountered in order to prevent possible loops
     :returns: All non-abstract implementations of the root ProfileOperation
     """
-    #from post_processing.operations import get_operations
     import post_processing.operations
 
     if encountered_types is None:
@@ -3450,14 +3507,6 @@ def get_profile_operation_types(
         for subclass in root.__subclasses__()
         if subclass not in encountered_types
     }
-
-    #subclasses.update({
-    #    operation_class.operation(): operation_class
-    #    for operation_class in get_operations()
-    #    if operation_class.operation() not in subclasses
-    #       and operation_class != root
-    #       and operation_class not in encountered_types
-    #})
 
     immediate_subclasses: typing.Sequence[typing.Type[ProfileOperation]] = list(subclasses.values())
 

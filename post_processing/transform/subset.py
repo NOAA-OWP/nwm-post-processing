@@ -10,6 +10,7 @@ import re
 import tempfile
 
 from collections import abc as generic
+import concurrent.futures as futures
 
 import numpy
 import xarray
@@ -18,10 +19,11 @@ from post_processing import enums
 
 from post_processing.utilities.common import timed_function
 from post_processing.transform.subsetting.cache import MASK_PROVIDER
-from post_processing.utilities.netcdf import load_netcdf
-from post_processing.utilities.netcdf import save_netcdf
+from post_processing.utilities.netcdf import submit_write
+from post_processing.utilities.netcdf import load
 from post_processing.configuration import settings
-
+from post_processing.utilities.common import cycle_future_list
+from post_processing.utilities.common import condense_exceptions
 
 LOGGER: logging.Logger = logging.getLogger(pathlib.Path(__file__).stem)
 
@@ -57,104 +59,102 @@ def mask_dataset(
 
     masked_files: list[pathlib.Path] = []
 
-    with tempfile.TemporaryDirectory(dir=work_directory) as temporary_directory:
-        temporary_directory_path: pathlib.Path = pathlib.Path(temporary_directory)
-        files_to_move: list[pathlib.Path] = []
+    write_tasks: list[futures.Future[pathlib.Path]] = []
 
-        LOGGER.debug(f"Subsetting '{input_path}' by {len(masks)} masks")
-        with load_netcdf(input_path, full_load=True, chunks=None) as input_data:
-            if settings.this_is_very_verbose:
-                LOGGER.debug(f"Loaded '{input_path}'")
-            for mask_path in masks:
-                identifiers: dict[str, typing.Any] = dict(mask_metadata.get(mask_path, {}))
-                identifier_match: re.Match | None = identifier_pattern.search(mask_path.name)
+    LOGGER.debug(f"Subsetting '{input_path}' by {len(masks)} masks")
 
-                if identifier_match is not None:
-                    identifiers.update(identifier_match.groupdict())
+    with load(target=input_path, full_load=True, load_kwargs=dict(chunks=None)) as input_data:
+        if settings.this_is_very_verbose:
+            LOGGER.debug(f"Loaded '{input_path}'")
 
-                if "rfc" in identifiers:
-                    if 'RFC_ABBREVIATION' not in identifiers:
-                        rfc_abbreviation: enums.RFC | None = enums.RFC.from_string(identifiers['rfc'], strict=False)
-                        if rfc_abbreviation is not None:
-                            identifiers['RFC_ABBREVIATION'] = rfc_abbreviation
-                    identifiers['rfc'] = identifiers['rfc'].lower()
+        # TODO: With loads and writes now being run through its own gateway, this following section may probably be
+        #  threaded
+        for mask_path in masks:
+            identifiers: dict[str, typing.Any] = dict(mask_metadata.get(mask_path, {}))
+            identifier_match: re.Match | None = identifier_pattern.search(mask_path.name)
 
-                formatting_options: dict[str, typing.Any] = {
-                    **metadata,
-                    "mask_variable": mask_variable,
-                    "mask_name": mask_path.stem,
-                    **identifiers,
-                }
-                try:
-                    output_name: str = output_pattern.format_map(formatting_options)
-                except KeyError as key_error:
-                    LOGGER.error(
-                        f"Could not substitute values when building an output name: {key_error}{os.linesep}"
-                        f"Available Keys:{os.linesep}"
-                        f"    - {(os.linesep + '    - ').join(map(lambda kv: str(kv[0]) + '=' + str(kv[1]), formatting_options.items()))}"
-                    )
-                    raise
+            if identifier_match is not None:
+                identifiers.update(identifier_match.groupdict())
 
-                temporary_output_path: pathlib.Path = temporary_directory_path / output_name
-                if settings.this_is_very_verbose:
-                    LOGGER.debug(f"Retrieving the mask at '{mask_path}' for '{input_path}'")
-                mask_data: numpy.ndarray = MASK_PROVIDER.get_mask(path=mask_path, variable=mask_variable)
-                mask_data[mask_data == 0] = numpy.nan
-                if settings.this_is_very_verbose:
-                    LOGGER.debug(f"Retrieved the mask at '{mask_path}' for '{input_path}'")
+            if "rfc" in identifiers:
+                if 'RFC_ABBREVIATION' not in identifiers:
+                    rfc_abbreviation: enums.RFC | None = enums.RFC.from_string(identifiers['rfc'], strict=False)
+                    if rfc_abbreviation is not None:
+                        identifiers['RFC_ABBREVIATION'] = rfc_abbreviation
+                identifiers['rfc'] = identifiers['rfc'].lower()
 
-                masked_variables: dict[str, xarray.DataArray] = {
-                    variable_name: mask_array(input_data=variable, mask=mask_data)
-                    for variable_name, variable in input_data.data_vars.items()
-                    if variable.shape[-1 * len(mask_data.shape):] == mask_data.shape
-                }
-
-                copied_input_data: xarray.Dataset = xarray.Dataset(
-                    data_vars={
-                        data_name: data_variable.copy()
-                        for data_name, data_variable in input_data.data_vars.items()
-                        if data_name not in masked_variables
-                    },
-                    coords={
-                        coordinate_name: coordinate.copy()
-                        for coordinate_name, coordinate in input_data.coords.items()
-                    },
-                    attrs=input_data.attrs.copy(),
+            formatting_options: dict[str, typing.Any] = {
+                **metadata,
+                "mask_variable": mask_variable,
+                "mask_name": mask_path.stem,
+                **identifiers,
+            }
+            try:
+                output_name: str = output_pattern.format_map(formatting_options)
+            except KeyError as key_error:
+                LOGGER.error(
+                    f"Could not substitute values when building an output name: {key_error}{os.linesep}"
+                    f"Available Keys:{os.linesep}"
+                    f"    - {(os.linesep + '    - ').join(map(lambda kv: str(kv[0]) + '=' + str(kv[1]), formatting_options.items()))}"
                 )
+                raise
 
-                for coordinate_name in copied_input_data.coords.keys():
-                    copied_input_data[coordinate_name].encoding = copied_input_data[coordinate_name].encoding.copy()
+            output_path: pathlib.Path = work_directory / mask_path.stem / output_name
+            if settings.this_is_very_verbose:
+                LOGGER.debug(f"Retrieving the mask at '{mask_path}' for '{input_path}'")
+            mask_data: numpy.ndarray = MASK_PROVIDER.get_mask(path=mask_path, variable=mask_variable)
+            mask_data[mask_data == 0] = numpy.nan
+            if settings.this_is_very_verbose:
+                LOGGER.debug(f"Retrieved the mask at '{mask_path}' for '{input_path}'")
 
-                while masked_variables:
-                    variable_name, variable = masked_variables.popitem()
-                    if isinstance(variable, xarray.Dataset):
-                        LOGGER.warning(
-                            f"Something happened and the '{variable_name}' variable from '{input_path.name}' "
-                            f"was a dataset, not a data array."
-                        )
-                        variable = variable[variable_name]
-                    copied_input_data[variable_name] = variable
-                    copied_input_data[variable_name].encoding = variable.encoding.copy()
+            masked_variables: dict[str, xarray.DataArray] = {
+                variable_name: mask_array(input_data=variable, mask=mask_data)
+                for variable_name, variable in input_data.data_vars.items()
+                if variable.shape[-1 * len(mask_data.shape):] == mask_data.shape
+            }
 
-                copied_input_data.encoding.update(input_data.encoding)
-                if settings.this_is_verbose:
-                    LOGGER.debug(f"Subset '{input_path}' by '{mask_path}")
-                save_netcdf(path=temporary_output_path, dataset=copied_input_data)
+            copied_input_data: xarray.Dataset = xarray.Dataset(
+                data_vars={
+                    data_name: data_variable.copy()
+                    for data_name, data_variable in input_data.data_vars.items()
+                    if data_name not in masked_variables
+                },
+                coords={
+                    coordinate_name: coordinate.copy()
+                    for coordinate_name, coordinate in input_data.coords.items()
+                },
+                attrs=input_data.attrs.copy(),
+            )
 
-                if not temporary_output_path.is_file():
-                    raise FileNotFoundError(f"Data was supposed to be saved to '{temporary_output_path}' but it could not be found")
-                files_to_move.append(temporary_output_path)
+            for coordinate_name in copied_input_data.coords.keys():
+                copied_input_data[coordinate_name].encoding = copied_input_data[coordinate_name].encoding.copy()
 
-        missing_files: list[pathlib.Path] = list(filter(lambda file: not file.is_file(), files_to_move))
+            while masked_variables:
+                variable_name, variable = masked_variables.popitem()
+                if isinstance(variable, xarray.Dataset):
+                    LOGGER.warning(
+                        f"Something happened and the '{variable_name}' variable from '{input_path.name}' "
+                        f"was a dataset, not a data array."
+                    )
+                    variable = variable[variable_name]
+                copied_input_data[variable_name] = variable
+                copied_input_data[variable_name].encoding = variable.encoding.copy()
 
-        if missing_files:
-            raise FileNotFoundError(f"{len(missing_files)} temporary subset files were not found when preparing to move them.")
+            copied_input_data.encoding.update(input_data.encoding)
+            if settings.this_is_verbose:
+                LOGGER.debug(f"Subset '{input_path}' by '{mask_path}")
 
-        for file_to_move in files_to_move:
-            output_path: pathlib.Path = work_directory / file_to_move.name
-            if output_path != file_to_move:
-                output_path.parent.mkdir(parents=True, exist_ok=True)
-                shutil.move(file_to_move, output_path)
-            masked_files.append(output_path)
+            write_task: futures.Future[pathlib.Path] = submit_write(dataset=copied_input_data, target=output_path)
+            write_tasks.append(write_task)
+
+        masked_files, errors = cycle_future_list(futures=write_tasks)
+
+        if len(errors) == 1:
+            raise errors[0]
+        if errors:
+            raise condense_exceptions(
+                f"{len(errors)} errors were encountered trying to save masked datasets",
+                exceptions=errors
+            )
 
     return masked_files

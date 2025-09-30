@@ -279,7 +279,7 @@ with tempfile.TemporaryDirectory(str(work_directory)) as temporary_directory:
     temporary_path: pathlib.Path = pathlib.Path(temporary_directory)
     temporary_output_path: pathlib.Path = temporary_path / output_path.name
 
-    with netcdf.load_netcdf(path=input_path) as input_data:
+    with netcdf.load(path=input_path) as input_data:
         updated_file: xarray.Dataset = do_something(input_data)
         updated_file.to_netcdf(path=temporary_output_path, engine=settings.default_netcdf_engine)
     shutil.move(temporary_output_path, output_path)
