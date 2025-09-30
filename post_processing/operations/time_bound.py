@@ -65,7 +65,8 @@ def calculate_time_bounds(
         temporary_directory_path: pathlib.Path = pathlib.Path(temporary_directory)
         temporary_output_path: pathlib.Path = temporary_directory_path / output_path.name
 
-        with netcdf.load_netcdf(input_path, full_load=True) as netcdf_data:
+        #with netcdf.load_netcdf(input_path, full_load=True) as netcdf_data:
+        with netcdf.load(input_path, full_load=True) as netcdf_data:
             if time_variable not in netcdf_data.variables.keys():
                 raise KeyError(
                     f"Cannot accumulate data from '{input_path.name}::{time_variable}' - "
@@ -87,9 +88,10 @@ def calculate_time_bounds(
             )
             netcdf_data[output_variable_name] = time_bound_variable
             netcdf_data[output_variable_name].attrs.update(attributes)
-            netcdf.save_netcdf(path=temporary_output_path, dataset=netcdf_data)
+            #netcdf.save_netcdf(path=temporary_output_path, dataset=netcdf_data)
+            netcdf.write(target=output_path, dataset=netcdf_data)
 
-        shutil.move(temporary_output_path, output_path)
+        #shutil.move(temporary_output_path, output_path)
 
     return output_path
 

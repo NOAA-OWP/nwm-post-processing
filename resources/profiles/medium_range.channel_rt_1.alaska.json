@@ -11,7 +11,7 @@
             "on_each": [
                 {
                     "operation": "function",
-                    "function_name": "post_processing.transform.calculate_upstream_flow.calculate_upstream_flow",
+                    "function_name": "post_processing.transform.calculate_upstream_flow.calculate_upstream_flow_binned",
                     "comment": "This should end up calling `calculate_upstream_flow(input_path=data, output_path=data, routelink_path='{application_path}/RouteLink_CONUS.nc')`",
                     "kwargs": {
                         "routelink_path": "{routelink_path}/RouteLink_AK.nc",

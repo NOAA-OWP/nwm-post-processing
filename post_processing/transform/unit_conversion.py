@@ -175,7 +175,6 @@ def convert_file(
     input_path: pathlib.Path,
     output_path: pathlib.Path,
     conversions: generic.Sequence[tuple[str, str]],
-    work_directory: pathlib.Path,
 ) -> pathlib.Path:
     """
     Convert all specified variables in a file
@@ -183,36 +182,28 @@ def convert_file(
     :param input_path: The path to the input file
     :param output_path: Where to save the results
     :param conversions: A listing of the names of the variables to convert and what unit to convert them to
-    :param work_directory: Where to save intermediate products
     :return: The path to the converted file
     """
-    import shutil
     import xarray
-    import tempfile
 
-    from post_processing.utilities.netcdf import load_netcdf
-    from post_processing.utilities.netcdf import save_netcdf
+    from post_processing.utilities.netcdf import write
+    from post_processing.utilities.netcdf import load
 
-    with tempfile.TemporaryDirectory(dir=work_directory) as temporary_directory:
-        temporary_path: pathlib.Path = pathlib.Path(temporary_directory)
-        temporary_output_path: pathlib.Path = temporary_path / output_path.name
 
-        LOGGER.debug(
-            f"Opening '{input_path}' to convert {', '.join(map(lambda pair: pair[0], conversions))} to new units."
-        )
-        with load_netcdf(input_path) as input_data:
-            for variable_name, new_unit in conversions:
-                if variable_name not in input_data.data_vars:
-                    raise KeyError(f"Cannot convert the '{variable_name}' variable to '{new_unit}' - it is not in '{input_path}'")
-                data: xarray.DataArray = input_data.data_vars[variable_name]
-                LOGGER.debug(f"Converting '{input_path.stem}::{variable_name}' to '{new_unit}'")
-                converted_data = convert_variable_unit(variable=data, to_unit=new_unit)
-                original_encoding: dict[str, typing.Any] = converted_data.encoding.copy()
-                input_data[variable_name] = converted_data
-                input_data.encoding = original_encoding
-            LOGGER.debug(f"Saving the updated '{input_path.name}' data to a temporary location")
-            save_netcdf(path=temporary_output_path, dataset=input_data)
-        LOGGER.debug(f"Saving the temporary '{input_path.name}' data to {output_path}")
-        shutil.move(temporary_output_path, output_path)
+    LOGGER.debug(
+        f"Opening '{input_path}' to convert {', '.join(map(lambda pair: pair[0], conversions))} to new units."
+    )
+    with load(input_path) as input_data:
+        for variable_name, new_unit in conversions:
+            if variable_name not in input_data.data_vars:
+                raise KeyError(f"Cannot convert the '{variable_name}' variable to '{new_unit}' - it is not in '{input_path}'")
+            data: xarray.DataArray = input_data.data_vars[variable_name]
+            LOGGER.debug(f"Converting '{input_path.stem}::{variable_name}' to '{new_unit}'")
+            converted_data = convert_variable_unit(variable=data, to_unit=new_unit)
+            original_encoding: dict[str, typing.Any] = converted_data.encoding.copy()
+            input_data[variable_name] = converted_data
+            input_data.encoding = original_encoding
+        LOGGER.debug(f"Saving the updated '{input_path.name}' data to a temporary location")
+        write(target=output_path, dataset=input_data)
     return output_path
 

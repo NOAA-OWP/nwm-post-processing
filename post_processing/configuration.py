@@ -5,6 +5,7 @@ import logging
 import typing
 import os
 import pathlib
+import traceback
 
 from collections import UserDict
 
@@ -156,23 +157,7 @@ class _Settings(UserDict):
         :param key: The name of the environment variable to find
         :returns: The appropriate key
         """
-        matching_keys: list[str] = [
-            contained_key
-            for contained_key in self.keys()
-            if key.lower() == contained_key.lower()
-        ]
-
-        matching_keys.extend([
-            os_key
-            for os_key in os.environ.keys()
-            if os_key not in matching_keys
-               and os_key.lower() == key.lower()
-        ])
-
-        if len(matching_keys) == 1:
-            return matching_keys[0]
-
-        return key
+        return next(filter(lambda contained_key: contained_key.lower() == key.lower(), self.keys()), key)
 
     @property
     def base_path(self) -> pathlib.Path:
@@ -986,6 +971,5 @@ class _Settings(UserDict):
 
         return values
 
-
-settings = _Settings()
+settings: _Settings = _Settings()
 """Application wide settings"""

@@ -453,12 +453,13 @@ def subset_vector_file_into_file_by_value(
                 if "original_shape" in variable.encoding:
                     subset_data[variable_name].encoding["original_shape"] = tuple(variable.sizes.values())
 
-            successfully_saved: bool = netcdf.save_netcdf(path=temporary_output_path, dataset=subset_data)
-            if not successfully_saved:
-                raise Exception(
-                    f"Something kept masked data from being saved to '{temporary_output_path}' without a suitable error"
-                )
-        shutil.move(temporary_output_path, context.output_path)
+            netcdf.write(dataset=subset_data, target=context.output_path)
+            #successfully_saved: bool = netcdf.save_netcdf(path=temporary_output_path, dataset=subset_data)
+            #if not successfully_saved:
+            #    raise Exception(
+            #        f"Something kept masked data from being saved to '{temporary_output_path}' without a suitable error"
+            #    )
+        #shutil.move(temporary_output_path, context.output_path)
 
         if settings.this_is_verbose:
             LOGGER.debug(f"Masked data saved to '{context.output_path}'")

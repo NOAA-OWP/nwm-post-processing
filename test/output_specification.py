@@ -579,7 +579,7 @@ class Dataset:
             for percentile in percentiles
         }
 
-        overall_data: xarray.Dataset = netcdf.load_netcdf(path=paths_to_data)
+        overall_data: xarray.Dataset = netcdf.load(target=paths_to_data)
         variable: xarray.DataArray = overall_data[variable_to_threshold]
         minimum: numpy.float64 = variable.min().values.min()
         maximum: numpy.float64 = variable.max().values.max()
@@ -636,7 +636,7 @@ class Dataset:
 
             threshold_directory.mkdir(parents=True, exist_ok=True)
 
-            netcdf.save_netcdf(path=output_path, dataset=percentile_dataset)
+            netcdf.write(target=output_path, dataset=percentile_dataset)
             LOGGER.info(f"Saved the threshold dataset for the {int(percentile * 100)}th percentile to {output_path}")
             output_paths.append(output_path)
 

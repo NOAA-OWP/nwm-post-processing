@@ -80,7 +80,7 @@ def generate_sample_dataarray(
     Generate a sample dataarray for testing
     """
     random_number_generator: numpy.random.Generator = numpy.random.default_rng(seed=seed)
-    projection_dataset: xarray.Dataset = netcdf.load_netcdf(path=projection_path, full_load=True)
+    projection_dataset: xarray.Dataset = netcdf.load(target=projection_path, full_load=True)
     x_variable: xarray.DataArray = projection_dataset[projection_x_variable].load()
     y_variable: xarray.DataArray = projection_dataset[projection_y_variable].load()
     crs_variable: xarray.DataArray = projection_dataset[projection_crs_variable].load()
@@ -256,7 +256,7 @@ class ReprojectionTest(unittest.TestCase):
 
         start = datetime.now()
         print(f"Saving the lambert dataset for later testing...")
-        netcdf.save_netcdf(path=pathlib.Path.home() / "lambert_test.nc", dataset=overall_dataset)
+        netcdf.write(target=pathlib.Path.home() / "lambert_test.nc", dataset=overall_dataset)
         print(f"It took {datetime.now() - start} to save the lambert dataset")
         start = datetime.now()
         reprojected_data: xarray.Dataset = reproject.reproject_dataset(
@@ -272,9 +272,6 @@ class ReprojectionTest(unittest.TestCase):
             reprojection_y_coordinate_name=self.mercator_projection.y_values.name,
         )
         print(f"It took {datetime.now() - start} to reproject the dataset to mercator")
-        start = datetime.now()
-        netcdf.save_netcdf(path=pathlib.Path.home() / "mercator_test.nc", dataset=reprojected_data)
-        print(f"It took {datetime.now() - start} to save the mercator dataset")
 
 
 if __name__ == '__main__':
