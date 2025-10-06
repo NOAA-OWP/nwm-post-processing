@@ -26,7 +26,7 @@ def member(
     default_factory: typing.Callable[[], T] = dataclasses.MISSING,
     metadata: dict = None,
     kw_only: bool = False,
-    init_function: typing.Callable[[], typing.Any] = None,
+    init_function: typing.Callable[["BaseModel"], typing.Any] = None,
     load_order: int = 0
 ) -> dataclasses.Field:
     """
@@ -38,7 +38,7 @@ def member(
     metadata[MEMBER_FIELD_KEY] = True
     metadata[LOAD_ORDER_KEY] = load_order
 
-    if callable(default_factory):
+    if callable(init_function):
         metadata[INIT_FUNCTION_KEY] = init_function
 
     if dataclasses.MISSING not in (default, default_factory):
@@ -99,13 +99,13 @@ class BaseModel:
                 and isinstance(field.metadata.get(INIT_FUNCTION_KEY), typing.Callable)
         ]
 
-        loaders: generic.Iterable[generic.Callable[[], typing.Any]] = map(
+        loaders: generic.Iterable[generic.Callable[[BaseModel], typing.Any]] = map(
             lambda pair: pair[0],
             sorted(loaders_and_order, key=lambda pair: pair[1])
         )
 
         for loader in loaders:
-            loader()
+            loader(self)
 
     @classmethod
     def from_dict(cls: typing.Type[ModelType], **kwargs: typing.Any) -> ModelType:

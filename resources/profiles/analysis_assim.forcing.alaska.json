@@ -1,9 +1,66 @@
 {
     "operations": [
         {
-            "operation": "echo",
-            "message": "AnA Forcing Alaska has not been implemented yet",
-            "level": "ERROR"
+            "operation": "drop",
+            "exclude": true,
+            "fields": [
+                "time",
+                "x",
+                "y",
+                "reference_time",
+                "crs",
+                "RAINRATE"
+            ]
+        },
+        {
+            "operation": "total_over_time",
+            "rate_variable_name": "RAINRATE",
+            "total_variable_name": "PRECIP",
+            "output_unit": "mm",
+            "input_quantity_unit": "mm",
+            "input_time_unit": "seconds",
+            "time_unit": "hours",
+            "amount_of_time": 1,
+            "total_variable_attributes": {
+                "standard_name": "rainfall_amount",
+                "long_name": "accumulated liquid precipitation"
+            }
+        },
+        {
+            "operation": "drop",
+            "fields": "RAINRATE"
+        },
+        {
+            "operation": "branch",
+            "branches": {
+                "WMS": [
+                    {
+                        "operation": "reproject",
+                        "reference_dataset_path": "{resource_path}/projections/alaska_mercator.nc",
+                        "output_crs_variable_name": "mercator"
+                    },
+                    {
+                        "operation": "save",
+                        "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.tm{tminus}.alaska.nc",
+                        "directory": "{output_path}/"
+                    }
+                ],
+                "RFC": [
+                    {
+                        "operation": "reproject",
+                        "reference_dataset_path": "{resource_path}/projections/alaska_sphere_stereographic.nc"
+                    },
+                    {
+                        "operation": "drop",
+                        "fields": ["crs"]
+                    },
+                    {
+                        "operation": "save",
+                        "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.tm{tminus}.alaska.nc",
+                        "directory": "{output_path}/"
+                    }
+                ]
+            }
         }
     ],
     "configuration": "analysis_assim",

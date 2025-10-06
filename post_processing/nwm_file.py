@@ -7,6 +7,7 @@ import pathlib
 import re
 
 from datetime import datetime
+from datetime import timedelta
 
 from post_processing import enums
 from post_processing.utilities import common
@@ -25,10 +26,31 @@ class NWMFile:
     t_minus: typing.Optional[str] = dataclasses.field(default=None)
     member: typing.Optional[int] = dataclasses.field(default=None)
     path: typing.Optional[pathlib.Path] = dataclasses.field(default=None)
+    _lead: typing.Optional[timedelta] = dataclasses.field(default=None, init=False, repr=False)
 
     def __post_init__(self):
         if self.frame is None and self.t_minus is None:
             raise ValueError("frame and t_minus cannot both be None")
+        if self.frame and self.t_minus:
+            raise ValueError("Both a frame and t_minus cannot be set")
+        if self.frame:
+            if len(self.frame) > 3:
+                hours: str = self.frame[:-2]
+                minutes: str = self.frame[-2:]
+                self._lead = timedelta(hours=int(float(hours)), minutes=int(float(minutes)))
+            else:
+                self._lead = timedelta(hours=int(float(self.frame)))
+        else:
+            if len(self.t_minus) > 2:
+                hours: str = self.t_minus[:-2]
+                minutes: str = self.t_minus[-2:]
+                self._lead = -timedelta(hours=int(float(hours)), minutes=int(float(minutes)))
+            else:
+                self._lead = -timedelta(hours=int(float(self.t_minus)))
+
+    @property
+    def lead(self) -> timedelta:
+        return self._lead
 
     @property
     def group_hash(self) -> int:
@@ -63,7 +85,7 @@ class NWMFile:
 
         name: str = path.name
 
-        match: typing.Optional[re.Match] = common.NWM_FILENAME_PATTERN.match(name)
+        match: typing.Optional[re.Match] = common.NWM_FILENAME_PATTERN.search(name)
 
         if match is None:
             raise ValueError(
@@ -121,3 +143,55 @@ class NWMFile:
             name += f"tm{str(self.t_minus).zfill(2)}"
 
         name += f".{self.region.value}.nc"
+
+    def __eq__(self, other: typing.Any) -> bool:
+        if not isinstance(other, self.__class__):
+            return False
+
+        return self.group_hash == other.group_hash and self.lead == other.lead
+
+    def __ne__(self, other: typing.Any) -> bool:
+        return not self.__eq__(other)
+
+    def __gt__(self, other: typing.Any) -> bool:
+        if not isinstance(other, self.__class__):
+            return False
+
+        if self.group_hash == other.group_hash:
+            return self.lead > other.lead
+        if self.configuration != other.configuration:
+            return self.configuration > other.configuration
+        if self.model_output_type != other.model_output_type:
+            return self.model_output_type > other.model_output_type
+        if self.region != other.region:
+            return self.region > other.region
+        if self.member != other.member:
+            return self.member > other.member
+
+        return self.cycle > other.cycle
+
+    def __lt__(self, other: typing.Any) -> bool:
+        if not isinstance(other, self.__class__):
+            return False
+
+        if self.group_hash == other.group_hash:
+            return self.lead < other.lead
+        if self.configuration != other.configuration:
+            return self.configuration < other.configuration
+        if self.model_output_type != other.model_output_type:
+            return self.model_output_type < other.model_output_type
+        if self.region != other.region:
+            return self.region < other.region
+        if self.member != other.member:
+            return self.member < other.member
+
+        return self.cycle < other.cycle
+
+    def __ge__(self, other: typing.Any) -> bool:
+        return self == other or self > other
+
+    def __le__(self, other: typing.Any) -> bool:
+        return self == other or self < other
+
+    def __hash__(self):
+        return hash((self.group_hash, self.lead))
