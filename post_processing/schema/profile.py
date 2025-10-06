@@ -134,6 +134,12 @@ class OperationType(enum.StrEnum):
     """Change the dimensions on a netcdf file"""
     TIME_BOUND = "calculate_time_bound"
     """Form a time bound for the input"""
+    GROUP_BY = "group_by"
+    """Group input for operations"""
+    STREAM = "stream"
+    """Stream arrays one by one into online transform algorithms"""
+    COMBINE = "combine"
+    """Combine two variables into one"""
 
 
 @dataclasses.dataclass
@@ -621,8 +627,6 @@ class ReprojectionOperation(PathToPathOperation, FileOutputMixin):
         metadata: dict[str, typing.Any],
     ) -> pathlib.Path:
         import xarray
-        import tempfile
-        import shutil
         from post_processing.transform import reproject
         from post_processing.utilities import netcdf
 
@@ -632,45 +636,25 @@ class ReprojectionOperation(PathToPathOperation, FileOutputMixin):
             **metadata
         )
 
-        with tempfile.TemporaryDirectory() as temporary_directory:
-            temporary_directory_path: pathlib.Path = pathlib.Path(temporary_directory)
-            temporary_output_path: pathlib.Path = temporary_directory_path / target_path.name
-            #netcdf_file: xarray.Dataset = netcdf.load_netcdf(input_path, full_load=True)
-            netcdf_file: xarray.Dataset = netcdf.load(input_path, full_load=True)
-            reprojected_data: xarray.Dataset = reproject.reproject_dataset(
-                dataset=netcdf_file,
-                reprojection_dataset_path=reprojection_dataset_path,
-                crs_variable_name=self.crs_variable,
-                reprojection_crs_variable_name=self.reference_crs_variable,
-                projection_string_attribute=self.crs_string_attribute,
-                x_coordinate_name=self.x_variable,
-                y_coordinate_name=self.y_variable,
-                reprojection_x_coordinate_name=self.reference_x_variable,
-                reprojection_y_coordinate_name=self.reference_y_variable,
-                output_crs_variable_name=self.output_crs_variable_name
-            )
-            import concurrent.futures as futures
-            write_task: futures.Future[pathlib.Path] = netcdf.submit_write(
-                target=target_path,
-                dataset=reprojected_data
-            )
+        netcdf_file: xarray.Dataset = netcdf.load(input_path, full_load=True)
+        reprojected_data: xarray.Dataset = reproject.reproject_dataset(
+            dataset=netcdf_file,
+            reprojection_dataset_path=reprojection_dataset_path,
+            crs_variable_name=self.crs_variable,
+            reprojection_crs_variable_name=self.reference_crs_variable,
+            projection_string_attribute=self.crs_string_attribute,
+            x_coordinate_name=self.x_variable,
+            y_coordinate_name=self.y_variable,
+            reprojection_x_coordinate_name=self.reference_x_variable,
+            reprojection_y_coordinate_name=self.reference_y_variable,
+            output_crs_variable_name=self.output_crs_variable_name
+        )
 
-            while True:
-                try:
-                    target_path: pathlib.Path = write_task.result(timeout=1.5)
-                    break
-                except TimeoutError:
-                    continue
+        target_path = netcdf.write(
+            target=target_path,
+            dataset=reprojected_data
+        )
 
-            """
-            netcdf.save_netcdf(
-                path=temporary_output_path,
-                dataset=reprojected_data
-            )
-            reprojected_data.close()
-            netcdf_file.close()
-            shutil.move(temporary_output_path, target_path)
-            """
         return target_path
 
     def __call__(
@@ -849,7 +833,7 @@ class SubsetOperation(PathToPathOperation):
                 for subset_path in collapsed_paths
             ]
 
-            results: typing.Sequence[typing.Sequence[typing.Union[pathlib.Path]]] = starmap(
+            results: typing.Sequence[typing.Sequence[typing.Union[pathlib.Path]]] = starmap_threaded(
                 function=call_generic_operations,
                 args=arguments_on_each,
                 thread_count=settings.maximum_additional_threads
@@ -1413,6 +1397,7 @@ class DropOperation(PathToPathOperation, FileOutputMixin):
         :param output_file: Where to save the result
         :returns: The path to the updated data
         """
+
         import xarray
         from post_processing.utilities import netcdf
 
@@ -1770,7 +1755,7 @@ class AttributeOperation(PathToPathOperation, FileOutputMixin):
         ]
 
         try:
-            new_paths: typing.Sequence[pathlib.Path] = starmap(
+            new_paths: typing.Sequence[pathlib.Path] = starmap_threaded(
                 function=nco.add_or_modify_attribute,
                 args=arguments,
                 thread_count=settings.maximum_additional_threads
@@ -3283,6 +3268,7 @@ def call_generic_operations(
     current_data = data
 
     for operation in operations:
+        LOGGER.debug(f"Performing {operation.operation_id}: {operation.__class__.__name__}")
         metadata['stage'] = operation.operation_id
 
         if operation.disable:
@@ -3486,6 +3472,7 @@ def get_profile_operation_types(
     :param encountered_types: A list of types that have already been encountered in order to prevent possible loops
     :returns: All non-abstract implementations of the root ProfileOperation
     """
+    # DO NOT DELETE! This will bring in all operation types that need to be considered
     import post_processing.operations
 
     if encountered_types is None:

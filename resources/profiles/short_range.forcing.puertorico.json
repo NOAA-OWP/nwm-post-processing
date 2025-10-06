@@ -9,6 +9,6 @@
     ],
     "configuration": "short_range",
     "output_type": "forcing",
-    "region": "conus",
+    "region": "puertorico",
     "member": null
 }

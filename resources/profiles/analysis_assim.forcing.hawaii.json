@@ -1,10 +1,100 @@
 {
     "operations": [
         {
-            "operation": "echo",
-            "message": "An output for 'nwm.t<cycle>z.analysis_assim.forcing.tm00.hawaii.nc' should be generated, as defined in {source_file}.",
-            "level": "error",
-            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/WMS/analysis_assim/fe/nwm.t2025060718z.analysis_assim.forcing.tm00.hawaii.nc"
+            "operation": "drop",
+            "exclude": true,
+            "fields": [
+                "time",
+                "x",
+                "y",
+                "reference_time",
+                "crs",
+                "T2D",
+                "RAINRATE"
+            ]
+        },
+        {
+            "operation": "total_over_time",
+            "rate_variable_name": "RAINRATE",
+            "total_variable_name": "PRECIP",
+            "output_unit": "mm",
+            "input_quantity_unit": "mm",
+            "input_time_unit": "seconds",
+            "time_unit": "hours",
+            "amount_of_time": 1,
+            "total_variable_attributes": {
+                "standard_name": "rainfall_amount",
+                "long_name": "accumulated liquid precipitation"
+            }
+        },
+        {
+            "operation": "calculate_time_bound"
+        },
+        {
+            "operation": "drop",
+            "fields": [
+                "RAINRATE"
+            ]
+        },
+        {
+            "operation": "branch",
+            "branches": {
+                "WMS": [
+                    {
+                        "operation": "drop",
+                        "fields": [
+                            "T2D"
+                        ]
+                    },
+                    {
+                        "operation": "unit_conversion",
+                        "conversions": [
+                            {
+                                "variable_name": "PRECIP",
+                                "target_unit": "in"
+                            }
+                        ]
+                    },
+                    {
+                        "operation": "reproject",
+                        "reference_dataset_path": "{resource_path}/projections/hawaii_mercator.nc"
+                    },
+                    {
+                        "operation": "save",
+                        "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.tm{tminus}.hawaii.nc",
+                        "directory": "{output_path}/",
+                        "include_conditions": {
+                            "tminus": "00"
+                        }
+                    }
+                ],
+                "RFC": [
+                    {
+                        "operation": "rename",
+                        "mapping": {
+                            "T2D": "TEMPERATURE"
+                        }
+                    },
+                    {
+                        "operation": "unit_conversion",
+                        "conversions": [
+                            {
+                                "variable_name": "TEMPERATURE",
+                                "target_unit": "C"
+                            }
+                        ]
+                    },
+                    {
+                        "operation": "reproject",
+                        "reference_dataset_path": "{resource_path}/projections/hawaii_sphere_lambert.nc"
+                    },
+                    {
+                        "operation": "save",
+                        "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.{frame}.aprfc.nc",
+                        "directory": "{output_path}/"
+                    }
+                ]
+            }
         }
     ],
     "configuration": "analysis_assim",

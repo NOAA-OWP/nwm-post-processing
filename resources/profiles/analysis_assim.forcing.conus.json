@@ -37,10 +37,6 @@
             ]
         },
         {
-            "operation": "echo",
-            "message": "This needs to calculate the time_bounds with a dimension of nv"
-        },
-        {
             "operation": "branch",
             "branches": {
                 "WMS": [
@@ -48,6 +44,15 @@
                         "operation": "drop",
                         "fields": [
                             "T2D"
+                        ]
+                    },
+                    {
+                        "operation": "unit_conversion",
+                        "conversions": [
+                            {
+                                "variable_name": "PRECIP",
+                                "target_unit": "in"
+                            }
                         ]
                     },
                     {

@@ -116,6 +116,16 @@ class _Conversions:
                 from_unit=["K", "k"],
                 factor=1.0,
                 final_adjustment=-272.15,
+            ),
+            ConversionFactor(
+                to_unit=["in"],
+                from_unit=["mm"],
+                factor=1/25.4,
+            ),
+            ConversionFactor(
+                to_unit=["mm"],
+                from_unit=["in"],
+                factor=25.4,
             )
         ])
 
