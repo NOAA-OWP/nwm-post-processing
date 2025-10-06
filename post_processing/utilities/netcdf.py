@@ -6,21 +6,21 @@ import logging
 import pathlib
 import os
 from threading import RLock
-from concurrent.futures import Future
 import collections.abc as generic
 
 from post_processing.configuration import settings
-from post_processing.enums import Verbosity
 
 from post_processing.utilities.common import timed_function
 
 if typing.TYPE_CHECKING:
     import xarray
     import numpy
-    from post_processing.utilities.writer import NetcdfGateway
+    from post_processing.work import gateway
+    from post_processing.interfaces.work import PendingTaskResult
 
 
 LOGGER: logging.Logger = logging.getLogger(pathlib.Path(__file__).stem)
+T = typing.TypeVar("T")
 
 _DEFAULT_ENCODING: generic.Mapping["numpy.dtype", dict[str, typing.Any]] | None = None
 
@@ -30,7 +30,7 @@ WRITER_WAIT_SECONDS: float = float(os.environ.get(f"{settings.prefix}_WRITER_WAI
 OPEN_LOCK: RLock = RLock()
 """Lock to help secure file opening"""
 
-__IO_GATEWAY: typing.Optional["NetcdfGateway"] = None
+__IO_GATEWAY: typing.Optional["gateway.Gateway"] = None
 
 os.environ.setdefault("HDF5_USE_FILE_LOCKING", "FALSE")
 
@@ -50,12 +50,12 @@ def _open_gateway():
     """
     Open up the pathway for NetCDF IO
     """
-    from post_processing.utilities.writer import NetcdfGateway
+    from post_processing.work.gateway import get_gateway
     global __IO_GATEWAY
     if __IO_GATEWAY is None or not __IO_GATEWAY.running:
         with OPEN_LOCK:
             if __IO_GATEWAY is None or not __IO_GATEWAY.running:
-                __IO_GATEWAY = NetcdfGateway(
+                __IO_GATEWAY = get_gateway(
                     queue_length=WRITER_QUEUE_LENGTH,
                     wait_seconds=WRITER_WAIT_SECONDS,
                 )
@@ -68,7 +68,7 @@ def submit_write(
     *,
     compute: bool = True,
     **kwargs
-) -> Future[pathlib.Path]:
+) -> "PendingTaskResult[pathlib.Path]":
     """
     Submit a task to the Netcdf gateway to write a dataset to disk
 
@@ -79,8 +79,8 @@ def submit_write(
     :returns: The future reference to the written path
     """
     _open_gateway()
-    if compute and hasattr(dataset, "compute") and callable(dataset.compute):
-        dataset = dataset.compute()
+    #if compute and hasattr(dataset, "compute") and callable(dataset.compute):
+    #    dataset = dataset.compute()
 
     try:
         default_encodings: dict[numpy.dtype, dict[str, typing.Any]] = get_default_encoding()
@@ -100,11 +100,88 @@ def submit_write(
 
     write_arguments.update(kwargs)
 
-    future_result: Future[pathlib.Path] = __IO_GATEWAY.save(
+    from post_processing.work.tasks.writing import SaveTask
+    from post_processing.interfaces.work import PendingTaskResult
+
+    task: SaveTask = SaveTask(
         dataset=dataset,
         target=target,
-        write_kwargs=write_arguments,
+        kwargs=write_arguments,
     )
+
+    future_result: PendingTaskResult[pathlib.Path] = __IO_GATEWAY.enqueue(task=task)
+    return future_result
+
+def submit_load_array(
+    target: pathlib.Path,
+    variable_name: str,
+    load_kwargs: dict[str, typing.Any] = None,
+    engine: str = settings.default_netcdf_engine,
+    **kwargs
+) -> "PendingTaskResult[numpy.typing.NDArray]":
+    """
+    Submit a task to the IO Gateway that will return the numpy array from a netcdf variable
+
+    :param target: Where the data to load lives
+    :param variable_name: Name of the variable to load
+    :param load_kwargs: Keyword arguments to feed to the netcdf load function
+    :param engine: Which engine to use to interpret the netcdf data
+    """
+    _open_gateway()
+    if load_kwargs is None:
+        load_kwargs = {}
+
+    load_kwargs.update(kwargs)
+
+    from post_processing.work.tasks.reading import ArrayLoadTask
+    from post_processing.interfaces.work import PendingTaskResult
+
+    task: ArrayLoadTask = ArrayLoadTask(
+        target=target,
+        variable_name=variable_name,
+        kwargs=load_kwargs,
+        engine=engine
+    )
+
+    future_result: PendingTaskResult["numpy.typing.NDArray"] = __IO_GATEWAY.enqueue(task=task)
+
+    return future_result
+
+
+def submit_select(
+    target: pathlib.Path | generic.Sequence[pathlib.Path],
+    variable_name: str,
+    criteria: dict[str, typing.Any],
+    load_kwargs: dict[str, typing.Any] = None,
+    engine: str = settings.default_netcdf_engine,
+    method: str = None,
+    drop: bool = True,
+    **kwargs
+) -> "PendingTaskResult[xarray.DataArray]":
+    """
+    Submit a task to the IO gateway that will select a portion of data from a file
+    """
+    _open_gateway()
+    if load_kwargs is None:
+        load_kwargs = {}
+
+    load_kwargs.update(kwargs)
+
+    from post_processing.work.tasks.reading import SelectTask
+    from post_processing.interfaces.work import PendingTaskResult
+
+    task: SelectTask = SelectTask(
+        target=target,
+        variable_name=variable_name,
+        criteria=criteria,
+        method=method,
+        drop=drop,
+        kwargs=load_kwargs,
+        engine=engine
+    )
+
+    future_result: PendingTaskResult["xarray.DataArray"] = __IO_GATEWAY.enqueue(task=task)
+
     return future_result
 
 def submit_load(
@@ -113,7 +190,7 @@ def submit_load(
     full_load: bool = False,
     engine: str = settings.default_netcdf_engine,
     **kwargs
-) -> Future["xarray.Dataset"]:
+) -> "PendingTaskResult[xarray.Dataset]":
     """
     Submit a task to the IO Gateway that will return a reference to an xarray Dataset
 
@@ -128,13 +205,39 @@ def submit_load(
 
     load_kwargs.update(kwargs)
 
-    future_result: Future["xarray.Dataset"] = __IO_GATEWAY.load(
+    from post_processing.work.tasks.reading import LoadTask
+    from post_processing.interfaces.work import PendingTaskResult
+
+    task: LoadTask = LoadTask(
         target=target,
-        load_kwargs=load_kwargs,
+        kwargs=load_kwargs,
         full_load=full_load,
         engine=engine
     )
 
+    future_result: PendingTaskResult["xarray.Dataset"] = __IO_GATEWAY.enqueue(task=task)
+
+    return future_result
+
+def submit_load_variable(
+    target: pathlib.Path,
+    variable_name: str,
+    load_arguments: dict[str, typing.Any] = None,
+    full_load: bool = False,
+    engine: str = settings.default_netcdf_engine,
+) -> "PendingTaskResult[xarray.DataArray]":
+    from post_processing.work.tasks.reading import LoadVariableTask
+    from post_processing.interfaces.work import PendingTaskResult
+
+    task: LoadVariableTask = LoadVariableTask(
+        target=target,
+        variable_name=variable_name,
+        kwargs=load_arguments,
+        full_load=full_load,
+        engine=engine
+    )
+
+    future_result: PendingTaskResult["xarray.DataArray"] = __IO_GATEWAY.enqueue(task=task)
     return future_result
 
 @timed_function()
@@ -156,7 +259,8 @@ def write(
     :returns: The path to where data was written
     """
     from post_processing.utilities.common import cycle_future
-    future_result: Future[pathlib.Path] = submit_write(
+    from post_processing.interfaces.work import PendingTaskResult
+    future_result: PendingTaskResult[pathlib.Path] = submit_write(
         dataset=dataset,
         target=target,
         write_arguments=write_arguments,
@@ -179,22 +283,129 @@ def load(
     load_kwargs: dict[str, typing.Any] = None,
     full_load: bool = False,
     engine: str = settings.default_netcdf_engine,
+    transformation: typing.Callable[["xarray.Dataset"], T] = None,
     **kwargs
-) -> "xarray.Dataset":
+) -> "xarray.Dataset" | T:
     from post_processing.utilities.common import cycle_future
-    future_result: Future["xarray.Dataset"] = submit_load(
+    from post_processing.interfaces.work import PendingTaskResult
+    future_result: PendingTaskResult["xarray.Dataset"] = submit_load(
         target=target,
         load_kwargs=load_kwargs,
         full_load=full_load,
         engine=engine,
         **kwargs
     )
-    result, error = cycle_future(future_result)
+    result, error = cycle_future(
+        future_result,
+        transform=transformation
+    )
 
     if error is not None:
         raise error
     elif result is None:
         raise RuntimeError(f"Could not load '{target.name}'")
+
+    return result
+
+@timed_function()
+def load_variable(
+    target: pathlib.Path | generic.Sequence[pathlib.Path],
+    variable_name: str,
+    load_kwargs: dict[str, typing.Any] = None,
+    full_load: bool = False,
+    engine: str = settings.default_netcdf_engine,
+    transformation: typing.Callable[["xarray.DataArray"], T] = None,
+    **kwargs
+) -> "xarray.DataArray" | T:
+    from post_processing.utilities.common import cycle_future
+    from post_processing.interfaces.work import PendingTaskResult
+    future_result: PendingTaskResult["xarray.DataArray"] = submit_load_variable(
+        target=target,
+        variable_name=variable_name,
+        load_arguments=load_kwargs,
+        full_load=full_load,
+        engine=engine
+    )
+
+    result, error = cycle_future(
+        future_result,
+        transform=transformation
+    )
+
+    if error is not None:
+        raise error
+    elif result is None:
+        raise RuntimeError(f"Could not load '{target.name}'")
+
+    return result
+
+
+def select(
+    target: pathlib.Path | generic.Sequence[pathlib.Path],
+    variable_name: str,
+    criteria: dict[str, typing.Any],
+    load_kwargs: dict[str, typing.Any] = None,
+    engine: str = settings.default_netcdf_engine,
+    method: str = None,
+    drop: bool = False,
+    transformation: typing.Callable[["xarray.DataArray"], T] = None,
+    **kwargs
+) -> "xarray.DataArray" | T:
+    import xarray
+    from post_processing.interfaces.work import PendingTaskResult
+    from post_processing.utilities.common import cycle_future
+
+    submission: PendingTaskResult[xarray.DataArray] = submit_select(
+        target=target,
+        variable_name=variable_name,
+        criteria=criteria,
+        engine=engine,
+        method=method,
+        drop=drop,
+        load_kwargs=load_kwargs,
+        **kwargs
+    )
+
+    result, error = cycle_future(
+        submission,
+        transform=transformation
+    )
+
+    if error is not None:
+        raise error
+    if result is None:
+        raise RuntimeError(f"Something went awry and no data was selected from '{target}'")
+
+    return result
+
+def load_array(
+    target: pathlib.Path | generic.Sequence[pathlib.Path],
+    variable_name: str,
+    load_kwargs: dict[str, typing.Any] = None,
+    engine: str = settings.default_netcdf_engine,
+    transformation: typing.Callable[["numpy.typing.NDArray"], T] = None,
+    **kwargs
+) -> "numpy.typing.NDArray" | T:
+    from post_processing.interfaces.work import PendingTaskResult
+    from post_processing.utilities.common import cycle_future
+
+    submission: PendingTaskResult["numpy.typing.NDArray"] = submit_load_array(
+        target=target,
+        variable_name=variable_name,
+        load_kwargs=load_kwargs,
+        engine=engine,
+        **kwargs
+    )
+
+    result, error = cycle_future(
+        submission,
+        transform=transformation,
+    )
+
+    if error is not None:
+        raise error
+    if result is None:
+        raise RuntimeError(f"Something went awry and no data was loaded from '{target}'")
 
     return result
 
@@ -262,32 +473,6 @@ def operate_on_variable(
             result = operation(dataset[variable_name])
             return result
 
-@timed_function()
-def load_variable(
-    path: pathlib.Path | str | generic.Sequence[pathlib.Path | str],
-    variable_name: str,
-    engine: str | typing.Literal['h5netcdf', "netcdf4"] = settings.default_netcdf_engine,
-    chunks: generic.Mapping[str, typing.Any] | typing.Literal['auto'] = "auto",
-    **kwargs
-) -> "xarray.DataArray":
-    """
-
-    """
-    if chunks is None:
-        raise ValueError(f"Individual Netcdf Variables cannot be loaded without chunking")
-
-    import xarray
-    with OPEN_LOCK:
-        with xarray.open_dataset(filename_or_obj=path, engine=engine, chunks=chunks, **kwargs) as dataset:
-            if variable_name not in dataset:
-                raise KeyError(f"There is no '{variable_name}' variable in {path}")
-
-            variable: xarray.DataArray = dataset[variable_name]
-
-            if hasattr(variable, "compute") and callable(variable.compute):
-                variable = variable.compute().copy()
-            return variable
-
 
 def load_metadata(
     path: typing.Union[pathlib.Path, str, typing.Sequence[typing.Union[pathlib.Path, str]]],
@@ -311,7 +496,7 @@ def load_metadata(
     metadata: dict[str, typing.Any] = {}
     for input_path in path:
         with OPEN_LOCK:
-            with xarray.open_dataset(filename_or_obj=input_path, engine=engine, chunks="auto") as source:
+            with load(target=input_path, full_load=True) as source:
                 metadata.update({
                     str(key): format_value(value)
                     for key, value in source.attrs.items()
@@ -322,6 +507,8 @@ def load_metadata(
 
                 for variable_name, variable_data in source.data_vars.items():
                     metadata.update(_get_variable_metadata(variable=variable_data))
+                source.close()
+            del source
 
     return metadata
 

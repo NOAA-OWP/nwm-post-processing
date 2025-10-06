@@ -19,6 +19,7 @@ if typing.TYPE_CHECKING:
     import numpy
     import numpy.typing
     from concurrent.futures import Future
+    from post_processing.interfaces.work import PendingTaskResult
 
 T = typing.TypeVar("T")
 """A generic type"""
@@ -435,7 +436,7 @@ def last(
 
 @typing.overload
 def cycle_future_list(
-    futures: list["Future[T]"],
+    futures: list["PendingTaskResult[T]"],
     *,
     block_seconds: float = 1.0,
     backoff_seconds: float = 1.0,
@@ -445,7 +446,7 @@ def cycle_future_list(
 
 @typing.overload
 def cycle_future_list(
-    futures: generic.Sequence["Future[T]"],
+    futures: generic.Sequence["PendingTaskResult[T]"],
     *,
     transform: generic.Callable[[T, generic.Sequence[T]], VT],
     block_seconds: float = 1.0,
@@ -456,7 +457,7 @@ def cycle_future_list(
 
 
 def cycle_future_list(
-    futures: generic.Iterable["Future[T]"],
+    futures: generic.Iterable["PendingTaskResult[T]"],
     *,
     transform: generic.Callable[[T, generic.Sequence[T]], VT] = None,
     block_seconds: float = 1.0,
@@ -474,6 +475,7 @@ def cycle_future_list(
     :returns: The results from all the futures
     """
     from concurrent.futures import Future
+    from post_processing.interfaces.work import PendingTaskResult
     import time
 
     if transform is None:
@@ -486,14 +488,14 @@ def cycle_future_list(
     elif not callable(exception_handler):
         raise ValueError(f"{exception_handler} (type={type(exception_handler)}) is not callable")
 
-    current_values: list[Future[T]] = list(futures)
+    current_values: list[PendingTaskResult[T]] = list(futures)
 
     results: list[VT] = []
     last_item_id: typing.Optional[int] = None
     exceptions: list[Exception] = []
 
     while current_values:
-        value: Future[T] = current_values.pop(0)
+        value: PendingTaskResult[T] = current_values.pop(0)
 
         try:
             result: T = value.result(timeout=block_seconds)
@@ -513,7 +515,7 @@ def cycle_future_list(
 
 @typing.overload
 def cycle_future_mapping(
-    futures: generic.Mapping[KT, "Future[T]"],
+    futures: generic.Mapping[KT, "PendingTaskResult[T]"],
     *,
     block_seconds: float = 1.0,
     backoff_seconds: int = 1.0,
@@ -523,7 +525,7 @@ def cycle_future_mapping(
 
 @typing.overload
 def cycle_future_mapping(
-    futures: generic.Mapping[KT, "Future[T]"],
+    futures: generic.Mapping[KT, "PendingTaskResult[T]"],
     *,
     transform: generic.Callable[[KT, T, generic.Sequence[T]], VT],
     block_seconds: float = 1.0,
@@ -533,7 +535,7 @@ def cycle_future_mapping(
     ...
 
 def cycle_future_mapping(
-    futures: generic.Mapping[KT, "Future[T]"],
+    futures: generic.Mapping[KT, "PendingTaskResult[T]"],
     *,
     transform: generic.Callable[[KT, T, generic.Sequence[T]], VT] = None,
     block_seconds: float = 1.0,
@@ -550,7 +552,7 @@ def cycle_future_mapping(
     :param exception_handler: Special handling for exceptions
     :returns: The results from all the futures
     """
-    from concurrent.futures import Future
+    from post_processing.interfaces.work import PendingTaskResult
     import time
 
     if transform is None:
@@ -563,7 +565,7 @@ def cycle_future_mapping(
     elif not callable(exception_handler):
         raise ValueError(f"{exception_handler} (type={type(exception_handler)}) is not callable")
 
-    current_values: dict[KT, Future[T]] = dict(**futures)
+    current_values: dict[KT, PendingTaskResult[T]] = dict(**futures)
 
     results: list[VT] = []
     last_item_id: typing.Optional[int] = None
@@ -591,7 +593,7 @@ def cycle_future_mapping(
 
 @typing.overload
 def cycle_futures(
-    futures: generic.Sequence["Future[T]"],
+    futures: generic.Sequence["PendingTaskResult[T]"],
     *,
     block_seconds: float = 1.0,
     backoff_seconds: float = 1.0
@@ -600,7 +602,7 @@ def cycle_futures(
 
 @typing.overload
 def cycle_futures(
-    futures: generic.Sequence["Future[T]"],
+    futures: generic.Sequence["PendingTaskResult[T]"],
     *,
     transform: generic.Callable[[T, generic.Sequence[T]], VT],
     block_seconds: float = 1.0,
@@ -610,7 +612,7 @@ def cycle_futures(
 
 @typing.overload
 def cycle_futures(
-    futures: generic.Mapping[KT, "Future[T]"],
+    futures: generic.Mapping[KT, "PendingTaskResult[T]"],
     *,
     block_seconds: float = 1.0,
     backoff_seconds: int = 1.0,
@@ -620,7 +622,7 @@ def cycle_futures(
 
 @typing.overload
 def cycle_futures(
-    futures: generic.Mapping[KT, "Future[T]"],
+    futures: generic.Mapping[KT, "PendingTaskResult[T]"],
     *,
     transform: generic.Callable[[KT, T, generic.Sequence[T]], VT],
     block_seconds: float = 1.0,
@@ -631,7 +633,7 @@ def cycle_futures(
 
 
 def cycle_futures(
-    futures: typing.Union[generic.Mapping[KT, "Future[T]"], generic.Sequence["Future[T]"]],
+    futures: typing.Union[generic.Mapping[KT, "PendingTaskResult[T]"], generic.Sequence["PendingTaskResult[T]"]],
     *,
     transform: typing.Union[generic.Callable[[KT, T, generic.Sequence[T]], VT], generic.Callable[[T, generic.Sequence[T]], VT]] = None,
     block_seconds: float = 1.0,
@@ -667,46 +669,39 @@ def cycle_futures(
 
 @typing.overload
 def cycle_future(
-    future: "Future[T]",
+    future: "PendingTaskResult[T]",
     *,
     block_seconds: float = 1.0,
-    backoff_seconds: int = 1.0,
     exception_handler: generic.Callable[[Exception], Exception] = None,
 ) -> tuple[typing.Optional[T], typing.Optional[Exception]]:
     ...
 
 @typing.overload
 def cycle_future(
-    future: "Future[T]",
+    future: "PendingTaskResult[T]",
     *,
-    transform: generic.Callable[[T, generic.Sequence[T]], VT],
+    transform: generic.Callable[[T], VT],
     block_seconds: float = 1.0,
-    backoff_seconds: float = 1.0,
     exception_handler: generic.Callable[[Exception], Exception] = None
 ) -> tuple[typing.Optional[VT], typing.Optional[Exception]]:
     ...
 
 def cycle_future(
-    future: "Future[T]",
+    future: "PendingTaskResult[T]",
     *,
     transform: generic.Callable[[T], VT] = None,
     block_seconds: float = 1.0,
-    backoff_seconds: float = 1.0,
     exception_handler: generic.Callable[[Exception], Exception] = None,
 ) -> tuple[typing.Optional[typing.Union[T, VT]], typing.Optional[BaseException]]:
     """
     Cycle through the list of values and apply and transforms as the contents are generated
 
-    :param futures: The list of values to cycle through
+    :param future: The list of values to cycle through
     :param transform: The function to apply to each value
     :param block_seconds: The number of seconds to wait for a result
-    :param backoff_seconds: The number of seconds to wait after timing out while waiting for a result that just timed out
     :param exception_handler: Special handling for exceptions
     :returns: The results from all the futures
     """
-    from concurrent.futures import Future
-    import time
-
     if transform is not None and not callable(transform):
         raise TypeError("transform must be callable")
 
@@ -727,6 +722,8 @@ def cycle_future(
             return None, exception
         except BaseException as exception:
             return None, exception
+
+    return None, RuntimeError(f"Results could not be gathered from a pending task")
 
 
 def get_property_values(obj: object) -> dict[str, typing.Any]:

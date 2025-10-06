@@ -1373,7 +1373,7 @@ class DropOperation(PathToPathOperation, FileOutputMixin):
         from post_processing.utilities import netcdf
         import xarray
 
-        with netcdf.load(target=input_path) as netcdf_data:
+        with netcdf.load(target=input_path, full_load=True) as netcdf_data:
             if self.exclude:
                 dimensions_to_remove: list[str] = [
                     str(dimension)
@@ -1413,56 +1413,51 @@ class DropOperation(PathToPathOperation, FileOutputMixin):
         :param output_file: Where to save the result
         :returns: The path to the updated data
         """
-        import tempfile
-
+        import xarray
         from post_processing.utilities import netcdf
 
-        with tempfile.TemporaryDirectory(dir=settings.intermediate_directory) as temporary_directory:
-            temporary_directory_path: pathlib.Path = pathlib.Path(temporary_directory)
-            with netcdf.load(target=input_file, full_load=True) as netcdf_data:
-                if self.exclude:
-                    variables_to_drop: list[str] = [
-                        str(variable_name)
-                        for variable_name in netcdf_data.variables.keys()
-                        if variable_name not in self.fields
-                    ]
-                else:
-                    missing_variables: list[str] = [
-                        field_name
-                        for field_name in self.fields
-                        if field_name not in netcdf_data.variables.keys()
-                    ]
-                    if missing_variables and settings.this_is_verbose:
-                        LOGGER.debug(
-                            f"Cannot remove variables - '{input_file}' is missing the following variables: "
-                            f"'{', '.join(missing_variables)}'"
-                        )
-                    variables_to_drop: list[str] = list(
-                        field
-                        for field in self.fields
-                        if field in netcdf_data.variables.keys()
-                    )
-
-                updated_data = netcdf_data.drop_vars(variables_to_drop)
-
-                from concurrent.futures import Future
-                future_path: Future[pathlib.Path] = netcdf.submit_write(
-                    dataset=updated_data,
-                    target=output_file,
-                    compute=True
+        netcdf_data: xarray.Dataset = netcdf.load(target=input_file, full_load=True)
+        if self.exclude:
+            variables_to_drop: list[str] = [
+                str(variable_name)
+                for variable_name in netcdf_data.variables.keys()
+                if variable_name not in self.fields
+            ]
+        else:
+            missing_variables: list[str] = [
+                field_name
+                for field_name in self.fields
+                if field_name not in netcdf_data.variables.keys()
+            ]
+            if missing_variables and settings.this_is_verbose:
+                LOGGER.debug(
+                    f"Cannot remove variables - '{input_file}' is missing the following variables: "
+                    f"'{', '.join(missing_variables)}'"
                 )
+            variables_to_drop: list[str] = list(
+                field
+                for field in self.fields
+                if field in netcdf_data.variables.keys()
+            )
 
-                from post_processing.utilities.common import cycle_future
-                result, error = cycle_future(future_path)
+        updated_data = netcdf_data.drop_vars(variables_to_drop)
 
-                if error is not None:
-                    raise error
-                if result is None:
-                    raise FileNotFoundError(f"Did not get a reference to data written to '{output_file}'")
+        from post_processing.interfaces.work import PendingTaskResult
+        future_path: PendingTaskResult[pathlib.Path] = netcdf.submit_write(
+            dataset=updated_data,
+            target=output_file,
+            compute=True
+        )
 
-                output_file = result
-                updated_data.close()
-                netcdf_data.close()
+        from post_processing.utilities.common import cycle_future
+        result, error = cycle_future(future_path)
+
+        if error is not None:
+            raise error
+        if result is None:
+            raise FileNotFoundError(f"Did not get a reference to data written to '{output_file}'")
+
+        output_file = result
 
         return output_file
 
@@ -2532,8 +2527,12 @@ class AnomalyOperation(PathToPathOperation):
         """
 
         """
+        from post_processing.interfaces.work import PendingTaskResult
         from post_processing.utilities.netcdf import operate_on_variable
+        from post_processing.utilities.common import cycle_futures
+        from post_processing.utilities import netcdf
         from post_processing.transform import anomaly
+        import numpy
         output_paths: generic.Sequence[pathlib.Path] = []
         frame_pattern: re.Pattern = re.compile(
             r"(?P<model>[a-zA-Z]+)\."
@@ -2547,16 +2546,18 @@ class AnomalyOperation(PathToPathOperation):
             sorted_files: generic.Sequence[pathlib.Path] = sorted(data, key=lambda path: path.name)
             earliest_path: pathlib.Path = sorted_files[0]
             latest_path: pathlib.Path = sorted_files[-1]
-            earliest_day: int = operate_on_variable(
-                path=earliest_path,
+
+            earliest_day: int = netcdf.load_array(
+                target=earliest_path,
                 variable_name=self.time_variable,
-                operation=lambda time_variable: time_variable.min().dt.dayofyear.data
-            ).item()
-            latest_day: int = operate_on_variable(
-                path=latest_path,
+                transformation=lambda array: numpy.min(array).astype("M8[ms]").item().timetuple().tm_yday
+            )
+            latest_day: int = netcdf.load_array(
+                target=latest_path,
                 variable_name=self.time_variable,
-                operation=lambda time_variable: time_variable.max().dt.dayofyear.data
-            ).item()
+                transformation=lambda array: numpy.max(array).astype("M8[ms]").item().timetuple().tm_yday
+            )
+
             all_metadata: dict[pathlib.Path, dict[str, typing.Any]] = {}
 
             for input_path in data:
@@ -2570,8 +2571,11 @@ class AnomalyOperation(PathToPathOperation):
                 all_metadata[input_path] = file_specific_metadata
 
             import concurrent.futures as futures
+            from post_processing.utilities.common import cycle_futures
+            from post_processing.interfaces.work import PendingTaskResult
             from time import sleep
 
+            # Preload the thresholds so they don't get loaded over and over again
             with futures.ThreadPoolExecutor(max_workers=settings.maximum_additional_threads) as executor:
                 load_results: list[futures.Future] = []
                 for threshold in self.thresholds:
@@ -2583,22 +2587,7 @@ class AnomalyOperation(PathToPathOperation):
                     )
                     load_results.append(future_load_result)
                     LOGGER.debug(f"Scheduled a preload for the data for {threshold}")
-                while load_results:
-                    load_result = load_results.pop(0)
-                    try:
-                        load_result.result(0.25)
-                    except TimeoutError:
-                        load_results.append(load_result)
-                        if len(load_results) == 1:
-                            sleep(0.5)
-                    except BaseException as e:
-                        for future in load_results:
-                            try:
-                                future.cancel()
-                            except:
-                                pass
-                        LOGGER.error(f"{metadata['stage']}: Failed to preload threshold data: {e}")
-                        raise e
+                cycle_futures(futures=load_results)
                 LOGGER.debug(f"Threshold data has been preloaded")
 
             arguments: list[dict[str, typing.Any]] = [

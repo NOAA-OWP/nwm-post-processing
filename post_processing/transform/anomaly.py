@@ -132,24 +132,22 @@ class ThresholdDefinition:
 
             import numpy
             import xarray
-            from post_processing.utilities.netcdf import operate_on_variable
+            from post_processing.utilities import netcdf
 
-            def get_days_of_year(array: xarray.DataArray) -> xarray.DataArray:
-                return array.sel(**{self.time_coordinate: days_of_year}).astype(numpy.float32).compute()
-
-            specific_statistics: xarray.DataArray = operate_on_variable(
-                path=file_path,
+            specific_statistics: xarray.DataArray = netcdf.select(
+                target=file_path,
                 variable_name=self.variable,
-                operation=get_days_of_year
+                criteria={self.time_coordinate: days_of_year},
+                transformation=lambda array: array.astype(numpy.float32),
             )
 
             if self.time_coordinate in specific_statistics.dims:
                 for day in days_of_year:
-                    self._data[day] = specific_statistics.sel({self.time_coordinate: day}).copy()
+                    self._data[day] = specific_statistics.sel({self.time_coordinate: day})
             else:
                 # The time coordinate may have been reduced out of the dataset by the `.sel` if there was just a
                 # single day. If so, there's only one day to assign
-                self._data[days_of_year] = specific_statistics.copy()
+                self._data[days_of_year] = specific_statistics
 
     def get_stats(self, day_of_year: int, **path_metadata) -> "xarray.DataArray":
         """
@@ -204,7 +202,6 @@ def make_apply_thresholds(
     :returns: A numpy ufunc compatible function
     """
     import numpy
-    import xarray
 
     if len(set(scores)) != len(scores):
         raise ValueError(f"Cannot apply thresholds - there cannot be duplicate scores: {scores}")
@@ -212,7 +209,7 @@ def make_apply_thresholds(
     if not isinstance(scores, numpy.ndarray):
         scores: numpy.ndarray = numpy.array(scores)
 
-    def _apply_thresholds(variable: xarray.DataArray, *thresholds: numpy.ndarray) -> numpy.ndarray:
+    def _apply_thresholds(variable: numpy.typing.NDArray[numpy.floating], *thresholds: numpy.ndarray) -> numpy.ndarray:
         """
         The ufunc passed to xarray and dask to vectorize the bin comparisons.
 
@@ -283,8 +280,7 @@ def calculate_anomaly(
         operational_metadata = {}
 
     try:
-        with LOAD_LOCK:
-            dataset = load(input_path, full_load=True, chunks=False)
+        dataset: xarray.Dataset = load(input_path, full_load=True, chunks=False)
     except:
         LOGGER.error(f"Could not load the netcdf data at '{input_path.resolve()}'")
         raise
@@ -381,7 +377,7 @@ def calculate_anomaly(
 
     anomaly_scores: numpy.ndarray = xarray.apply_ufunc(
         apply_thresholds,
-        variable,
+        variable.data,
         *threshold_arrays,
         input_core_dims=input_dimensions,
         output_dtypes=[numpy.result_type(*scores)],
@@ -411,8 +407,10 @@ def calculate_anomaly(
     try:
         from post_processing.utilities.netcdf import write
         updated_dataset[output_array.name].encoding.update(encoding)
+        LOGGER.debug(f"Now writing data with anomaly to {output_path}")
         write(dataset=updated_dataset, target=output_path)
-        updated_dataset.close()
+        LOGGER.debug(f"Done writing updated data from {input_path} to {output_path}")
+        #updated_dataset.close()
     except:
         LOGGER.error(f"Could not save the dataset with the newly calculated anomaly data to '{output_path.resolve()}'")
         raise

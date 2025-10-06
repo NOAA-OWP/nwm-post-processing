@@ -2,12 +2,10 @@
 Contains logic for subsetting netcdf files
 """
 import os
-import shutil
 import typing
 import pathlib
 import logging
 import re
-import tempfile
 
 from collections import abc as generic
 import concurrent.futures as futures
@@ -35,6 +33,13 @@ def mask_array(
     input_data: xarray.DataArray,
     mask: numpy.typing.NDArray[numpy.float32],
 ) -> xarray.DataArray:
+    """
+    Mask a numeric numpy array by an array of 1s and 0s
+
+    :param input_data: The data to mask
+    :param mask: The mask of 1s and 0s
+    :return: A new data array with the originals metadata, but with all values not makes set to NaN
+    """
     encoding: dict[str, typing.Any] = input_data.encoding.copy()
     masked_data: xarray.DataArray = input_data * mask
     masked_data.attrs = input_data.attrs.copy()
@@ -56,12 +61,29 @@ def mask_dataset(
     metadata: generic.Mapping[str, typing.Any],
     mask_metadata: generic.Mapping[pathlib.Path, generic.Mapping[str, typing.Any]],
 ) -> generic.Sequence[pathlib.Path]:
+    """
+    Iterate through each 2D+ mask and generate a new version of the input data with only the allowed data
 
+    NOTE: This operates on multidimensional data - use post_processing.transform.subsetting.vector for 1D
+
+    :param input_path: The path to the data to mask
+    :param masks: The paths to each mask to use
+    :param mask_variable: The variable in the mask files that contain the mask grid
+    :param mask_coordinates: The coordinates in the mask files that contain the mask grid (deprecated)
+    :param work_directory: The directory where temporary files may be placed
+    :param output_pattern: The pattern to use when forming file names
+    :param identifier_pattern: The pattern to use to identify variables within mask names
+    :param metadata: Information that may be used to generate file names
+    :param mask_metadata: General information about the masks in use
+    :returns: The path to the results of each mask application
+    """
+    from post_processing.interfaces.work import PendingTaskResult
     masked_files: list[pathlib.Path] = []
 
-    write_tasks: list[futures.Future[pathlib.Path]] = []
+    write_tasks: list[PendingTaskResult[pathlib.Path]] = []
 
-    LOGGER.debug(f"Subsetting '{input_path}' by {len(masks)} masks")
+    if settings.this_is_verbose:
+        LOGGER.debug(f"Subsetting '{input_path}' by {len(masks)} masks")
 
     with load(target=input_path, full_load=True, load_kwargs=dict(chunks=None)) as input_data:
         if settings.this_is_very_verbose:
@@ -107,8 +129,9 @@ def mask_dataset(
             if settings.this_is_very_verbose:
                 LOGGER.debug(f"Retrieved the mask at '{mask_path}' for '{input_path}'")
 
+            # TODO: Can this be threaded?
             masked_variables: dict[str, xarray.DataArray] = {
-                variable_name: mask_array(input_data=variable, mask=mask_data)
+                variable_name: mask_array(input_data=variable.load().copy(deep=True), mask=mask_data)
                 for variable_name, variable in input_data.data_vars.items()
                 if variable.shape[-1 * len(mask_data.shape):] == mask_data.shape
             }
@@ -144,7 +167,7 @@ def mask_dataset(
             if settings.this_is_verbose:
                 LOGGER.debug(f"Subset '{input_path}' by '{mask_path}")
 
-            write_task: futures.Future[pathlib.Path] = submit_write(dataset=copied_input_data, target=output_path)
+            write_task: PendingTaskResult[pathlib.Path] = submit_write(dataset=copied_input_data, target=output_path)
             write_tasks.append(write_task)
 
         masked_files, errors = cycle_future_list(futures=write_tasks)
