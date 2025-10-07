@@ -194,6 +194,8 @@ def convert_file(
     :param conversions: A listing of the names of the variables to convert and what unit to convert them to
     :return: The path to the converted file
     """
+    import warnings
+
     import xarray
 
     from post_processing.utilities.netcdf import write
@@ -214,6 +216,11 @@ def convert_file(
             input_data[variable_name] = converted_data
             input_data.encoding = original_encoding
         LOGGER.debug(f"Saving the updated '{input_path.name}' data to a temporary location")
-        write(target=output_path, dataset=input_data)
+
+        with warnings.catch_warnings(record=True) as recorded_warnings:
+            warnings.simplefilter("always")
+            write(target=output_path, dataset=input_data)
+        for recorded_warning in recorded_warnings:
+            LOGGER.debug(recorded_warning)
     return output_path
 

@@ -121,7 +121,6 @@ class Projection:
         projection_attribute_name: str = None
     ) -> "Projection":
         with _LOAD_LOCK:
-            #with load_netcdf(path, full_load=True) as projection_dataset:
             with netcdf.load(target=path, full_load=True) as projection_dataset:
                 projection: Projection = cls.read_dataset(
                     projection_dataset=projection_dataset,
@@ -166,7 +165,7 @@ class _ProjectionStore:
         self.__store: dict[int, Projection] = {}
         self.__lock: RLock = RLock()
 
-    def clean(self):
+    def clean(self, projection_key: int = None):
         """
         Empty out the cache in order to clear space
         """
@@ -175,6 +174,32 @@ class _ProjectionStore:
 
             for key in keys:
                 del self.__store[key]
+
+    def remove(
+        self,
+        path: pathlib.Path,
+        x_variable_name: str = None,
+        y_variable_name: str = None,
+        crs_variable_name: str = None,
+        projection_attribute_name: str = None
+    ) -> bool:
+        """
+        Remove a specific projection from the store
+        """
+        key: int = hash((
+            str(path),
+            x_variable_name,
+            y_variable_name,
+            crs_variable_name,
+            projection_attribute_name
+        ))
+        if key in self.__store:
+            with self.__lock:
+                if key in self.__store:
+                    projection: Projection = self.__store.pop(key)
+                    del projection
+                    return True
+        return False
 
     def get(
         self,
@@ -217,6 +242,29 @@ class _ProjectionStore:
 ProjectionStore: _ProjectionStore = _ProjectionStore()
 """A central store for common projections"""
 
+def remove_projection(
+        path: pathlib.Path,
+        x_variable_name: str = None,
+        y_variable_name: str = None,
+        crs_variable_name: str = None,
+        projection_attribute_name: str = None
+) -> bool:
+    """
+    Remove a projection from the global store that is no longer needed
+    """
+    try:
+        removal: bool = ProjectionStore.remove(
+            path=path,
+            x_variable_name=x_variable_name,
+            y_variable_name=y_variable_name,
+            crs_variable_name=crs_variable_name,
+            projection_attribute_name=projection_attribute_name
+        )
+    except:
+        LOGGER.error(f"Failed to remove a Projection stored at {path}", exc_info=True)
+        removal = False
+
+    return removal
 
 
 def get_affine_transformation(
@@ -709,7 +757,7 @@ def reproject_gridded_variables(
         original_variable: xarray.DataArray = dataset.data_vars.get(data_variable.name)
 
         if original_variable is None:
-            LOGGER.warning(f"There is a new variable in a reprojected dataset: {data_variable.name}")
+            LOGGER.debug(f"There is a new variable in a reprojected dataset: {data_variable.name}")
             continue
 
         data_variable.encoding.update(original_variable.encoding)
@@ -746,6 +794,7 @@ def reproject_dataset(
     :param reprojection_x_coordinate_name: The name of the variable containing the x coordinate values in the reprojection dataset
     :param reprojection_y_coordinate_name: The name of the variable containing the y coordinate values in the reprojection dataset
     :param resampling_strategy: How to determine what values to put into potentially new grid cells
+    :param output_crs_variable_name: The name of the CRS that should be in the output file
     :returns: The reprojected dataset
     """
     if not output_crs_variable_name:
@@ -787,4 +836,5 @@ def reproject_dataset(
             resampling_strategy=resampling_strategy,
             output_crs_variable_name=output_crs_variable_name
         )
+    del input_projection
     return reprojected_data

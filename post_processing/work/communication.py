@@ -4,8 +4,13 @@ Classes, functions, and objects used to communicate across threads, processes, a
 from post_processing.interfaces.work import Signal
 from post_processing.interfaces.work import TaskQueue
 
+# TODO: Make this a system setting
 COMMUNICATE_VIA_THREADS: bool = True
+
+# TODO: Make this a system setting
 COMMUNICATE_VIA_PROCESSES: bool = False
+
+# TODO: Make this a system setting
 COMMUNICATE_VIA_NODES: bool = False
 
 def get_signal(state: bool = False) -> Signal:

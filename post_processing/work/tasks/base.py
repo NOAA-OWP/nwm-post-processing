@@ -83,3 +83,22 @@ class DataTask(typing.Generic[T], abc.ABC):
         if self.future.done():
             return "Complete"
         return "Pending"
+
+@dataclasses.dataclass
+class DyeTask(DataTask[T]):
+    """
+    A simple task used to help find issues
+    """
+
+    def __call__(self) -> T:
+        print(f"Hitting the dye...")
+        import sys, threading, traceback
+        frames = sys._current_frames()  # {thread_id: frame}
+        threads = {t.ident: t for t in threading.enumerate()}
+        for tid, frame in frames.items():
+            t = threads.get(tid)
+            name = getattr(t, "name", "?")
+            daemon = getattr(t, "daemon", "?")
+            alive = getattr(t, "is_alive", lambda: "?")()
+            print(f"\n--- Thread {tid} name={name} daemon={daemon} alive={alive} ---")
+            traceback.print_stack(frame)

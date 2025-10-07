@@ -7,6 +7,7 @@ import pathlib
 import os
 from threading import RLock
 import collections.abc as generic
+import atexit
 
 from post_processing.configuration import settings
 
@@ -34,14 +35,15 @@ __IO_GATEWAY: typing.Optional["gateway.Gateway"] = None
 
 os.environ.setdefault("HDF5_USE_FILE_LOCKING", "FALSE")
 
+@atexit.register
 def close_gateway():
     """
     Shut down the thread handler for Netcdf IO
     """
     global __IO_GATEWAY
-    if __IO_GATEWAY is not None:
+    if __IO_GATEWAY is not None and __IO_GATEWAY.running:
         with OPEN_LOCK:
-            if __IO_GATEWAY is not None:
+            if __IO_GATEWAY is not None and __IO_GATEWAY.running:
                 __IO_GATEWAY.shutdown()
                 del __IO_GATEWAY
                 __IO_GATEWAY = None
