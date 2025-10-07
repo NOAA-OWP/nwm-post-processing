@@ -677,9 +677,6 @@ class ReprojectionOperation(PathToPathOperation, FileOutputMixin):
         :param metadata: Metadata available for reference
         :returns: Paths to updated data
         """
-        import xarray
-        from post_processing.utilities import netcdf
-
         reference_path: pathlib.Path = pathlib.Path(
             str(self.reference_dataset_path).format_map(metadata)
         )
@@ -716,6 +713,14 @@ class ReprojectionOperation(PathToPathOperation, FileOutputMixin):
             )
             raise
 
+        from post_processing.transform.reproject import remove_projection
+        remove_projection(
+            path=self.reference_dataset_path,
+            x_variable_name=self.reference_x_variable,
+            y_variable_name=self.reference_y_variable,
+            crs_variable_name=self.reference_crs_variable,
+            projection_attribute_name=self.reference_crs_string_attribute
+        )
         return updated_paths
 
     def __post_init__(self) -> None:
@@ -843,6 +848,8 @@ class SubsetOperation(PathToPathOperation):
                 exception.args = (f"Failure in:{os.linesep}{self}{os.linesep}{exception.args[0]}", *exception.args[1:])
             raise exception
 
+        from post_processing.transform.subset import clean as clean_masks
+        clean_masks()
         return [path for inner_results in results for path in inner_results]
 
     def __post_init__(self):
@@ -1065,6 +1072,9 @@ class ExtractOperation(PathToPathOperation):
             if 'failure in' not in str(exception).lower():
                 exception.args = (f"Failure in:{os.linesep}{self}{os.linesep}{exception.args[0]}", *exception.args[1:])
             raise exception
+
+        from post_processing.transform.subset import clean as clean_masks
+        clean_masks()
 
         return [path for inner_results in results for path in inner_results]
 
@@ -1344,20 +1354,20 @@ class DropOperation(PathToPathOperation, FileOutputMixin):
 
     def _remove_dimensions(
         self,
-        input_path: pathlib.Path,
-        output_path: pathlib.Path
+        input_file: pathlib.Path,
+        output_file: pathlib.Path
     ) -> pathlib.Path:
         """
         Remove the given fields as dimensions
 
-        :param input_path: The path to the netcdf data whose dimensions to remove
-        :param output_path: Where to save the new dataset
+        :param input_file: The path to the netcdf data whose dimensions to remove
+        :param output_file: Where to save the new dataset
         :returns: The path to the updated data
         """
         from post_processing.utilities import netcdf
         import xarray
 
-        with netcdf.load(target=input_path, full_load=True) as netcdf_data:
+        with netcdf.load(target=input_file, full_load=True) as netcdf_data:
             if self.exclude:
                 dimensions_to_remove: list[str] = [
                     str(dimension)
@@ -1372,7 +1382,7 @@ class DropOperation(PathToPathOperation, FileOutputMixin):
             from concurrent.futures import Future
             future_output_path: Future[pathlib.Path] = netcdf.submit_write(
                 dataset=netcdf_without_dimensions,
-                target=output_path
+                target=output_file
             )
 
             from post_processing.utilities.common import cycle_future
@@ -1381,9 +1391,9 @@ class DropOperation(PathToPathOperation, FileOutputMixin):
             if error is not None:
                 raise error
             elif result is None:
-                raise FileNotFoundError(f"Could not find the path to the written data in {output_path}")
-            output_path = result
-        return output_path
+                raise FileNotFoundError(f"Could not find the path to the written data in {output_file}")
+            output_file = result
+        return output_file
 
     def _remove_variables(
         self,
@@ -2513,7 +2523,6 @@ class AnomalyOperation(PathToPathOperation):
 
         """
         from post_processing.interfaces.work import PendingTaskResult
-        from post_processing.utilities.netcdf import operate_on_variable
         from post_processing.utilities.common import cycle_futures
         from post_processing.utilities import netcdf
         from post_processing.transform import anomaly
@@ -2556,8 +2565,6 @@ class AnomalyOperation(PathToPathOperation):
                 all_metadata[input_path] = file_specific_metadata
 
             import concurrent.futures as futures
-            from post_processing.utilities.common import cycle_futures
-            from post_processing.interfaces.work import PendingTaskResult
             from time import sleep
 
             # Preload the thresholds so they don't get loaded over and over again
@@ -2599,6 +2606,11 @@ class AnomalyOperation(PathToPathOperation):
                 args=arguments,
                 thread_count=settings.maximum_additional_threads,
             )
+
+            while self.thresholds:
+                threshold = self.thresholds.pop()
+                del threshold
+
         except Exception as exception:
             if 'failure in' not in str(exception):
                 exception.args = (f"Failure in:{os.linesep}{self}{os.linesep}{exception.args[0]}", *exception.args[1:])

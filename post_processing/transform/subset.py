@@ -49,6 +49,15 @@ def mask_array(
         LOGGER.debug(f"Subset the {input_data.name} variable")
     return masked_data
 
+def clean():
+    """
+    Clean out all resources that might have been used
+    """
+    try:
+        MASK_PROVIDER.clean()
+    except Exception as exc:
+        LOGGER.error(f"Could not clean the mask provider: {exc}")
+
 @timed_function()
 def mask_dataset(
     input_path: pathlib.Path,

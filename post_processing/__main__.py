@@ -9,6 +9,7 @@ import logging
 import pathlib
 import sys
 import faulthandler
+import atexit
 
 import collections.abc as generic
 
@@ -227,10 +228,19 @@ def find_invalid_profiles() -> generic.Sequence[str]:
     from post_processing.schema.profile import find_invalid_profiles
     return find_invalid_profiles()
 
-
+@atexit.register
 def shutdown():
+    """
+    Close down any leakable objects
+
+    Registered for 'atexit' AND during 'main' to ensure all bases are covered in order to exit cleanly
+    """
     from post_processing.utilities import netcdf
+    if settings.this_is_verbose:
+        LOGGER.debug(f"Shutting down the gateway")
     netcdf.close_gateway()
+    if settings.this_is_verbose:
+        LOGGER.debug(f"The gateway was closed")
 
 
 def main() -> int:
@@ -372,22 +382,25 @@ def main() -> int:
         LOGGER.critical(f"National Water Model Post Processing could not provide outputs", exc_info=False)
         return 1
     LOGGER.info(f"Operation complete in {datetime.now() - start_time}")
+    try:
+        shutdown()
+    except BaseException as exception:
+        LOGGER.error(exception, exc_info=True)
 
     if profiler is not None:
         profiler.disable()
         filename: str = f"{datetime.now().astimezone().strftime('%Y%m%d.%H%M')}_{arguments.source_file.name}.profile"
         profiler.dump_stats(filename)
         LOGGER.info(f"Profile results saved to: {filename}")
-    return 0
 
+    return 0
 
 if __name__ == "__main__":
     if settings.debug:
         LOGGER.warning("Debug mode is enabled. Stop and disable if this is a testing or production environment.")
-    exit_code: int = main()
     try:
-        shutdown()
-    except BaseException as exception:
-        LOGGER.error(exception, exc_info=True)
-        exit_code = 1 if exit_code == 0 else exit_code
+        exit_code: int = main()
+    except BaseException as exc:
+        LOGGER.error(f"Error encountered: {exc}", exc_info=True)
+        exit_code = 1
     sys.exit(exit_code)

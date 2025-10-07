@@ -57,6 +57,22 @@ class _MaskProvider:
         self.__sizes: dict[pathlib.Path, dict[str, int]] = {}
         self.__variables: dict[pathlib.Path, generic.Mapping[str, str]] = {}
 
+    def clean(self):
+        """
+        Free all possible memory from the provider
+        """
+        with self.__lock:
+            keys: list[MaskKey] = list(self.__masks.keys())
+            paths: list[pathlib.Path] = list(self.__mask_metadata.keys())
+            for mask_key in keys:
+                mask = self.__masks.pop(mask_key)
+                mask[...] = 0
+                del mask
+            for path in paths:
+                self.__sizes.pop(path)
+                self.__variables.pop(path)
+                self.__mask_metadata.pop(path)
+
     def __load_mask(self, path: pathlib.Path, variable: str):
         from post_processing.utilities.netcdf import load
         key: MaskKey = MaskKey(path=path, variable_name=variable)

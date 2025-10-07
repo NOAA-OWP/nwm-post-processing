@@ -28,16 +28,29 @@
         },
         {
             "operation": "drop",
-            "fields": "RAINRATE"
+            "fields": ["RAINRATE"]
         },
         {
             "operation": "branch",
             "branches": {
                 "WMS": [
                     {
+                        "operation": "drop",
+                        "fields": [
+                            "reference_time"
+                        ],
+                        "drop_dimension": true
+                    },
+                    {
+                        "operation": "drop",
+                        "fields": [
+                            "time"
+                        ]
+                    },
+                    {
                         "operation": "reproject",
                         "reference_dataset_path": "{resource_path}/projections/alaska_mercator.nc",
-                        "output_crs_variable_name": "mercator"
+                        "reference_crs_variable": "mercator"
                     },
                     {
                         "operation": "save",
@@ -56,7 +69,7 @@
                     },
                     {
                         "operation": "save",
-                        "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.tm{tminus}.alaska.nc",
+                        "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.tm{tminus}.alaska.aprfc.nc",
                         "directory": "{output_path}/"
                     }
                 ]

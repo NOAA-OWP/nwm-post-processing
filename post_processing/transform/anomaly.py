@@ -35,6 +35,14 @@ class ThresholdDefinition:
     _data: dict[int, "xarray.DataArray"] = member(default_factory=dict)
     _lock: RLock = member(default_factory=RLock)
 
+    def __del__(self):
+        with self._lock:
+            keys: list[int] = list(self._data.keys())
+            for key in keys:
+                array: "xarray.DataArray" = self._data.pop(key)
+                array.close()
+                del array
+
     @classmethod
     def generate_init_key(
         cls,
@@ -406,11 +414,13 @@ def calculate_anomaly(
 
     try:
         from post_processing.utilities.netcdf import write
+        from post_processing.configuration import settings
         updated_dataset[output_array.name].encoding.update(encoding)
-        LOGGER.debug(f"Now writing data with anomaly to {output_path}")
+        if settings.this_is_very_verbose:
+            LOGGER.debug(f"Now writing data with anomaly to {output_path}")
         write(dataset=updated_dataset, target=output_path)
-        LOGGER.debug(f"Done writing updated data from {input_path} to {output_path}")
-        #updated_dataset.close()
+        if settings.this_is_very_verbose:
+            LOGGER.debug(f"Done writing updated data from {input_path} to {output_path}")
     except:
         LOGGER.error(f"Could not save the dataset with the newly calculated anomaly data to '{output_path.resolve()}'")
         raise

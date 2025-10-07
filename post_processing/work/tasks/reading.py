@@ -66,11 +66,11 @@ def _load(
                         dataset = dataset.load()
                         dataset.close()
                     else:
-                        LOGGER.warning(f"Loading '{target}' in full, but without the specific netcdf4 approach")
+                        LOGGER.debug(f"Loading '{target}' in full, but without the specific netcdf4 approach")
                         dataset: xarray.Dataset = xarray.load_dataset(target, engine=engine, **load_kwargs).copy(deep=True)
                         dataset.close()
                 else:
-                    LOGGER.warning(f"Loading '{target} lazily...")
+                    LOGGER.debug(f"Loading '{target} lazily...")
                     dataset: xarray.Dataset = xarray.open_dataset(target, engine=engine, chunks=chunks, **load_kwargs)
 
                 return dataset
