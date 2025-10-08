@@ -56,7 +56,7 @@ def clean():
     try:
         MASK_PROVIDER.clean()
     except Exception as exc:
-        LOGGER.error(f"Could not clean the mask provider: {exc}")
+        LOGGER.debug(f"Could not clean the mask provider: {exc}", exc_info=True)
 
 @timed_function()
 def mask_dataset(

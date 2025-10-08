@@ -68,9 +68,11 @@ class _MaskProvider:
                 mask = self.__masks.pop(mask_key)
                 mask[...] = 0
                 del mask
-            for path in paths:
+            for path in list(self.__sizes.keys()):
                 self.__sizes.pop(path)
+            for path in list(self.__variables.keys()):
                 self.__variables.pop(path)
+            for path in list(self.__mask_metadata.keys()):
                 self.__mask_metadata.pop(path)
 
     def __load_mask(self, path: pathlib.Path, variable: str):
