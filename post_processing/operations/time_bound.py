@@ -61,37 +61,30 @@ def calculate_time_bounds(
     if not isinstance(duration, numpy.timedelta64):
         raise TypeError(f"Cannot create timebounds based on a duration of '{duration}' (type={type(duration)})")
 
-    with tempfile.TemporaryDirectory(dir=work_directory) as temporary_directory:
-        temporary_directory_path: pathlib.Path = pathlib.Path(temporary_directory)
-        temporary_output_path: pathlib.Path = temporary_directory_path / output_path.name
 
-        #with netcdf.load_netcdf(input_path, full_load=True) as netcdf_data:
-        with netcdf.load(input_path, full_load=True) as netcdf_data:
-            if time_variable not in netcdf_data.variables.keys():
-                raise KeyError(
-                    f"Cannot accumulate data from '{input_path.name}::{time_variable}' - "
-                    f"there is no variable by that name"
-                )
-
-            time: xarray.DataArray = netcdf_data[time_variable]
-            lower_bound: numpy.datetime64 = time.min(skipna=True).values - duration
-            upper_bound: numpy.datetime64 = time.max(skipna=True).values
-            data: numpy.typing.NDArray[numpy.datetime64] = numpy.array([[lower_bound, upper_bound]])
-
-            time_bound_variable: xarray.DataArray = xarray.DataArray(
-                name=output_variable_name,
-                data=data,
-                coords={
-                    time.name: time
-                },
-                dims=tuple([*time.dims, bound_dimension_name])
+    with netcdf.load(input_path, full_load=True) as netcdf_data:
+        if time_variable not in netcdf_data.variables.keys():
+            raise KeyError(
+                f"Cannot accumulate data from '{input_path.name}::{time_variable}' - "
+                f"there is no variable by that name"
             )
-            netcdf_data[output_variable_name] = time_bound_variable
-            netcdf_data[output_variable_name].attrs.update(attributes)
-            #netcdf.save_netcdf(path=temporary_output_path, dataset=netcdf_data)
-            netcdf.write(target=output_path, dataset=netcdf_data)
 
-        #shutil.move(temporary_output_path, output_path)
+        time: xarray.DataArray = netcdf_data[time_variable]
+        lower_bound: numpy.datetime64 = time.min(skipna=True).values - duration
+        upper_bound: numpy.datetime64 = time.max(skipna=True).values
+        data: numpy.typing.NDArray[numpy.datetime64] = numpy.array([[lower_bound, upper_bound]])
+
+        time_bound_variable: xarray.DataArray = xarray.DataArray(
+            name=output_variable_name,
+            data=data,
+            coords={
+                time.name: time
+            },
+            dims=tuple([*time.dims, bound_dimension_name])
+        )
+        netcdf_data[output_variable_name] = time_bound_variable
+        netcdf_data[output_variable_name].attrs.update(attributes)
+        netcdf.write(target=output_path, dataset=netcdf_data)
 
     return output_path
 

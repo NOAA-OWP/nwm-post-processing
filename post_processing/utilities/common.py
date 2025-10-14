@@ -12,6 +12,7 @@ import json
 import collections.abc as generic
 
 from datetime import datetime
+from datetime import timedelta
 
 LOGGER: logging.Logger = logging.getLogger(pathlib.Path(__file__).stem)
 
@@ -65,6 +66,30 @@ NWM_FILENAME_PATTERN: re.Pattern = re.compile(
 )
 """A regular expression that matches on an NWM file name and can pull out important variables"""
 
+ISO_8601_DURATION_PATTERN: re.Pattern = re.compile(
+    r"P((?P<days>\d+)D)?(T((?P<hours>\d+)H)?((?P<minutes>\d+)M)?((?P<seconds>\d+(\.\d+)?)S)?)?"
+)
+
+
+def parse_timedelta(period: str) -> timedelta:
+    """
+    Parse a time delta out of an ISO 8601 duration string
+
+    :param period: an ISO 8601 duration string
+    :return: a timedelta that is as long as the ISO 8601 period
+    """
+    match: re.Match | None = ISO_8601_DURATION_PATTERN.match(period.strip())
+
+    if match is None:
+        raise ValueError(f"'parse_timedelta' can only parse ISO 8601 duration strings. Instead received: {period}")
+
+    parameters: dict[str, float] = {
+        key: float(captured_value) if captured_value is not None else 0.0
+        for key, captured_value in match.groupdict().items()
+    }
+
+    return timedelta(**parameters)
+
 
 def is_nan_safe(value: typing.Any) -> bool:
     """
@@ -80,11 +105,28 @@ def is_nan_safe(value: typing.Any) -> bool:
         return False
 
 
+@typing.overload
+def starmap(
+    function: generic.Callable[FunctionParameters, RT],
+    args: generic.Mapping[KT, ArgsAndKwargs],
+    thread_count: int = 0
+) -> generic.Mapping[KT, RT]:
+    ...
+
+@typing.overload
 def starmap(
     function: generic.Callable[FunctionParameters, RT],
     args: generic.Iterable[ArgsAndKwargs],
     thread_count: int = 0
 ) -> generic.Sequence[RT]:
+    ...
+
+
+def starmap(
+    function: generic.Callable[FunctionParameters, RT],
+    args: generic.Iterable[ArgsAndKwargs] | generic.Mapping[KT, ArgsAndKwargs],
+    thread_count: int = 0
+) -> generic.Sequence[RT] | generic.Mapping[KT, RT]:
     """
     Eagerly call the given function with each of sequence of positional arguments
 
@@ -93,22 +135,25 @@ def starmap(
     :param thread_count: The number of threads to use if threading is enabled
     :returns: The result of each function call
     """
-    results: list[RT] = []
 
     from post_processing.configuration import settings
-    from post_processing.enums import Verbosity
 
     if not isinstance(args, generic.Iterable) or isinstance(args, (str, bytes)):
         raise TypeError(f"Arguments for starmap must be an iterable collection. Received '{args}' (type={type(args)})")
 
     if settings.allow_threading and thread_count is not None and thread_count > 0:
-        results.extend(
-            starmap_threaded(function=function, args=args, thread_count=thread_count, thread_prefix="starmap")
+        results: generic.Mapping[KT, RT] | generic.Sequence[RT] = starmap_threaded(
+            function=function,
+            args=args,
+            thread_count=thread_count
         )
     else:
-        for argument_index, arg in enumerate(args):
-            if settings.verbosity >= Verbosity.ALL:
-                LOGGER.debug(f"Running through iteration {argument_index + 1} of {function}")
+        if isinstance(args, generic.Mapping):
+            results: dict[KT, RT] = {}
+        else:
+            results: list[RT] = []
+
+        for key, arg in (args.items() if isinstance(args, generic.Mapping) else ((None, arg) for arg in args)):
             if isinstance(arg, generic.Mapping):
                 result: RT = function(**arg)
             elif isinstance(arg, generic.Sequence) and len(arg) == 2 and isinstance(arg[0], generic.Sequence) and isinstance(arg[1], generic.Mapping):
@@ -117,9 +162,11 @@ def starmap(
                 result: RT = function(*arg)
             else:
                 result: RT = function(arg)
-            if settings.verbosity >= Verbosity.ALL:
-                LOGGER.debug(f"Completed iteration {argument_index + 1} of {function}")
-            results.append(result)
+
+            if isinstance(results, dict):
+                results[key] = result
+            else:
+                results.append(result)
 
     return results
 
@@ -282,14 +329,34 @@ def find_candidate_paths(
         )
     return possible_paths
 
+@typing.overload
+def starmap_threaded(
+    function: generic.Callable[[FunctionParameters], RT],
+    args: generic.Mapping[KT, ArgsAndKwargs],
+    thread_count: int = None,
+    *,
+    thread_prefix: str = None
+) -> generic.Mapping[KT, RT]:
+    ...
+
+@typing.overload
+def starmap_threaded(
+    function: generic.Callable[[FunctionParameters], RT],
+    args: generic.Sequence[ArgsAndKwargs],
+    thread_count: int = None,
+    *,
+    thread_prefix: str = None
+) -> generic.Sequence[RT]:
+    ...
+
 
 def starmap_threaded(
     function: generic.Callable[[FunctionParameters], RT],
-    args: generic.Iterable[ArgsAndKwargs],
+    args: generic.Iterable[ArgsAndKwargs] | generic.Mapping[KT, ArgsAndKwargs],
     thread_count: int = None,
     *,
-    thread_prefix: str = "starmap-threaded"
-) -> generic.Sequence[RT]:
+    thread_prefix: str = None
+) -> generic.Sequence[RT] | generic.Mapping[KT, RT]:
     """
     Eagerly call the given function with each of sequence of positional arguments within a thread pool for a
     degree of concurrency
@@ -303,17 +370,29 @@ def starmap_threaded(
     from post_processing.configuration import settings
     from post_processing.enums import Verbosity
 
+    if thread_prefix is None:
+        import threading
+        thread_prefix = f"{threading.current_thread().name}-starmap-"
+
     if not settings.allow_threading and settings.this_is_very_verbose:
         LOGGER.warning(f"Threading is being called directly even though it is supposed to be disabled")
 
     if thread_count is None:
         thread_count = settings.maximum_additional_threads
 
-    results: list[RT] = []
+    if isinstance(args, generic.Mapping):
+        results: dict[KT, RT] = {}
+    else:
+        results: list[RT] = []
+
     import concurrent.futures
     with concurrent.futures.ThreadPoolExecutor(max_workers=thread_count, thread_name_prefix=thread_prefix) as executor:
-        future_results: list[concurrent.futures.Future[RT]] = []
-        for arg in args:
+        if isinstance(args, generic.Mapping):
+            future_results: dict[KT, concurrent.futures.Future[RT]] = {}
+        else:
+            future_results: list[concurrent.futures.Future[RT]] = []
+
+        for key, arg in (args.items() if isinstance(args, generic.Mapping) else ((None, arg) for arg in args)):
             arguments_are_keyword: bool = isinstance(arg, generic.Mapping)
             arguments_are_positional: bool = isinstance(arg, generic.Sequence) and not isinstance(arg, str)
             arguments_are_positional_and_keyword: bool = (
@@ -343,7 +422,11 @@ def starmap_threaded(
                     function,
                     arg
                 )
-            future_results.append(future_result)
+
+            if isinstance(args, generic.Mapping):
+                future_results[key] = future_result
+            else:
+                future_results.append(future_result)
 
         if settings.verbosity >= Verbosity.ALL:
             LOGGER.debug(f"{len(future_results)} jobs have been scheduled for {function}")
@@ -520,7 +603,7 @@ def cycle_future_mapping(
     block_seconds: float = 1.0,
     backoff_seconds: int = 1.0,
     exception_handler: generic.Callable[[Exception], Exception] = None,
-) -> tuple[typing.Union[generic.Sequence[T], generic.Sequence[VT]], generic.Sequence[Exception]]:
+) -> tuple[generic.Mapping[KT, T], generic.Sequence[Exception]]:
     ...
 
 @typing.overload
@@ -531,7 +614,7 @@ def cycle_future_mapping(
     block_seconds: float = 1.0,
     backoff_seconds: int = 1.0,
     exception_handler: generic.Callable[[Exception], Exception] = None,
-) -> tuple[typing.Union[generic.Sequence[T], generic.Sequence[VT]], generic.Sequence[Exception]]:
+) -> tuple[generic.Mapping[KT, VT], generic.Sequence[Exception]]:
     ...
 
 def cycle_future_mapping(
@@ -541,7 +624,7 @@ def cycle_future_mapping(
     block_seconds: float = 1.0,
     backoff_seconds: float = 1.0,
     exception_handler: generic.Callable[[Exception], Exception] = None,
-) -> tuple[typing.Union[generic.Sequence[T], generic.Sequence[VT]], generic.Sequence[Exception]]:
+) -> tuple[generic.Mapping[KT, T | VT], generic.Sequence[Exception]]:
     """
     Cycle through the list of values and apply and transforms as the contents are generated
 
@@ -567,7 +650,7 @@ def cycle_future_mapping(
 
     current_values: dict[KT, PendingTaskResult[T]] = dict(**futures)
 
-    results: list[VT] = []
+    results: dict[KT, VT] = {}
     last_item_id: typing.Optional[int] = None
     exceptions: list[Exception] = []
 
@@ -577,7 +660,7 @@ def cycle_future_mapping(
         try:
             result: T = future.result(timeout=block_seconds)
             transformed_result: VT = transform(key, result, results)
-            results.append(transformed_result)
+            results[key] = transformed_result
         except TimeoutError:
             current_values[key] = future
             future_id: int = id(key)
@@ -589,6 +672,27 @@ def cycle_future_mapping(
             exceptions.append(processed_exception)
 
     return results, exceptions
+
+@typing.overload
+def cycle_futures(
+    futures: generic.Mapping[KT, "PendingTaskResult[T]"],
+    *,
+    block_seconds: float = 1.0,
+    backoff_seconds: int = 1.0,
+    exception_handler: generic.Callable[[Exception], Exception] = None,
+) -> tuple[generic.Mapping[KT, T], generic.Sequence[Exception]]:
+    ...
+
+@typing.overload
+def cycle_futures(
+    futures: generic.Mapping[KT, "PendingTaskResult[T]"],
+    *,
+    transform: generic.Callable[[KT, T, generic.Sequence[T]], VT],
+    block_seconds: float = 1.0,
+    backoff_seconds: int = 1.0,
+    exception_handler: generic.Callable[[Exception], Exception] = None,
+) -> tuple[generic.Mapping[KT, VT], generic.Sequence[Exception]]:
+    ...
 
 
 @typing.overload
@@ -610,27 +714,6 @@ def cycle_futures(
 ) -> tuple[generic.Sequence[VT], generic.Sequence[Exception]]:
     ...
 
-@typing.overload
-def cycle_futures(
-    futures: generic.Mapping[KT, "PendingTaskResult[T]"],
-    *,
-    block_seconds: float = 1.0,
-    backoff_seconds: int = 1.0,
-    exception_handler: generic.Callable[[Exception], Exception] = None,
-) -> tuple[generic.Sequence[T], generic.Sequence[Exception]]:
-    ...
-
-@typing.overload
-def cycle_futures(
-    futures: generic.Mapping[KT, "PendingTaskResult[T]"],
-    *,
-    transform: generic.Callable[[KT, T, generic.Sequence[T]], VT],
-    block_seconds: float = 1.0,
-    backoff_seconds: int = 1.0,
-    exception_handler: generic.Callable[[Exception], Exception] = None,
-) -> tuple[generic.Sequence[VT], generic.Sequence[Exception]]:
-    ...
-
 
 def cycle_futures(
     futures: typing.Union[generic.Mapping[KT, "PendingTaskResult[T]"], generic.Sequence["PendingTaskResult[T]"]],
@@ -639,7 +722,7 @@ def cycle_futures(
     block_seconds: float = 1.0,
     backoff_seconds: float = 1.0,
     exception_handler: generic.Callable[[Exception], Exception] = None,
-) -> tuple[typing.Union[generic.Sequence[VT], generic.Sequence[T]], generic.Sequence[Exception]]:
+) -> tuple[typing.Union[generic.Mapping[KT, T], generic.Mapping[KT, VT], generic.Sequence[VT], generic.Sequence[T]], generic.Sequence[Exception]]:
     """
     Step through a collection of futures, trying to process and act on them as soon as possible rather than
     waiting for each to finish
@@ -934,8 +1017,10 @@ def is_array_like(value: object) -> bool:
 
 
 def timed_function(
+    *,
     logger: typing.Optional[logging.Logger] = None,
-    level: typing.Optional[int] = None
+    level: typing.Optional[int] = None,
+    name: str = None
 ) -> generic.Callable[[generic.Callable[FunctionParameters, RT]], generic.Callable[FunctionParameters, RT]]:
     """
     Logs a function timing duration if timing recording is enabled and the given log level is allowable by the logger
@@ -947,6 +1032,7 @@ def timed_function(
     from post_processing.configuration import settings
     _logger = logger or logging.getLogger('TIMING')
     _level = _logger.getEffectiveLevel() if level is None else level
+    _function_name: str = name
 
     def decorator(func: generic.Callable[FunctionParameters, RT]) -> generic.Callable[FunctionParameters, RT]:
         """
@@ -962,7 +1048,7 @@ def timed_function(
 
         code = func.__code__
         function_metadata: dict[str, typing.Any] = {
-            "functionName": func.__name__,
+            "functionName": _function_name or func.__name__,
             "moduleName": func.__module__,
             "path": code.co_filename,
             "lineNumber": code.co_firstlineno,
@@ -974,16 +1060,17 @@ def timed_function(
             """
             Calls the input function with its given arguments and logs its runtime in ISO8601 duration format
             """
-            import time
 
-            start: float = time.perf_counter()
+            start: datetime = datetime.now().astimezone()
             successful: bool = False
             try:
                 result: RT = func(*args, **kwargs)
                 successful = True
                 return result
             finally:
-                seconds: float = time.perf_counter() - start
+                end: datetime = datetime.now().astimezone()
+                duration: timedelta = end - start
+                seconds: float = duration.total_seconds()
 
                 duration_description: str = "P"
                 days, seconds = divmod(seconds, 24.0 * 60.0 * 60.0)
@@ -1042,7 +1129,7 @@ def timed_function(
                 function_description += ")"
                 _logger.log(
                     _level,
-                    f"{function_description} | {'successful' if successful else 'failed'} | {duration_description}",
+                    f"{function_description} | {'successful' if successful else 'failed'} | {duration_description} | {start.strftime('%Y-%m-%d %H:%M:%S%z')} | {end.strftime('%Y-%m-%d %H:%M:%S%z')}",
                     extra=function_metadata
                 )
 

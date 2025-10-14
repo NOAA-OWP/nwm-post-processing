@@ -8,11 +8,16 @@ import os
 from threading import RLock
 import collections.abc as generic
 import atexit
+from typing import Concatenate
 
 from post_processing.configuration import settings
 
 from post_processing.utilities.common import timed_function
+from post_processing.interfaces.aliases import DatasetFunction
+from post_processing.interfaces.aliases import DataArrayFunction
 
+VariableParameters = typing.ParamSpec("VariableParameters")
+T = typing.TypeVar("T")
 if typing.TYPE_CHECKING:
     import xarray
     import numpy
@@ -21,7 +26,6 @@ if typing.TYPE_CHECKING:
 
 
 LOGGER: logging.Logger = logging.getLogger(pathlib.Path(__file__).stem)
-T = typing.TypeVar("T")
 
 _DEFAULT_ENCODING: generic.Mapping["numpy.dtype", dict[str, typing.Any]] | None = None
 
@@ -186,6 +190,71 @@ def submit_select(
 
     return future_result
 
+def submit_variable_transformation(
+    target: pathlib.Path,
+    variable_name: str,
+    function: DataArrayFunction,
+    kwargs: dict[str, typing.Any] = None,
+    selector: dict[str, typing.Any] = None,
+    selector_method: str = None,
+    drop_unselected: bool = True,
+    data_filter: typing.Callable[["xarray.DataArray"], "xarray.DataArray"] = None,
+) -> "PendingTaskResult[T]":
+    """
+    Submit a job to transform a variable
+    """
+    _open_gateway()
+
+    from post_processing.work.tasks.reading import TransformVariableTask
+    from post_processing.interfaces.work import PendingTaskResult
+
+    task: TransformVariableTask[T] = TransformVariableTask(
+        target=target,
+        variable_name=variable_name,
+        function=function,
+        kwargs=kwargs,
+        selector=selector,
+        selector_method=selector_method,
+        drop_unselected=drop_unselected,
+        data_filter=data_filter,
+    )
+
+    pending_result: PendingTaskResult[T] = __IO_GATEWAY.enqueue(task=task)
+    return pending_result
+
+
+@typing.runtime_checkable
+class DatasetMutator(typing.Protocol[VariableParameters]):
+    def __call__(self, dataset: "xarray.Dataset", **kwargs: VariableParameters.kwargs) -> "xarray.Dataset":
+        ...
+
+def submit_dataset_operation(
+    target: pathlib.Path,
+    output_path: pathlib.Path,
+    function: generic.Callable[typing.Concatenate["xarray.Dataset", VariableParameters], "xarray.Dataset"],
+    kwargs: dict[str, typing.Any] = None,
+    read_kwargs: dict[str, typing.Any] = None,
+    write_kwargs: dict[str, typing.Any] = None,
+    engine: str = settings.default_netcdf_engine,
+) -> "PendingTaskResult[pathlib.Path]":
+    _open_gateway()
+
+    from post_processing.work.tasks.writing import OperateOnDatasetTask
+    from post_processing.interfaces.work import PendingTaskResult
+
+    task: OperateOnDatasetTask = OperateOnDatasetTask(
+        target=target,
+        function=function,
+        output_path=output_path,
+        kwargs=kwargs,
+        read_arguments=read_kwargs,
+        write_arguments=write_kwargs,
+        engine=engine
+    )
+
+    pending_result: PendingTaskResult[pathlib.Path] = __IO_GATEWAY.enqueue(task=task)
+    return pending_result
+
 def submit_load(
     target: pathlib.Path,
     load_kwargs: dict[str, typing.Any] = None,
@@ -341,7 +410,7 @@ def load_variable(
 
     return result
 
-
+@timed_function()
 def select(
     target: pathlib.Path | generic.Sequence[pathlib.Path],
     variable_name: str,
@@ -380,6 +449,7 @@ def select(
 
     return result
 
+@timed_function()
 def load_array(
     target: pathlib.Path | generic.Sequence[pathlib.Path],
     variable_name: str,
@@ -498,7 +568,7 @@ def load_metadata(
     metadata: dict[str, typing.Any] = {}
     for input_path in path:
         with OPEN_LOCK:
-            with load(target=input_path, full_load=True) as source:
+            with load(target=input_path, full_load=True, engine=engine) as source:
                 metadata.update({
                     str(key): format_value(value)
                     for key, value in source.attrs.items()

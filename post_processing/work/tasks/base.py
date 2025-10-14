@@ -50,6 +50,9 @@ class DataTask(typing.Generic[T], abc.ABC):
     future: PendingTaskResult[T] = dataclasses.field(default_factory=get_pending_task_result, kw_only=True)
     _stack: str = dataclasses.field(default_factory=get_stack, kw_only=True, init=False, hash=False, compare=False, repr=False)
 
+    def __post_init__(self):
+        ...
+
     @classmethod
     def get_associated_error_type(cls) -> typing.Type[exceptions.GatewayError]:
         """

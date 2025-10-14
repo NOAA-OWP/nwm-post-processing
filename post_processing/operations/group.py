@@ -16,7 +16,12 @@ from post_processing.schema import profile as base_profile
 from post_processing.enums import TimeUnit
 from post_processing.schema.base import member
 from post_processing.utilities.common import starmap
+from post_processing.utilities.common import timed_function
 from post_processing.configuration import settings
+
+if typing.TYPE_CHECKING:
+    import xarray
+    import numpy
 
 LOGGER: logging.Logger = get_logger(__file__)
 
@@ -62,8 +67,145 @@ def generate_groups_by_lead(
     return groups
 
 
+def get_floor_and_maximum_time(
+    variable: "xarray.DataArray",
+    period: typing.Union[str, timedelta, "numpy.datetime64"] = "PT1H"
+) -> tuple["numpy.datetime64", "numpy.datetime64"]:
+    import numpy
+
+    # Don't check for ints because knowing the start time can be a mess
+    if variable.dtype != numpy.datetime64:
+        raise TypeError(
+            f"The input array needed to determine the time floor must be a datetime64 but was instead "
+            f"'{variable.dtype}' (type={type(variable.dtype)})"
+        )
+
+    if len(variable.shape) != 1:
+        raise ValueError(
+            f"Cannot determine the minimum floor time from "
+            f"'{variable.name}({', '.join(map(lambda pair: str(pair[0]) + '=' + str(pair[1]), variable.sizes))})' - "
+            f"it is not one dimensional"
+        )
+
+    if isinstance(period, str):
+        from post_processing.utilities.common import parse_timedelta
+        period: timedelta = parse_timedelta(period=period)
+
+    if isinstance(period, timedelta):
+        period: numpy.timedelta64 = numpy.timedelta64(period)
+
+    if not isinstance(period, numpy.timedelta64):
+        raise TypeError(
+            f"Cannot determine the floor of a time variable - The defined period is not a timedelta64 dtype"
+        )
+
+    minimum: numpy.datetime64 = numpy.min(variable.data)
+    floor: numpy.datetime64 = minimum - period
+
+    maximum: numpy.datetime64 = numpy.max(variable.data)
+    return floor, maximum
+
+@timed_function()
+def create_time_bounds(
+    first_file: pathlib.Path,
+    last_file: pathlib.Path,
+    time_variable_name: str = "time",
+    period: typing.Union[str, timedelta, "numpy.timedelta64"] = "PT1H",
+    attributes: typing.Dict[str, typing.Any] | None = None,
+    encoding: typing.Dict[str, typing.Any] | None = None,
+    name: str = "time_bounds",
+    dimensions: generic.Sequence[str] | None = None,
+) -> "xarray.DataArray":
+    import numpy
+    import xarray
+
+    from post_processing.utilities.common import cycle_future_list
+    from post_processing.utilities.netcdf import submit_variable_transformation
+    from post_processing.interfaces.work import PendingTaskResult
+
+    future_time_bounds: list[PendingTaskResult[tuple[numpy.datetime64, numpy.datetime64]]] = [
+        submit_variable_transformation(
+            target=first_file,
+            variable_name=time_variable_name,
+            function=get_floor_and_maximum_time,
+            kwargs={
+                "period": period
+            }
+        ),
+        submit_variable_transformation(
+            target=last_file,
+            variable_name=time_variable_name,
+            function=get_floor_and_maximum_time,
+            kwargs={
+                "period": period
+            }
+        )
+    ]
+
+    minimum_and_maximum_times, errors = cycle_future_list(future_time_bounds)
+
+    if errors:
+        if len(errors) == 1:
+            raise errors[0]
+        from post_processing.utilities.common import condense_exceptions
+        raise condense_exceptions(
+            message=f"Could not create the time bounds between '{first_file}' and '{last_file}'",
+            exceptions=errors
+        )
+
+    earliest: numpy.datetime64 = numpy.min(minimum_and_maximum_times)
+    latest: numpy.datetime64 = numpy.max(minimum_and_maximum_times)
+
+    if not dimensions:
+        dimensions = (time_variable_name, "nv")
+
+    array: xarray.DataArray = xarray.DataArray(
+        name=name,
+        dims=dimensions,
+        data=numpy.array([[earliest, latest]]),
+        attrs=attributes.copy() if isinstance(attributes, generic.Mapping) else {}
+    )
+
+    if isinstance(encoding, generic.Mapping):
+        array.encoding.update(encoding)
+
+    return array
+
+@timed_function()
+def apply_time_bounds(
+    dataset: "xarray.Dataset",
+    first_file: pathlib.Path,
+    last_file: pathlib.Path,
+    time_variable_name: str = "time",
+    period: typing.Union[str, timedelta, "numpy.timedelta64"] = "PT1H",
+    attributes: typing.Dict[str, typing.Any] | None = None,
+    encoding: typing.Dict[str, typing.Any] | None = None,
+    name: str = "time_bounds",
+    dimensions: generic.Sequence[str] | None = None,
+) -> "xarray.Dataset":
+    time_bounds: xarray.DataArray = create_time_bounds(
+        first_file=first_file,
+        last_file=last_file,
+        time_variable_name=time_variable_name,
+        period=period,
+        attributes=attributes,
+        encoding=encoding,
+        name=name,
+        dimensions=dimensions,
+    )
+
+    encoding: generic.Mapping[str, typing.Any] = time_bounds.encoding.copy()
+    attributes: generic.Mapping[str, typing.Any] = time_bounds.attributes.copy()
+
+    dataset[time_bounds.name] = time_bounds
+    dataset[time_bounds.name].attrs.update(attributes)
+    dataset[time_bounds.name].encoding.update(encoding)
+
+    return dataset
+
+
 @dataclasses.dataclass
-class GroupByLeadOperation(base_profile.PathToPathOperation):
+class GroupByLeadOperation(base_profile.PathToPathOperation, base_profile.FileOutputMixin):
     @classmethod
     def operation(cls) -> base_profile.OperationType:
         return base_profile.OperationType.GROUP_BY
@@ -112,41 +254,85 @@ class GroupByLeadOperation(base_profile.PathToPathOperation):
         previous_operations: list[base_profile.ProfileOperation],
         metadata: dict[str, typing.Any]
     ) -> generic.Sequence[pathlib.Path]:
-        file_groups: generic.Mapping[str, generic.Sequence[pathlib.Path]] = generate_groups_by_lead(
+        file_groups: generic.Mapping[str, generic.Sequence[pathlib.Path] | pathlib.Path] = generate_groups_by_lead(
             paths=data,
             lead_duration=self._duration,
         )
 
-        keyword_arguments: list[dict] = []
+        keyword_arguments: dict[str, dict] = {}
 
         for group_name, file_group in file_groups.items():
             group_metadata: dict[str, typing.Any] = {
                 "group": group_name,
                 **metadata.copy(),
             }
-            keyword_arguments.append({
+            keyword_arguments[group_name] = {
                 "operations": self.on_each,
                 "profile": profile,
                 "process_identifier": process_identifier,
                 "work_directory": work_directory,
                 "data": file_group,
                 "previous_operations": previous_operations.copy(),
-                "metadata": group_metadata,
-            })
+                "metadata": group_metadata
+            }
 
-        results: generic.Sequence[list[pathlib.Path]] = starmap(
+        results: generic.Mapping[str, generic.Sequence[pathlib.Path]] = starmap(
             function=base_profile.call_generic_operations,
             args=keyword_arguments,
             thread_count=settings.maximum_additional_threads
         )
 
-        flattened_results: generic.Sequence[pathlib.Path] = [
-            file
-            for group_results in results
-            for file in group_results
-        ]
+        from post_processing.utilities.netcdf import submit_dataset_operation
+        from post_processing.interfaces.work import PendingTaskResult
 
-        return flattened_results
+        time_bound_applications: list[PendingTaskResult[pathlib.Path]] = []
+        for group_name in list(results.keys()):
+            generated_paths: generic.Sequence[pathlib.Path] | pathlib.Path = results[group_name]
+            group_metadata: generic.Mapping[str, typing.Any] = keyword_arguments[group_name]["metadata"]
+
+            if isinstance(generated_paths, pathlib.Path):
+                generated_paths = [generated_paths]
+
+            for path in generated_paths:
+                updated_path: pathlib.Path = self.get_output_path(
+                    work_directory=work_directory,
+                    input_path=path,
+                    **group_metadata
+                )
+                first_file: pathlib.Path = file_groups[group_name][0]
+                last_file: pathlib.Path = file_groups[group_name][-1]
+
+                time_bound_applications.append(
+                    submit_dataset_operation(
+                        target=path,
+                        output_path=updated_path,
+                        function=apply_time_bounds,
+                        kwargs={
+                            "first_file": first_file,
+                            "last_file": last_file,
+                            "time_variable_name": self.time_variable_name,
+                            "period": self.period,
+                            "attributes": self.time_bound_attributes.copy(),
+                            "encoding": self.time_bound_encoding.copy(),
+                            "name": self.time_bound_name,
+                            "dimensions": self.time_bound_dimensions
+                        }
+                    )
+                )
+
+        from post_processing.utilities.common import cycle_futures
+        group_results, errors = cycle_futures(time_bound_applications)
+
+        if errors:
+            if len(errors) == 1:
+                raise errors[0]
+            from post_processing.utilities.common import condense_exceptions
+            raise condense_exceptions(
+                message=f"Could not apply time bounds to results of grouped operations",
+                exceptions=errors
+            )
+
+        return group_results
 
     def __hash__(self):
         try:
@@ -172,8 +358,14 @@ class GroupByLeadOperation(base_profile.PathToPathOperation):
         description += os.linesep.join(each_description)
         return description
 
-    on_each: list[base_profile.ProfileOperation] = dataclasses.field()
-    time_unit: TimeUnit = dataclasses.field()
-    amount_of_time: typing.Union[int, float] = dataclasses.field(default=1.0)
+    on_each: list[base_profile.ProfileOperation]
+    time_unit: TimeUnit
+    amount_of_time: typing.Union[int, float] = dataclasses.field(default=1.0, kw_only=True)
+    period: typing.Union[str, timedelta, "numpy.timedelta64"] = dataclasses.field(default="PT1H", kw_only=True)
+    time_bound_name: str = dataclasses.field(default="time_bounds", kw_only=True)
+    time_bound_dimensions: typing.Optional[generic.Sequence[str]] = dataclasses.field(default=None, kw_only=True)
+    time_variable_name: str = dataclasses.field(default="time", kw_only=True)
+    time_bound_encoding: dict[str, typing.Any] = dataclasses.field(default_factory=dict, kw_only=True)
+    time_bound_attributes: dict[str, typing.Any] = dataclasses.field(default_factory=dict, kw_only=True)
     _duration: timedelta = member(default=None)
 

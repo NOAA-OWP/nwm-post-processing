@@ -3263,7 +3263,8 @@ def call_generic_operations(
     work_directory: pathlib.Path,
     data: InputType,
     previous_operations: list[ProfileOperation],
-    metadata: dict[str, typing.Any]
+    metadata: dict[str, typing.Any],
+    on_complete: generic.Iterable[tuple[typing.Callable, generic.Mapping] | typing.Callable] = None
 ) -> OutputType:
     """
     Call operations sequentially without regard for input and output data
@@ -3275,8 +3276,39 @@ def call_generic_operations(
     :param data: The data that should flow into the operations
     :param previous_operations: A record of what operations have been performed
     :param metadata: Decorative metadata that may be used to generate names
+    :param on_complete: A series on operations to perform specifically for this group 
     :returns: The result of the last operation after the input data has been pushed through each ProfileOperation
     """
+    if on_complete is None:
+        on_complete = []
+
+    on_complete_updates: list[tuple[int, tuple[typing.Callable, generic.Mapping]]] = []
+
+    for handler_index, handler in enumerate(on_complete):
+        if callable(handler):
+            on_complete_updates.append((handler_index, (handler, {})))
+            continue
+
+        handler_pair_is_valid: bool = True
+        if not isinstance(handler, generic.Sequence):
+            handler_pair_is_valid = False
+        elif len(handler) != 2:
+            handler_pair_is_valid = False
+        elif not callable(handler[0]):
+            handler_pair_is_valid = False
+        elif not isinstance(handler[1], generic.Mapping):
+            handler_pair_is_valid = False
+
+        if not handler_pair_is_valid:
+            raise ValueError(
+                f"Cannot call generic operations from stage {metadata['stage']} - "
+                f"on_complete handler {handler_index} must either be a function or a function and keyword "
+                f"arguments and instead received (type={type(handler)}) '{handler}'"
+            )
+
+    for index_to_update, new_pair in on_complete_updates:
+        on_complete[index_to_update] = new_pair
+
     current_data = data
 
     for operation in operations:
@@ -3315,6 +3347,10 @@ def call_generic_operations(
                 f"there is already a record"
             )
 
+    for handler, kwargs in on_complete:
+        updated_data = handler(current_data, **kwargs)
+        if updated_data is not None:
+            current_data = updated_data
     return current_data
 
 

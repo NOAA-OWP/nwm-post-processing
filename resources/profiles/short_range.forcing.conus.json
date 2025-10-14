@@ -55,44 +55,18 @@
                                 "operation": "stream",
                                 "streams": [
                                     {
-                                        "input_variable": "time",
-                                        "output_variable": "minimum_time",
-                                        "calculation_type": "min"
-                                    },
-                                    {
-                                        "input_variable": "time",
-                                        "output_variable": "maximum_time",
-                                        "calculation_type": "max"
-                                    },
-                                    {
                                         "input_variable": "PRECIP",
                                         "calculation_type": "mean"
                                     }
                                 ],
                                 "output_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.{group}.{Region}.nc"
-                            },
-                            {
-                                "operation": "combine",
-                                "variables": [
-                                    "minimum_time",
-                                    "maximum_time"
-                                ],
-                                "new_dimension": "nv",
-                                "name": "time_bounds"
-                            },
-                            {
-                                "operation": "drop",
-                                "fields": [
-                                    "minimum_time",
-                                    "maximum_time"
-                                ]
-                            },
-                            {
-                                "operation": "save",
-                                "directory": "{output_path}/",
-                                "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.{group}.{region}.nc"
                             }
                         ]
+                    },
+                    {
+                        "operation": "save",
+                        "directory": "{output_path}/",
+                        "filename_pattern": "{file_name}"
                     }
                 ],
                 "RFC": [
