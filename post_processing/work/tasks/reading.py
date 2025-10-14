@@ -19,6 +19,7 @@ from post_processing.work import exceptions
 from post_processing.utilities.common import timed_function
 
 from post_processing.interfaces.aliases import DataArrayFunction
+from post_processing.interfaces.aliases import DatasetFunction
 
 T = typing.TypeVar("T")
 P = typing.ParamSpec("P")
@@ -89,7 +90,8 @@ def _load(
             attempts += 1
             LOGGER.error(
                 f"Failed to load {target}{' due to ' + str(last_exception) if last_exception else ''}. "
-                f"Waiting and trying again..."
+                f"Waiting and trying again...",
+                exc_info=last_exception,
             )
             time.sleep(1)
 
@@ -179,13 +181,70 @@ class LoadVariableTask(base.DataTask[xarray.DataArray]):
             return variable
 
 @dataclasses.dataclass
+class TransformDatasetTask(base.DataTask[T]):
+    """
+    Perform a quick operation on a dataset and return the result
+    """
+    function: DatasetFunction
+    load_kwargs: dict[str, typing.Any] = dataclasses.field(default_factory=dict)
+    full_load: bool = dataclasses.field(default=False)
+
+    def __str__(self):
+        arguments: str = ', '.join(map(
+            lambda pair: f"{pair[0]}={pair[1]}",
+            self.kwargs.items()
+        ))
+        return (
+            f"{self.__class__.__name__}: {self.function.__name__}(dataset{', ' + arguments if arguments else ''}) "
+            f"on '{self.target}', {'fully loaded' if self.full_load else 'lazily loaded'}, via '{self.engine}'"
+        )
+
+    def __post_init__(self):
+        super().__post_init__()
+
+        if not callable(self.function):
+            raise TypeError(
+                f"The function for a {self.__class__.__name__} is expected to be a function but is instead "
+                f"{self.function} (type={type(self.function)})"
+            )
+        if self.function.__name__ == "<lambda>":
+            raise TypeError(
+                f"The function for a {self.__class__.__name__} is expected to be a named function or constructor "
+                f"but is instead an anonymous function/lambda"
+            )
+
+        if self.kwargs is None:
+            self.kwargs = {}
+
+        if self.load_kwargs is None:
+            self.load_kwargs = {}
+
+    def __call__(self) -> T:
+        additional_arguments: dict[str, typing.Any] = {
+            "engine": self.engine,
+            "full_load": self.full_load,
+            "chunks": None if self.full_load else "auto",
+        }
+
+        with _load(target=self.target, load_kwargs=self.load_kwargs, **additional_arguments) as data:
+            result: T = self.function(data, **self.kwargs)
+
+            if isinstance(result, (xarray.DataArray, xarray.Dataset)):
+                LOGGER.debug(
+                    f"The result from '{self}' is of type "
+                    f"{type(result)} - there may be lingering connections to lazy elements or file caches that may "
+                    f"cause segfaults down the line."
+                )
+            return result
+
+@dataclasses.dataclass
 class TransformVariableTask(base.DataTask[T]):
     """
     Perform a quick operation on a variable and return the result
     """
     variable_name: str
     function: DataArrayFunction
-    full_load: bool = dataclasses.field(default=True)
+    full_load: bool = dataclasses.field(default=False)
     data_filter: typing.Optional[typing.Callable[[xarray.DataArray], xarray.DataArray]] = dataclasses.field(default=None)
     selector: typing.Optional[typing.Dict[str, typing.Any]] = dataclasses.field(default=None)
     selector_method: str = dataclasses.field(default=None)
@@ -218,7 +277,7 @@ class TransformVariableTask(base.DataTask[T]):
 
     @timed_function()
     def __call__(self) -> T:
-        with _load(target=self.target, load_kwargs=self.kwargs, full_load=False, chunks="auto", engine=self.engine) as data:
+        with _load(target=self.target, full_load=False, chunks="auto", engine=self.engine) as data:
             if self.variable_name not in data:
                 raise KeyError(
                     f"Cannot select '{self.variable_name}' from '{self.target}' - it is not a variable to select"
@@ -239,7 +298,15 @@ class TransformVariableTask(base.DataTask[T]):
                     f"Calling {self.function.__qualname__}(<{self.variable_name}>"
                     f"{', ' + ', '.join(map(str, self.kwargs)) if self.kwargs else ''})"
                 )
+
             result: T = self.function(variable, **self.kwargs)
+
+            if isinstance(result, (xarray.DataArray, xarray.Dataset)):
+                LOGGER.debug(
+                    f"The result from '{self}' is of type "
+                    f"{type(result)} - there may be lingering connections to lazy elements or file caches that may "
+                    f"cause segfaults down the line."
+                )
 
             return result
 

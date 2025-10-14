@@ -1395,6 +1395,34 @@ class DropOperation(PathToPathOperation, FileOutputMixin):
             output_file = result
         return output_file
 
+    @staticmethod
+    def _drop_variable(dataset: "xarray.Dataset", fields: list[str], exclude: bool = False) -> "xarray.Dataset":
+        if exclude:
+            variables_to_drop: list[str] = [
+                str(variable_name)
+                for variable_name in dataset.variables.keys()
+                if variable_name not in fields
+            ]
+        else:
+            missing_variables: list[str] = [
+                field_name
+                for field_name in fields
+                if field_name not in dataset.variables.keys()
+            ]
+            if missing_variables and settings.this_is_verbose:
+                LOGGER.debug(
+                    f"Cannot remove variables - the input file is missing the following variables: "
+                    f"'{', '.join(missing_variables)}'"
+                )
+            variables_to_drop: list[str] = list(
+                field
+                for field in fields
+                if field in dataset.variables.keys()
+            )
+
+        dataset = dataset.drop_vars(variables_to_drop)
+        return dataset
+
     def _remove_variables(
         self,
         input_file: pathlib.Path,
@@ -1407,45 +1435,21 @@ class DropOperation(PathToPathOperation, FileOutputMixin):
         :param output_file: Where to save the result
         :returns: The path to the updated data
         """
-
-        import xarray
         from post_processing.utilities import netcdf
-
-        netcdf_data: xarray.Dataset = netcdf.load(target=input_file, full_load=True)
-        if self.exclude:
-            variables_to_drop: list[str] = [
-                str(variable_name)
-                for variable_name in netcdf_data.variables.keys()
-                if variable_name not in self.fields
-            ]
-        else:
-            missing_variables: list[str] = [
-                field_name
-                for field_name in self.fields
-                if field_name not in netcdf_data.variables.keys()
-            ]
-            if missing_variables and settings.this_is_verbose:
-                LOGGER.debug(
-                    f"Cannot remove variables - '{input_file}' is missing the following variables: "
-                    f"'{', '.join(missing_variables)}'"
-                )
-            variables_to_drop: list[str] = list(
-                field
-                for field in self.fields
-                if field in netcdf_data.variables.keys()
-            )
-
-        updated_data = netcdf_data.drop_vars(variables_to_drop)
-
         from post_processing.interfaces.work import PendingTaskResult
-        future_path: PendingTaskResult[pathlib.Path] = netcdf.submit_write(
-            dataset=updated_data,
-            target=output_file,
-            compute=True
+
+        pending_result: PendingTaskResult[pathlib.Path] = netcdf.submit_dataset_operation(
+            target=input_file,
+            output_path=output_file,
+            function=self._drop_variable,
+            kwargs={
+                "fields": self.fields,
+                "exclude": self.exclude,
+            },
         )
 
         from post_processing.utilities.common import cycle_future
-        result, error = cycle_future(future_path)
+        result, error = cycle_future(pending_result)
 
         if error is not None:
             raise error

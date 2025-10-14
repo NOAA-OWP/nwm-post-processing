@@ -648,7 +648,10 @@ def cycle_future_mapping(
     elif not callable(exception_handler):
         raise ValueError(f"{exception_handler} (type={type(exception_handler)}) is not callable")
 
-    current_values: dict[KT, PendingTaskResult[T]] = dict(**futures)
+    current_values: dict[KT, PendingTaskResult[T]] = {
+        key: value
+        for key, value in futures.items()
+    }
 
     results: dict[KT, VT] = {}
     last_item_id: typing.Optional[int] = None
@@ -746,7 +749,7 @@ def cycle_futures(
         exception_handler=exception_handler,
     )
 
-    assert isinstance(results, generic.Sequence)
+    assert isinstance(results, (generic.Sequence, generic.Mapping)), f"Expected results to be a sequence but instead received a '{type(results)}'"
     assert isinstance(exceptions, generic.Sequence)
     return results, exceptions
 

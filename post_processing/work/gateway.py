@@ -35,6 +35,7 @@ class Gateway(abc.ABC):
         self,
         queue_length: int = DEFAULT_QUEUE_LENGTH,
         wait_seconds: float = DEFAULT_WAIT_SECONDS,
+        run_unqueable_tasks: bool = True,
     ):
         self.__wait_seconds: float = wait_seconds
         """How long to wait for a task in the queue before repolling"""
@@ -42,11 +43,16 @@ class Gateway(abc.ABC):
         """Whether the loop should be running"""
         self._queue: communication.TaskQueue = communication.get_queue(maxsize=queue_length)
         """A thread-safe queue of jobs to operate on"""
+        self._run_unqueable_tasks: bool = run_unqueable_tasks
 
     @property
     @abc.abstractmethod
     def running(self) -> bool:
         """Whether the gateway is up and running"""
+        ...
+
+    @abc.abstractmethod
+    def can_queue_task(self, task: DataTask[T] | None) -> bool:
         ...
 
     def enqueue(self, task: DataTask[T] | None) -> PendingTaskResult[T]:
@@ -59,6 +65,13 @@ class Gateway(abc.ABC):
         submitted: bool = False
 
         while self._should_operate.is_set() and not submitted:
+            if not self.can_queue_task(task=task):
+                if self._run_unqueable_tasks:
+                    LOGGER.warning(f"Cannot queue '{task}' - running directly instead")
+                    task = self.execute_task(task=task, dye_encountered=True)
+                    return task.future
+                else:
+                    raise RuntimeError(f"Cannot queue '{task}' within {self.__class__.__qualname__}")
             try:
                 if task is None:
                     LOGGER.debug(f"Enqueue 'None' in the gateway - this will close it.")
@@ -123,19 +136,10 @@ class Gateway(abc.ABC):
             if isinstance(job, DyeTask):
                 dye_encountered = True
                 LOGGER.info(f"First encountered the dye. The queue size is: {self._queue.qsize()}")
-
-            job_is_still_running: bool = job.future.set_running_or_notify_cancel()
-            if not job_is_still_running:
-                LOGGER.debug(f"{job} is no longer running")
                 continue
 
             try:
-                if dye_encountered:
-                    LOGGER.debug(
-                        f"Executing '{job}'"
-                    )
-                result = job.execute()
-                job.future.set_result(result)
+                self.execute_task(task=job, dye_encountered=dye_encountered)
             except KeyboardInterrupt:
                 self.shutdown()
                 break
@@ -144,11 +148,35 @@ class Gateway(abc.ABC):
             if settings.this_is_very_verbose:
                 LOGGER.debug(f"Completed: {job}")
 
+    def execute_task(self, task: DataTask[T], dye_encountered: bool = False) -> DataTask[T]:
+        task_is_still_running: bool = task.future.set_running_or_notify_cancel()
+        if not task_is_still_running:
+            LOGGER.debug(f"{task} is no longer running")
+            return task
+        if dye_encountered:
+            LOGGER.debug(f"Executing '{task}'")
+
+        result: T = task.execute()
+        task.future.set_result(result)
+        return task
+
 
 class ThreadedGateway(Gateway):
     """
     An IO handler for Netcdf data that trips over itself when threaded
     """
+
+    def can_queue_task(self, task: DataTask[T] | None) -> bool:
+        if not isinstance(self.__thread, threading.Thread) or not self.__thread.is_alive():
+            raise RuntimeError(f"Cannot queue '{task}' within {self.__class__.__qualname__} - it is not running")
+        current_thread: threading.Thread = threading.current_thread()
+        if current_thread.ident == self.__thread.ident:
+            return False
+        in_gateway_thread: bool = current_thread.ident == self.__thread.ident
+        if in_gateway_thread:
+            LOGGER.debug(f"Cannot queue '{task}' in '{self}' from within the gateway thread")
+        return not in_gateway_thread
+
     def __init__(
         self,
         queue_length: int = DEFAULT_QUEUE_LENGTH,

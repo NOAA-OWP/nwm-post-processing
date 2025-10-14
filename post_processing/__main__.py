@@ -380,9 +380,11 @@ def main() -> int:
     except BaseException as exception:
         LOGGER.error(exception, exc_info=True)
         LOGGER.critical(f"National Water Model Post Processing could not provide outputs", exc_info=False)
+        shutdown()
         return 1
     LOGGER.info(f"Operation complete in {datetime.now() - start_time}")
     try:
+        # TODO: Make `shutdown` a `finally` call
         shutdown()
     except BaseException as exception:
         LOGGER.error(exception, exc_info=True)

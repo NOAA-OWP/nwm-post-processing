@@ -74,7 +74,7 @@ def get_floor_and_maximum_time(
     import numpy
 
     # Don't check for ints because knowing the start time can be a mess
-    if variable.dtype != numpy.datetime64:
+    if not numpy.issubdtype(variable.dtype, numpy.datetime64):
         raise TypeError(
             f"The input array needed to determine the time floor must be a datetime64 but was instead "
             f"'{variable.dtype}' (type={type(variable.dtype)})"
@@ -195,7 +195,7 @@ def apply_time_bounds(
     )
 
     encoding: generic.Mapping[str, typing.Any] = time_bounds.encoding.copy()
-    attributes: generic.Mapping[str, typing.Any] = time_bounds.attributes.copy()
+    attributes: generic.Mapping[str, typing.Any] = time_bounds.attrs.copy()
 
     dataset[time_bounds.name] = time_bounds
     dataset[time_bounds.name].attrs.update(attributes)
