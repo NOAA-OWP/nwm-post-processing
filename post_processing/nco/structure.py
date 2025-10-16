@@ -7,6 +7,7 @@ import dataclasses
 import pathlib
 import enum
 import re
+import collections.abc as generic
 
 from .operation_helpers import EditMode
 from .operation_helpers import get_header
@@ -437,6 +438,9 @@ class NetcdfSummary:
         attribute_name_parameter: str = "attribute_name"
         attribute_value_parameter: str = "attribute_value"
         dtype_parameter: str = "dtype"
+
+        # Your IDE may not like some of the symbols after the first '}' character. This is fine and a standard
+        # limitation of linters.
         dimension_pattern: re.Pattern = re.compile(rf"\s+(?P<{dimension_name_parameter}>\w+) = (?P<{count_parameter}>\w+)\s+;")
         variable_definition_pattern: re.Pattern = re.compile(
             rf"\s+(?P<{dtype_parameter}>\w+) (?P<{variable_name_parameter}>\w+)(\((?P<{dimension_list_parameter}>[^)]+)\))? ;"
@@ -448,12 +452,12 @@ class NetcdfSummary:
             rf'"?(?P<{attribute_value_parameter}>(?<=").+(?=")|(?<!").+(?= ;))"? ;'
         )
 
-        dimension_matches: typing.Sequence[typing.Mapping[str, str]] = [
+        dimension_matches: generic.Sequence[generic.Mapping[str, str]] = [
             match.groupdict()
             for match in dimension_pattern.finditer(header)
         ]
 
-        variable_matches: typing.Sequence[typing.Mapping[str, str]] = [
+        variable_matches: generic.Sequence[generic.Mapping[str, str]] = [
             match.groupdict()
             for match in variable_definition_pattern.finditer(header)
         ]
@@ -510,7 +514,7 @@ class NetcdfSummary:
         )
 
     @classmethod
-    def load_summaries(cls, paths: typing.Sequence[typing.Union[str, pathlib.Path]]) -> typing.Sequence["NetcdfSummary"]:
+    def load_summaries(cls, paths: generic.Sequence[typing.Union[str, pathlib.Path]]) -> generic.Sequence["NetcdfSummary"]:
         """
         Load a series of netcdf data into summary objects
         """

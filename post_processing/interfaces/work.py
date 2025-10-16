@@ -7,6 +7,10 @@ T = typing.TypeVar('T')
 
 @typing.runtime_checkable
 class PendingTaskResult(typing.Protocol[T]):
+    """
+    An abstraction for some task that may be performed outside the normal flow of operations - does not need to be
+    a concurrent.futures.Future but follows the same functionality
+    """
     def cancel(self):
         ...
 
@@ -63,7 +67,7 @@ class Signal(typing.Protocol):
         """
 
 @typing.runtime_checkable
-class TaskQueue(typing.Protocol[T], typing.Generic[T]):
+class TaskQueue(typing.Protocol[T]):
     """
     An interface for the basic communication queue that will be used to communicate across concurrent systems
     """

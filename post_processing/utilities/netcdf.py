@@ -198,7 +198,7 @@ def submit_variable_transformation(
     selector: dict[str, typing.Any] = None,
     selector_method: str = None,
     drop_unselected: bool = True,
-    data_filter: typing.Callable[["xarray.DataArray"], "xarray.DataArray"] = None,
+    data_filter: generic.Callable[["xarray.DataArray"], "xarray.DataArray"] = None,
 ) -> "PendingTaskResult[T]":
     """
     Submit a job to transform a variable
@@ -354,7 +354,7 @@ def write(
     :param compute: Whether to compute writes because the data is a dask dataset with unevaluated expressions
     :returns: The path to where data was written
     """
-    from post_processing.utilities.common import cycle_future
+    from post_processing.work import cycle_future
     from post_processing.interfaces.work import PendingTaskResult
     future_result: PendingTaskResult[pathlib.Path] = submit_write(
         dataset=dataset,
@@ -379,10 +379,10 @@ def load(
     load_kwargs: dict[str, typing.Any] = None,
     full_load: bool = False,
     engine: str = settings.default_netcdf_engine,
-    transformation: typing.Callable[["xarray.Dataset"], T] = None,
+    transformation: generic.Callable[["xarray.Dataset"], T] = None,
     **kwargs
 ) -> "xarray.Dataset" | T:
-    from post_processing.utilities.common import cycle_future
+    from post_processing.work import cycle_future
     from post_processing.interfaces.work import PendingTaskResult
     future_result: PendingTaskResult["xarray.Dataset"] = submit_load(
         target=target,
@@ -410,10 +410,10 @@ def load_variable(
     load_kwargs: dict[str, typing.Any] = None,
     full_load: bool = False,
     engine: str = settings.default_netcdf_engine,
-    transformation: typing.Callable[["xarray.DataArray"], T] = None,
+    transformation: generic.Callable[["xarray.DataArray"], T] = None,
     **kwargs
 ) -> "xarray.DataArray" | T:
-    from post_processing.utilities.common import cycle_future
+    from post_processing.work import cycle_future
     from post_processing.interfaces.work import PendingTaskResult
     future_result: PendingTaskResult["xarray.DataArray"] = submit_load_variable(
         target=target,
@@ -444,12 +444,12 @@ def select(
     engine: str = settings.default_netcdf_engine,
     method: str = None,
     drop: bool = False,
-    transformation: typing.Callable[["xarray.DataArray"], T] = None,
+    transformation: generic.Callable[["xarray.DataArray"], T] = None,
     **kwargs
 ) -> "xarray.DataArray" | T:
     import xarray
     from post_processing.interfaces.work import PendingTaskResult
-    from post_processing.utilities.common import cycle_future
+    from post_processing.work import cycle_future
 
     submission: PendingTaskResult[xarray.DataArray] = submit_select(
         target=target,
@@ -480,11 +480,11 @@ def load_array(
     variable_name: str,
     load_kwargs: dict[str, typing.Any] = None,
     engine: str = settings.default_netcdf_engine,
-    transformation: typing.Callable[["numpy.typing.NDArray"], T] = None,
+    transformation: generic.Callable[["numpy.typing.NDArray"], T] = None,
     **kwargs
 ) -> "numpy.typing.NDArray" | T:
     from post_processing.interfaces.work import PendingTaskResult
-    from post_processing.utilities.common import cycle_future
+    from post_processing.work import cycle_future
 
     submission: PendingTaskResult["numpy.typing.NDArray"] = submit_load_array(
         target=target,
@@ -586,7 +586,7 @@ def _load_metadata_from_dataset(dataset: "xarray.Dataset") -> dict[str, typing.A
 
 
 def load_metadata(
-    path: typing.Union[pathlib.Path, str, typing.Sequence[typing.Union[pathlib.Path, str]]],
+    path: typing.Union[pathlib.Path, str, generic.Sequence[typing.Union[pathlib.Path, str]]],
     engine: typing.Union[str, typing.Literal["h5netcdf", "zarr", "netcdf4"]] = settings.default_netcdf_engine,
 ) -> dict[str, typing.Any]:
     """
@@ -613,7 +613,7 @@ def load_metadata(
         for source_path in path
     }
 
-    from post_processing.utilities.common import cycle_futures
+    from post_processing.work import cycle_futures
     metadata_from_paths, errors = cycle_futures(future_metadata_from_paths)
 
     if errors:
@@ -696,7 +696,7 @@ def format_value(value: object) -> str:
     return str(value)
 
 
-def format_variable(var: "xarray.DataArray") -> typing.Sequence[str]:
+def format_variable(var: "xarray.DataArray") -> generic.Sequence[str]:
     """
     Format a block of text describing a variable
 
@@ -781,7 +781,7 @@ def describe_netcdf(
         separator_placeholder,
     ]
     if variable_name is not None:
-        description: typing.Sequence[str] = format_variable(var=netcdf_file.get(variable_name))
+        description: generic.Sequence[str] = format_variable(var=netcdf_file.get(variable_name))
         return os.linesep.join(description)
 
     longest_dimension_name: str = max(map(str, netcdf_file.sizes.keys()), key=len)

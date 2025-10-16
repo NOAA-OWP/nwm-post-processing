@@ -86,7 +86,7 @@ class Arguments:
         if messages:
             raise ArgumentValidationException(__file__, messages=messages)
 
-    def __parse(self, args: typing.Sequence[str]):
+    def __parse(self, args: generic.Sequence[str]):
         """
         Parse passed in command line input
         """
@@ -305,7 +305,7 @@ def main() -> int:
     # `nwm.t00z.short_range.channel_rt.f018.conus.nc`, this will find all files that belong to t00z, short range,
     # channel_rt, conus
     try:
-        cycle_files: typing.Sequence[pathlib.Path] = get_cycle_files(arguments.source_file)
+        cycle_files: generic.Sequence[pathlib.Path] = get_cycle_files(arguments.source_file)
     except Exception as exception:
         LOGGER.critical(f"Could not find files to process within this cycle: {exception}")
         return 1
@@ -333,7 +333,7 @@ def main() -> int:
         member=file_attributes[MEMBER_PATTERN_VARIABLE]
     )
 
-    profiles: typing.Sequence[Profile] = get_profile(manifest=manifest)
+    profiles: generic.Sequence[Profile] = get_profile(manifest=manifest)
     
     try:
         if profiles:
@@ -346,7 +346,7 @@ def main() -> int:
                     if settings.debug:
                         LOGGER.info(f"Running the profile from {profile.source_file}")
 
-                    outputs: typing.Sequence[pathlib.Path] = profile.run(
+                    outputs: generic.Sequence[pathlib.Path] = profile.run(
                         cycle=manifest.cycle,
                         files=manifest.files,
                         output_path=arguments.destination

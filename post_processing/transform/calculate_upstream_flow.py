@@ -148,7 +148,7 @@ def calculate_upstream_flow_binned(
     routelink_format: RoutelinkFormat = RoutelinkFormat.NETCDF,
     work_directory: pathlib.Path = None,
     *,
-    encoding: typing.Mapping[str, typing.Any] = None,
+    encoding: generic.Mapping[str, typing.Any] = None,
     **attributes
 ) -> pathlib.Path | generic.Sequence[pathlib.Path]:
     """

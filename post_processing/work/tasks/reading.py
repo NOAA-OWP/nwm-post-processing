@@ -245,7 +245,7 @@ class TransformVariableTask(base.DataTask[T]):
     variable_name: str
     function: DataArrayFunction
     full_load: bool = dataclasses.field(default=False)
-    data_filter: typing.Optional[typing.Callable[[xarray.DataArray], xarray.DataArray]] = dataclasses.field(default=None)
+    data_filter: typing.Optional[generic.Callable[[xarray.DataArray], xarray.DataArray]] = dataclasses.field(default=None)
     selector: typing.Optional[typing.Dict[str, typing.Any]] = dataclasses.field(default=None)
     selector_method: str = dataclasses.field(default=None)
     drop_unselected: bool = dataclasses.field(default=True)

@@ -5,6 +5,7 @@ import logging.config
 import typing
 import logging
 import pathlib
+import collections.abc as generic
 
 from logging import Logger
 
@@ -86,12 +87,12 @@ class LevelBasedFormatter(logging.Formatter):
         style="%",
         validate: bool = True,
         *,
-        defaults: typing.Mapping[str, typing.Any] = None,
-        level_formats: typing.Mapping[typing.Union[int, str], str] = None
+        defaults: generic.Mapping[str, typing.Any] = None,
+        level_formats: generic.Mapping[typing.Union[int, str], str] = None
     ):
         super().__init__(fmt=fmt, datefmt=datefmt, style=style, validate=validate, defaults=defaults)
 
-        self.level_formats: typing.Mapping[int, str] = {
+        self.level_formats: generic.Mapping[int, str] = {
             get_level(level=level): level_format
             for level, level_format in (level_formats or {}).items()
         }
@@ -161,7 +162,7 @@ class JSONLogHandler(logging.Handler):
             with self.filepath.open('rb+') as log_file:
                 import string
                 # Record the binary whitespace characters to make it easier to tell if we haven't hit actual data yet
-                empty_values: typing.Sequence[bytes] = [
+                empty_values: generic.Sequence[bytes] = [
                     value.encode() for value in string.whitespace
                 ]
 

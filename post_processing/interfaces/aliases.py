@@ -13,12 +13,12 @@ VT = typing.TypeVar("VT")
 VariableParameters = typing.ParamSpec("VariableParameters")
 
 DataArrayFunction = generic.Callable[typing.Concatenate["xarray.DataArray", VariableParameters], T]
+"""
+Represents a function whose first input is an xarray data array but may have varying positional and keyword arguments, 
+and returns some value of a generic type
+"""
 DatasetFunction = generic.Callable[typing.Concatenate["xarray.Dataset", VariableParameters], T]
-
-
-
-
-@typing.runtime_checkable
-class DatasetMutator(typing.Protocol[VariableParameters]):
-    def __call__(self, dataset: "xarray.Dataset", **kwargs: VariableParameters.kwargs) -> "xarray.Dataset":
-        ...
+"""
+Represents a function whose first input is an xarray Dataset, but may have varying positional and keyword arguments, 
+and returns some value of a generic type
+"""

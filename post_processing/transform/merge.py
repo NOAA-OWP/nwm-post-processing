@@ -17,7 +17,7 @@ LOGGER: logging.Logger = logging.getLogger(pathlib.Path(__file__).stem)
 
 @timed_function()
 def merge_files_into_file(
-    files: typing.Sequence[typing.Union[str, pathlib.Path]],
+    files: generic.Sequence[typing.Union[str, pathlib.Path]],
     output_file: typing.Union[str, pathlib.Path]
 ) -> None:
     from post_processing.utilities.netcdf import write
@@ -25,7 +25,7 @@ def merge_files_into_file(
         write(target=output_file, dataset=merged_files)
 
 @timed_function()
-def merge_files(files: typing.Sequence[str | pathlib.Path]) -> xarray.Dataset:
+def merge_files(files: generic.Sequence[str | pathlib.Path]) -> xarray.Dataset:
     from post_processing.utilities.netcdf import load
     files: generic.Sequence[pathlib.Path] = [
         file if isinstance(file, pathlib.Path) else pathlib.Path(file)

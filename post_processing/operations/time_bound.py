@@ -17,14 +17,14 @@ import xarray
 from post_processing.utilities import logging
 from post_processing.schema import profile as base_profiles
 from post_processing.utilities import netcdf
-from post_processing.utilities.common import starmap_threaded
+from post_processing.work import starmap_threaded
 from post_processing.utilities.common import NWM_FILENAME_PATTERN
 from post_processing.enums import TimeUnit
 
 LOGGER: logging.Logger = logging.get_logger(__file__)
 
 
-AccumulationFunction = typing.Callable[
+AccumulationFunction = generic.Callable[
     [
         pathlib.Path,
         pathlib.Path,
@@ -103,7 +103,7 @@ class TimeBoundOperation(base_profiles.PathToPathOperation, base_profiles.FileOu
         profile: base_profiles.Profile,
         process_identifier: str,
         work_directory: pathlib.Path,
-        data: typing.Sequence[pathlib.Path],
+        data: generic.Sequence[pathlib.Path],
         previous_operations: generic.Sequence[base_profiles.ProfileOperation],
         metadata: dict[str, typing.Any]
     ) -> generic.Sequence[pathlib.Path]:
