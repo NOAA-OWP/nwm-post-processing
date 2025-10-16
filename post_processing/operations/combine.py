@@ -13,7 +13,7 @@ import numpy
 import post_processing.schema.profile as base_profile
 from post_processing.utilities.logging import get_logger
 from post_processing.utilities import netcdf
-from post_processing.utilities import common
+from post_processing.work import starmap_threaded
 
 LOGGER: logging.Logger = get_logger(__file__)
 
@@ -102,7 +102,7 @@ class CombineOperation(base_profile.PathToPathOperation, base_profile.FileOutput
         profile: base_profile.Profile,
         process_identifier: str,
         work_directory: pathlib.Path,
-        data: typing.Sequence[pathlib.Path],
+        data: generic.Sequence[pathlib.Path],
         previous_operations: list[base_profile.ProfileOperation],
         metadata: dict[str, typing.Any]
     ) -> generic.Sequence[pathlib.Path]:
@@ -123,7 +123,7 @@ class CombineOperation(base_profile.PathToPathOperation, base_profile.FileOutput
                 "encoding": self.encoding,
             })
 
-        updated_files: generic.Sequence[pathlib.Path] = common.starmap_threaded(
+        updated_files: generic.Sequence[pathlib.Path] = starmap_threaded(
             function=combine,
             args=arguments,
             thread_prefix=self.__class__.__name__,

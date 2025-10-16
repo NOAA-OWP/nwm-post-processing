@@ -23,17 +23,38 @@ LOGGER: logging.Logger = logging.getLogger(pathlib.Path(__file__).stem)
 def member(
     *,
     default: T = dataclasses.MISSING,
-    default_factory: typing.Callable[[], T] = dataclasses.MISSING,
+    default_factory: generic.Callable[[], T] = dataclasses.MISSING,
     metadata: dict = None,
-    kw_only: bool = False,
-    init_function: typing.Callable[["BaseModel"], typing.Any] = None,
-    load_order: int = 0
-) -> dataclasses.Field:
+    init_function: generic.Callable[["BaseModel"], typing.Any] = None,
+    load_order: int = 0,
+    description: str = None
+) -> dataclasses.Field[T]:
     """
     Create a member specific field
+
+    This field will be internal to the class and meant to not be serialized or used by an outside entity whatsoever
+
+    :param default: The default value to use for this field. If neither a default nor default_factory is given, the
+    default for the field will be 'None'. Mutually exclusive to 'default_factory'
+    :param default_factory: An optional function to use to generate the value for this field. Useful for creating
+    collections. Mutually exclusive to 'default'
+    :param metadata: General metadata to attach to the field for later reference
+    :param init_function: Optional function to use to generate the initial value for this field. This function
+    will receive the instance being created, so the given function may be self-referencing. Equate this to a member
+    method passing 'self'
+    :param load_order: An ordering key informing what order the to call this field's init function. If this field
+    relies on another member field for initialization, set this load order number higher than the other's
+    :param description: Optional description to attach to the field describing what it is for
+    :returns: A field for a dataclass
     """
     if metadata is None:
         metadata = {}
+
+    if isinstance(description, str) and len(description) > 0:
+        metadata['description'] = description
+
+    if default == dataclasses.MISSING and default_factory == dataclasses.MISSING:
+        default = None
 
     metadata[MEMBER_FIELD_KEY] = True
     metadata[LOAD_ORDER_KEY] = load_order
@@ -46,8 +67,6 @@ def member(
             f"Cannot create a field - both a default value and a default factory cannot be specified - "
             f"choose one or the other"
         )
-    elif default == dataclasses.MISSING and default_factory == dataclasses.MISSING:
-        raise ValueError(f"An initial value must be given if a member variable is to be added")
 
     if default_factory != dataclasses.MISSING:
         if not callable(default_factory):
@@ -60,7 +79,7 @@ def member(
             init=False,
             compare=False,
             repr=False,
-            kw_only=kw_only
+            kw_only=True
         )
     else:
         field = dataclasses.field(
@@ -69,34 +88,93 @@ def member(
             init=False,
             compare=False,
             repr=False,
-            kw_only=kw_only
+            kw_only=True
         )
 
     return field
 
+def postprocessing_model(
+    cls: typing.Optional[typing.Type[T]] = None,
+    /,
+    *,
+    generate_init: bool = True,
+    generate_repr: bool = True,
+    comparable: bool = True,
+    unsafe_hash: bool = False,
+    frozen: bool = False
+) -> generic.Callable[[typing.Type[T]], typing.Type[T]] | typing.Type[T]:
+    """
+    Wrapper for `dataclasses.dataclass` that ensures that subclasses may insert optional fields
 
-@dataclasses.dataclass
+    :param cls: The class to directly wrap
+    :param generate_init: Whether to generate an __init__ function
+    :param generate_repr: Whether to generate a __repr__ function
+    :param comparable: Whether to generate comparison functions
+    :param unsafe_hash: Whether to force the generation of a __hash__ function
+    :param frozen: Whether created instances should pretend to be immutable
+    """
+    decorator: generic.Callable[[typing.Type[T]], typing.Type[T]] = dataclasses.dataclass(
+        kw_only=True,
+        init=generate_init,
+        repr=generate_repr,
+        eq=comparable,
+        order=comparable,
+        unsafe_hash=unsafe_hash,
+        frozen=frozen
+    )
+
+    if cls is None:
+        return decorator
+
+    return decorator(cls)
+
+
+@postprocessing_model
 class BaseModel:
     """
     A base class for post-processing model objects
     """
-    _raw_configuration: typing.Optional[str] = member(default=None, kw_only=True)
+    _raw_configuration: typing.Optional[str] = member()
+
+    @classmethod
+    def get_model_fields(cls) -> generic.Sequence[dataclasses.Field]:
+        """
+        Get all dataclass fields for this model
+        """
+        return list(getattr(cls, "__dataclass_fields__"))
 
     @property
     def raw_configuration(self) -> typing.Optional[str]:
         return self._raw_configuration
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        # did subclass override __post_init__?
+        if "__post_init__" in cls.__dict__:
+            msg = (
+                f"{cls.__name__} overrides __post_init__, which breaks Base dataclass "
+                f"initialization. Override _validate() instead."
+            )
+
+            from post_processing.configuration import settings
+            if settings.debug:
+                # Raise this as an error in debug mode to ensure it gets the attention it needs
+                raise RuntimeError(msg)
+            else:
+                import warnings
+                warnings.warn(msg, category=UserWarning, stacklevel=2)
 
     def __post_init__(self):
         self._validate()
         self.__load_members__()
 
     def __load_members__(self):
-        loaders_and_order: list[tuple[typing.Callable[[], typing.Any], int]] = [
+        loaders_and_order: list[tuple[generic.Callable[[], typing.Any], int]] = [
             (field.metadata[INIT_FUNCTION_KEY], field.metadata.get(LOAD_ORDER_KEY, 0))
             for field in get_fields(self)
             if not field.init
                 and MEMBER_FIELD_KEY in field.metadata
-                and isinstance(field.metadata.get(INIT_FUNCTION_KEY), typing.Callable)
+                and isinstance(field.metadata.get(INIT_FUNCTION_KEY), generic.Callable)
         ]
 
         loaders: generic.Iterable[generic.Callable[[BaseModel], typing.Any]] = map(
@@ -121,7 +199,7 @@ class BaseModel:
         for field in get_fields(cls):  # type: dataclasses.Field
             if field.name in kwargs:
                 value: typing.Union[dict, typing.Any] = kwargs[field.name]
-                expected_type: typing.Optional[typing.Type] = type_hints.get(field.name)
+                expected_type: typing.Optional[generic.Callable[[typing.Any], typing.Any]] = type_hints.get(field.name)
 
                 if dataclasses.is_dataclass(expected_type) and isinstance(value, dict):
                     initial_values[field.name] = expected_type(**value)
@@ -205,12 +283,12 @@ class BaseModel:
     def __getstate__(self):
         member_fields: set[str] = {
             field.name
-            for field in dataclasses.fields(type(self))
+            for field in self.get_model_fields()
             if not field.init and MEMBER_FIELD_KEY in field.metadata
         }
         vanilla_state: dict[str, typing.Any] = {
             key: value
-            for key, value in super().__getstate__().items()
+            for key, value in typing.cast(dict, super().__getstate__()).items()
             if key not in member_fields
         }
         return vanilla_state
@@ -223,7 +301,7 @@ class BaseModel:
                 raise ValueError(f"Cannot set the '{key}' value on a '{type(self)}' - that field does not exist")
         self.__load_members__()
 
-    def to_dict(self) -> typing.Mapping[str, typing.Any]:
+    def to_dict(self) -> generic.Mapping[str, typing.Any]:
         """
         Convert the model to a dictionary ready for serialization
 
@@ -233,7 +311,7 @@ class BaseModel:
         """
         fields = [
             field
-            for field in dataclasses.fields(self)
+            for field in self.get_model_fields()
             if field.init
                 and MEMBER_FIELD_KEY not in field.metadata
                 and not field.name.startswith("_")
@@ -255,7 +333,7 @@ class BaseModel:
 ModelType = typing.TypeVar("ModelType", bound=BaseModel)
 
 
-def get_fields(class_or_instance) -> typing.Sequence[dataclasses.Field]:
+def get_fields(class_or_instance) -> generic.Sequence[dataclasses.Field]:
     """
     Get fields from a class that are meant to be internal runtime state, not recognizable, serializable values
 

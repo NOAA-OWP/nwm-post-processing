@@ -6,7 +6,7 @@ import typing
 import dataclasses
 import pathlib
 import logging
-
+import collections.abc as generic
 
 from post_processing.enums import Region
 from post_processing.enums import Configuration
@@ -32,13 +32,13 @@ class InputManifest(BaseModel):
     """What type of data was created (channel_rt, forcing, land)"""
     cycle: str
     """What cycle of the model that this takes place"""
-    files: typing.Sequence[pathlib.Path]
+    files: generic.Sequence[pathlib.Path]
     """The files that will serve as input for post processing"""
     member: typing.Optional[int] = dataclasses.field(default=None)
     """The ensemble member that may be getting processed"""
 
     @classmethod
-    def from_files(cls, files: typing.Sequence[pathlib.Path]) -> "InputManifest":
+    def from_files(cls, files: generic.Sequence[pathlib.Path]) -> "InputManifest":
         """
         Create a manifest from a set of files
         """

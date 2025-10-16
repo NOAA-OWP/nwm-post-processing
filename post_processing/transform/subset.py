@@ -20,7 +20,7 @@ from post_processing.transform.subsetting.cache import MASK_PROVIDER
 from post_processing.utilities.netcdf import submit_write
 from post_processing.utilities.netcdf import load
 from post_processing.configuration import settings
-from post_processing.utilities.common import cycle_future_list
+from post_processing.work import cycle_future_list
 from post_processing.utilities.common import condense_exceptions
 
 LOGGER: logging.Logger = logging.getLogger(pathlib.Path(__file__).stem)

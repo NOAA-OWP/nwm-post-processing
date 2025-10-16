@@ -8,11 +8,16 @@ import os
 from threading import RLock
 import collections.abc as generic
 import atexit
+import dataclasses
 
 from post_processing.configuration import settings
 
 from post_processing.utilities.common import timed_function
+from post_processing.interfaces.aliases import DatasetFunction
+from post_processing.interfaces.aliases import DataArrayFunction
 
+VariableParameters = typing.ParamSpec("VariableParameters")
+T = typing.TypeVar("T")
 if typing.TYPE_CHECKING:
     import xarray
     import numpy
@@ -21,7 +26,6 @@ if typing.TYPE_CHECKING:
 
 
 LOGGER: logging.Logger = logging.getLogger(pathlib.Path(__file__).stem)
-T = typing.TypeVar("T")
 
 _DEFAULT_ENCODING: generic.Mapping["numpy.dtype", dict[str, typing.Any]] | None = None
 
@@ -186,6 +190,96 @@ def submit_select(
 
     return future_result
 
+def submit_variable_transformation(
+    target: pathlib.Path,
+    variable_name: str,
+    function: DataArrayFunction,
+    kwargs: dict[str, typing.Any] = None,
+    selector: dict[str, typing.Any] = None,
+    selector_method: str = None,
+    drop_unselected: bool = True,
+    data_filter: generic.Callable[["xarray.DataArray"], "xarray.DataArray"] = None,
+) -> "PendingTaskResult[T]":
+    """
+    Submit a job to transform a variable
+    """
+    _open_gateway()
+
+    from post_processing.work.tasks.reading import TransformVariableTask
+    from post_processing.interfaces.work import PendingTaskResult
+
+    task: TransformVariableTask[T] = TransformVariableTask(
+        target=target,
+        variable_name=variable_name,
+        function=function,
+        kwargs=kwargs,
+        selector=selector,
+        selector_method=selector_method,
+        drop_unselected=drop_unselected,
+        data_filter=data_filter,
+    )
+
+    pending_result: PendingTaskResult[T] = __IO_GATEWAY.enqueue(task=task)
+    return pending_result
+
+
+def submit_dataset_transformation(
+    target: pathlib.Path,
+    function: generic.Callable[typing.Concatenate["xarray.Dataset", VariableParameters], T],
+    function_kwargs: dict[str, typing.Any] = None,
+    load_kwargs: dict[str, typing.Any] = None,
+    full_load: bool = False,
+    engine: str = settings.default_netcdf_engine,
+) -> "PendingTaskResult[T]":
+    _open_gateway()
+    from post_processing.work.tasks.reading import TransformDatasetTask
+    from post_processing.interfaces.work import PendingTaskResult
+
+    task: TransformDatasetTask[T] = TransformDatasetTask(
+        target=target,
+        function=function,
+        load_kwargs=load_kwargs,
+        kwargs=function_kwargs,
+        engine=engine,
+        full_load=full_load,
+    )
+
+    future_result: PendingTaskResult[T] = __IO_GATEWAY.enqueue(task=task)
+    return future_result
+
+
+@typing.runtime_checkable
+class DatasetMutator(typing.Protocol[VariableParameters]):
+    def __call__(self, dataset: "xarray.Dataset", **kwargs: VariableParameters.kwargs) -> "xarray.Dataset":
+        ...
+
+def submit_dataset_operation(
+    target: pathlib.Path,
+    output_path: pathlib.Path,
+    function: generic.Callable[typing.Concatenate["xarray.Dataset", VariableParameters], "xarray.Dataset"],
+    kwargs: dict[str, typing.Any] = None,
+    read_kwargs: dict[str, typing.Any] = None,
+    write_kwargs: dict[str, typing.Any] = None,
+    engine: str = settings.default_netcdf_engine,
+) -> "PendingTaskResult[pathlib.Path]":
+    _open_gateway()
+
+    from post_processing.work.tasks.writing import OperateOnDatasetTask
+    from post_processing.interfaces.work import PendingTaskResult
+
+    task: OperateOnDatasetTask = OperateOnDatasetTask(
+        target=target,
+        function=function,
+        output_path=output_path,
+        kwargs=kwargs,
+        read_arguments=read_kwargs,
+        write_arguments=write_kwargs,
+        engine=engine
+    )
+
+    pending_result: PendingTaskResult[pathlib.Path] = __IO_GATEWAY.enqueue(task=task)
+    return pending_result
+
 def submit_load(
     target: pathlib.Path,
     load_kwargs: dict[str, typing.Any] = None,
@@ -260,7 +354,7 @@ def write(
     :param compute: Whether to compute writes because the data is a dask dataset with unevaluated expressions
     :returns: The path to where data was written
     """
-    from post_processing.utilities.common import cycle_future
+    from post_processing.work import cycle_future
     from post_processing.interfaces.work import PendingTaskResult
     future_result: PendingTaskResult[pathlib.Path] = submit_write(
         dataset=dataset,
@@ -285,10 +379,10 @@ def load(
     load_kwargs: dict[str, typing.Any] = None,
     full_load: bool = False,
     engine: str = settings.default_netcdf_engine,
-    transformation: typing.Callable[["xarray.Dataset"], T] = None,
+    transformation: generic.Callable[["xarray.Dataset"], T] = None,
     **kwargs
 ) -> "xarray.Dataset" | T:
-    from post_processing.utilities.common import cycle_future
+    from post_processing.work import cycle_future
     from post_processing.interfaces.work import PendingTaskResult
     future_result: PendingTaskResult["xarray.Dataset"] = submit_load(
         target=target,
@@ -316,10 +410,10 @@ def load_variable(
     load_kwargs: dict[str, typing.Any] = None,
     full_load: bool = False,
     engine: str = settings.default_netcdf_engine,
-    transformation: typing.Callable[["xarray.DataArray"], T] = None,
+    transformation: generic.Callable[["xarray.DataArray"], T] = None,
     **kwargs
 ) -> "xarray.DataArray" | T:
-    from post_processing.utilities.common import cycle_future
+    from post_processing.work import cycle_future
     from post_processing.interfaces.work import PendingTaskResult
     future_result: PendingTaskResult["xarray.DataArray"] = submit_load_variable(
         target=target,
@@ -341,7 +435,7 @@ def load_variable(
 
     return result
 
-
+@timed_function()
 def select(
     target: pathlib.Path | generic.Sequence[pathlib.Path],
     variable_name: str,
@@ -350,12 +444,12 @@ def select(
     engine: str = settings.default_netcdf_engine,
     method: str = None,
     drop: bool = False,
-    transformation: typing.Callable[["xarray.DataArray"], T] = None,
+    transformation: generic.Callable[["xarray.DataArray"], T] = None,
     **kwargs
 ) -> "xarray.DataArray" | T:
     import xarray
     from post_processing.interfaces.work import PendingTaskResult
-    from post_processing.utilities.common import cycle_future
+    from post_processing.work import cycle_future
 
     submission: PendingTaskResult[xarray.DataArray] = submit_select(
         target=target,
@@ -380,16 +474,17 @@ def select(
 
     return result
 
+@timed_function()
 def load_array(
     target: pathlib.Path | generic.Sequence[pathlib.Path],
     variable_name: str,
     load_kwargs: dict[str, typing.Any] = None,
     engine: str = settings.default_netcdf_engine,
-    transformation: typing.Callable[["numpy.typing.NDArray"], T] = None,
+    transformation: generic.Callable[["numpy.typing.NDArray"], T] = None,
     **kwargs
 ) -> "numpy.typing.NDArray" | T:
     from post_processing.interfaces.work import PendingTaskResult
-    from post_processing.utilities.common import cycle_future
+    from post_processing.work import cycle_future
 
     submission: PendingTaskResult["numpy.typing.NDArray"] = submit_load_array(
         target=target,
@@ -475,9 +570,23 @@ def operate_on_variable(
             result = operation(dataset[variable_name])
             return result
 
+def _load_metadata_from_dataset(dataset: "xarray.Dataset") -> dict[str, typing.Any]:
+    metadata: dict[str, typing.Any] = {
+        str(key): format_value(value)
+        for key, value in dataset.attrs.items()
+    }
+
+    for coordinate_data in dataset.coords.values():
+        metadata.update(_get_variable_metadata(variable=coordinate_data))
+
+    for variable in dataset.data_vars.values():
+        metadata.update(_get_variable_metadata(variable=variable))
+
+    return metadata
+
 
 def load_metadata(
-    path: typing.Union[pathlib.Path, str, typing.Sequence[typing.Union[pathlib.Path, str]]],
+    path: typing.Union[pathlib.Path, str, generic.Sequence[typing.Union[pathlib.Path, str]]],
     engine: typing.Union[str, typing.Literal["h5netcdf", "zarr", "netcdf4"]] = settings.default_netcdf_engine,
 ) -> dict[str, typing.Any]:
     """
@@ -490,27 +599,37 @@ def load_metadata(
     :param engine: The engine that will load and interpret the data
     :returns: A dictionary containing all the attributes in it and on its variables. Variable attributes will be prefixed by the variable name
     """
-    import xarray
+    from post_processing.interfaces.work import PendingTaskResult
 
     if isinstance(path, pathlib.Path):
         path = [path]
 
+    future_metadata_from_paths: dict[pathlib.Path, PendingTaskResult[dict[str, typing.Any]]] = {
+        source_path: submit_dataset_transformation(
+            target=source_path,
+            function=_load_metadata_from_dataset,
+            engine=engine,
+        )
+        for source_path in path
+    }
+
+    from post_processing.work import cycle_futures
+    metadata_from_paths, errors = cycle_futures(future_metadata_from_paths)
+
+    if errors:
+        if len(errors) == 1:
+            raise errors[0]
+        else:
+            from post_processing.utilities.common import condense_exceptions
+            raise condense_exceptions(f"Could not load metadata from netcdf files", errors)
+
     metadata: dict[str, typing.Any] = {}
-    for input_path in path:
-        with OPEN_LOCK:
-            with load(target=input_path, full_load=True) as source:
-                metadata.update({
-                    str(key): format_value(value)
-                    for key, value in source.attrs.items()
-                })
-
-                for coordinate_name, coordinate_data in source.coords.items():
-                    metadata.update(_get_variable_metadata(variable=coordinate_data))
-
-                for variable_name, variable_data in source.data_vars.items():
-                    metadata.update(_get_variable_metadata(variable=variable_data))
-                source.close()
-            del source
+    for source_path, file_metadata in metadata_from_paths.items():
+        metadata.update(file_metadata)
+        metadata.update({
+            f"{source_path.name}.{key}": value
+            for key, value in file_metadata.items()
+        })
 
     return metadata
 
@@ -577,7 +696,7 @@ def format_value(value: object) -> str:
     return str(value)
 
 
-def format_variable(var: "xarray.DataArray") -> typing.Sequence[str]:
+def format_variable(var: "xarray.DataArray") -> generic.Sequence[str]:
     """
     Format a block of text describing a variable
 
@@ -662,7 +781,7 @@ def describe_netcdf(
         separator_placeholder,
     ]
     if variable_name is not None:
-        description: typing.Sequence[str] = format_variable(var=netcdf_file.get(variable_name))
+        description: generic.Sequence[str] = format_variable(var=netcdf_file.get(variable_name))
         return os.linesep.join(description)
 
     longest_dimension_name: str = max(map(str, netcdf_file.sizes.keys()), key=len)
@@ -744,3 +863,105 @@ def peek(
                 variable_name=variable_name,
                 max_line_length=max_line_length
             )
+
+@dataclasses.dataclass
+class DeconstructedVariable:
+    """
+    Contains the raw pieces of a netcdf variable
+    """
+    name: str
+    dimensions: list[str]
+    data: "numpy.typing.NDArray"
+    attributes: dict[str, typing.Any] = dataclasses.field(default_factory=dict)
+    encoding: dict[str, typing.Any] = dataclasses.field(default_factory=dict)
+
+    def to_data_array(self) -> "xarray.DataArray":
+        import xarray
+
+        array: xarray.DataArray = xarray.DataArray(
+            name=self.name,
+            data=self.data,
+            attrs=self.attributes,
+            dims=self.dimensions,
+        )
+
+        if self.encoding is not None:
+            array.encoding.update(self.encoding)
+
+        return array
+
+    def attach_to_dataset(self, dataset: "xarray.Dataset") -> "xarray.Dataset":
+        import xarray
+
+        arguments: dict[str, typing.Any] = {
+            "name": self.name,
+            "data": self.data,
+            "dims": self.dimensions,
+        }
+
+        coordinates: list[xarray.DataArray] = [
+            dataset[dimension_name]
+            for dimension_name in self.dimensions
+            if dimension_name in dataset
+        ]
+
+        if coordinates:
+            arguments['coords'] = coordinates
+
+        data_array: xarray.DataArray = xarray.DataArray(**arguments)
+        dataset[self.name] = data_array
+        dataset[self.name].attrs.update(self.attributes)
+        dataset[self.name].encoding.update(self.encoding)
+        return dataset
+
+    @classmethod
+    def from_array(cls, variable: "xarray.DataArray") -> "DeconstructedVariable":
+        return cls(
+            name=str(variable.name),
+            dimensions=list(map(str, variable.dims)),
+            data=variable.data.copy(),
+            attributes=variable.attrs.copy(),
+            encoding=variable.encoding.copy(),
+        )
+
+@dataclasses.dataclass
+class DeconstructedDataset:
+    coordinates: list[DeconstructedVariable]
+    variables: list[DeconstructedVariable]
+    attributes: dict[str, typing.Any] = dataclasses.field(default_factory=dict)
+    encoding: dict[str, typing.Any] = dataclasses.field(default_factory=dict)
+
+    def to_dataset(self) -> "xarray.Dataset":
+        import xarray
+        dataset: xarray.Dataset = xarray.Dataset(
+            data_vars={
+                variable.name: variable.to_data_array()
+                for variable in self.variables
+            },
+            coords={
+                coordinate.name: coordinate.to_data_array()
+                for coordinate in self.coordinates
+            },
+            attrs=self.attributes.copy(),
+        )
+
+        if self.encoding:
+            dataset.encoding.update(self.encoding)
+
+        return dataset
+
+    @classmethod
+    def from_dataset(cls, dataset: "xarray.Dataset") -> "DeconstructedDataset":
+        deconstructed_dataset: cls = cls(
+            coordinates=[
+                DeconstructedVariable.from_array(coordinate)
+                for coordinate in dataset.coords.values()
+            ],
+            variables=[
+                DeconstructedVariable.from_array(variable)
+                for variable in dataset.data_vars.values()
+            ],
+            attributes=dataset.attrs.copy(),
+            encoding=dataset.encoding.copy(),
+        )
+        return deconstructed_dataset

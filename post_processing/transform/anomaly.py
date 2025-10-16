@@ -58,7 +58,7 @@ class ThresholdDefinition:
             LOGGER.debug(f"Updating the statistics for day {day_of_year} of {self.data_path.name}")
             self._data[day_of_year] = stats
 
-    def to_dict(self) -> typing.Mapping[str, typing.Any]:
+    def to_dict(self) -> generic.Mapping[str, typing.Any]:
         """
         Convert the definition to a dictionary in pure python types and avoiding private data
         """
@@ -123,7 +123,7 @@ class ThresholdDefinition:
         self._load_range(file_path=file_path, days_of_year=days_of_year)
         LOGGER.debug(f"{current_thread().name}: Done preloading threshold data between day {earliest_day} and day {latest_day} for {self}")
 
-    def _load_range(self, file_path: pathlib.Path, days_of_year: typing.Sequence[int]):
+    def _load_range(self, file_path: pathlib.Path, days_of_year: generic.Sequence[int]):
         with self._lock:
             days_of_year = [
                 day_of_year
@@ -198,9 +198,9 @@ class ThresholdDefinition:
 
 
 def make_apply_thresholds(
-    scores: typing.Sequence["numpy.floating"],
+    scores: generic.Sequence["numpy.floating"],
     default_score: float
-) -> typing.Callable[..., "numpy.ndarray"]:
+) -> generic.Callable[..., "numpy.ndarray"]:
     """
     Make the universal function used by numpy to use thresholds to establish binning. This is a function
     factory due to array mismatches that occur when using the scores and default_score variables.
@@ -261,7 +261,7 @@ def get_day_of_year(dataset: "xarray.Dataset", variable: str) -> int:
     assert variable in dataset, f"There is not '{variable}' variable in the given dataset"
     assert dataset[variable].shape == (1,), f"Cannot find the day of year in the '{variable}' variable - there is more than one value"
     day_of_year: numpy.ndarray = dataset[variable].dt.dayofyear.values
-    if isinstance(day_of_year, typing.Sequence):
+    if isinstance(day_of_year, generic.Sequence):
         day_of_year = day_of_year[0]
     day: int = day_of_year.item()
     return day
@@ -271,7 +271,7 @@ def calculate_anomaly(
     input_path: pathlib.Path,
     output_path: pathlib.Path,
     variable_to_bin: str,
-    thresholds: typing.Sequence[ThresholdDefinition],
+    thresholds: generic.Sequence[ThresholdDefinition],
     default_score: float,
     time_variable: str = 'time',
     dimension_names: typing.Union[str, typing.Iterable[str]] = 'feature_id',
@@ -370,12 +370,12 @@ def calculate_anomaly(
         threshold_arrays.append(daily_values.values)
         scores.append(threshold.level)
 
-    apply_thresholds: typing.Callable[[xarray.DataArray, *numpy.ndarray], numpy.ndarray] = make_apply_thresholds(
+    apply_thresholds: generic.Callable[[xarray.DataArray, *numpy.ndarray], numpy.ndarray] = make_apply_thresholds(
         scores=scores,
         default_score=default_score,
     )
 
-    input_dimensions: typing.Sequence[typing.Sequence] = [
+    input_dimensions: generic.Sequence[generic.Sequence] = [
         [],     # for the initial variable
         *[
             []  # For each threshold array
@@ -432,7 +432,7 @@ def assign_anomaly(
     input_path: pathlib.Path,
     output_path: pathlib.Path,
     variable_to_bin: str,
-    thresholds: typing.Sequence[ThresholdDefinition],
+    thresholds: generic.Sequence[ThresholdDefinition],
     default_score: float,
     time_variable: str = 'time',
     dimension_names: typing.Union[str, typing.Iterable[str]] = 'feature_id',

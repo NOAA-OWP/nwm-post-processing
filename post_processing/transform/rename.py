@@ -1,9 +1,9 @@
 """
 Functions and objects used to rename a variable and/or dimension in a netcdf file
 """
-import typing
 import pathlib
 import logging
+import collections.abc as generic
 
 from post_processing.utilities.common import timed_function
 
@@ -14,7 +14,7 @@ LOGGER: logging.Logger = logging.getLogger(pathlib.Path(__file__).stem)
 def rename_variable(
     input_path: pathlib.Path,
     output_path: pathlib.Path,
-    mapping: typing.Mapping[str, str]
+    mapping: generic.Mapping[str, str]
 ) -> pathlib.Path:
     """
     Rename variables and/or coordinates within a netcdf file
@@ -34,7 +34,7 @@ def rename_variable(
         output_path = output_path / input_path.name
 
     with load(input_path) as input_file:
-        coordinates_to_assign: typing.Sequence[str] = [
+        coordinates_to_assign: generic.Sequence[str] = [
             new_name
             for original_name, new_name in mapping.items()
             if original_name in input_file.coords
@@ -69,7 +69,7 @@ def rename_variable(
 def rename_dimension(
     input_path: pathlib.Path,
     output_path: pathlib.Path,
-    mapping: typing.Mapping[str, str]
+    mapping: generic.Mapping[str, str]
 ) -> pathlib.Path:
     """
     Rename dimensions within a netcdf file

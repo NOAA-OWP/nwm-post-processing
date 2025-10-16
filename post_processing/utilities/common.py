@@ -12,14 +12,13 @@ import json
 import collections.abc as generic
 
 from datetime import datetime
+from datetime import timedelta
 
 LOGGER: logging.Logger = logging.getLogger(pathlib.Path(__file__).stem)
 
 if typing.TYPE_CHECKING:
     import numpy
     import numpy.typing
-    from concurrent.futures import Future
-    from post_processing.interfaces.work import PendingTaskResult
 
 T = typing.TypeVar("T")
 """A generic type"""
@@ -35,24 +34,20 @@ RT = typing.TypeVar("RT")
 
 FunctionParameters = typing.ParamSpec("FunctionParameters")
 
-ArgsAndKwargs = typing.Union[
-    generic.Sequence[typing.Any],
-    generic.Mapping[str, typing.Any],
-    tuple[generic.Sequence[typing.Any], generic.Mapping[str, typing.Any]]
-]
-"""
-Either a series of positional arguments, a dictionary of keyword arguments, 
-or a tuple of the first item being positional arguments and the second being keyword arguments
-"""
-
 CYCLE_PATTERN_VARIABLE: str = "cycle"
+"""The name of the group in the NWM_FILENAME_PATTERN that holds the cycle number of NWM output"""
 CONFIGURATION_PATTERN_VARIABLE: str = "configuration"
+"""The name of the group in the NWM_FILENAME_PATTERN that holds the configuration name of the NWM output"""
 OUTPUT_TYPE_PATTERN_VARIABLE: str = "output_type"
+"""The name of the group in the NWM_FILENAME_PATTERN that holds the model output type of the NWM output"""
 MEMBER_PATTERN_VARIABLE: str = "member"
+"""The name of the group in the NWM_FILENAME_PATTERN that holds the optional member number of the NWM output"""
 FRAME_PATTERN_VARIABLE: str = "frame"
+"""The name of the group in the NWM_FILENAME_PATTERN that holds the frame number"""
 TMINUS_PATTERN_VARIABLE: str = "tminus"
+"""The name of the group in the NWM_FILENAME_PATTERN that holds the tminus number"""
 REGION_PATTERN_VARIABLE: str = "region"
-RFC_PATTERN_VARIABLE: str = "rfc"
+"""The name of the group in the NWM_FILENAME_PATTERN that holds the region name"""
 
 NWM_FILENAME_PATTERN: re.Pattern = re.compile(
     r"nwm\."
@@ -64,6 +59,31 @@ NWM_FILENAME_PATTERN: re.Pattern = re.compile(
     r"nc$"
 )
 """A regular expression that matches on an NWM file name and can pull out important variables"""
+
+ISO_8601_DURATION_PATTERN: re.Pattern = re.compile(
+    r"P((?P<days>\d+)D)?(T((?P<hours>\d+)H)?((?P<minutes>\d+)M)?((?P<seconds>\d+(\.\d+)?)S)?)?"
+)
+"""A regular expression that matches on an ISO 8601 duration, like 'PT1H' or 'P3DT1H47M'"""
+
+
+def parse_timedelta(period: str) -> timedelta:
+    """
+    Parse a time delta out of an ISO 8601 duration string
+
+    :param period: an ISO 8601 duration string
+    :return: a timedelta that is as long as the ISO 8601 period
+    """
+    match: re.Match | None = ISO_8601_DURATION_PATTERN.match(period.strip())
+
+    if match is None:
+        raise ValueError(f"'parse_timedelta' can only parse ISO 8601 duration strings. Instead received: {period}")
+
+    parameters: dict[str, float] = {
+        key: float(captured_value) if captured_value is not None else 0.0
+        for key, captured_value in match.groupdict().items()
+    }
+
+    return timedelta(**parameters)
 
 
 def is_nan_safe(value: typing.Any) -> bool:
@@ -78,50 +98,6 @@ def is_nan_safe(value: typing.Any) -> bool:
         return numpy.isnan(value)
     except TypeError:
         return False
-
-
-def starmap(
-    function: generic.Callable[FunctionParameters, RT],
-    args: generic.Iterable[ArgsAndKwargs],
-    thread_count: int = 0
-) -> generic.Sequence[RT]:
-    """
-    Eagerly call the given function with each of sequence of positional arguments
-
-    :param function: The function to call
-    :param args: Each set of arguments to pass
-    :param thread_count: The number of threads to use if threading is enabled
-    :returns: The result of each function call
-    """
-    results: list[RT] = []
-
-    from post_processing.configuration import settings
-    from post_processing.enums import Verbosity
-
-    if not isinstance(args, generic.Iterable) or isinstance(args, (str, bytes)):
-        raise TypeError(f"Arguments for starmap must be an iterable collection. Received '{args}' (type={type(args)})")
-
-    if settings.allow_threading and thread_count is not None and thread_count > 0:
-        results.extend(
-            starmap_threaded(function=function, args=args, thread_count=thread_count, thread_prefix="starmap")
-        )
-    else:
-        for argument_index, arg in enumerate(args):
-            if settings.verbosity >= Verbosity.ALL:
-                LOGGER.debug(f"Running through iteration {argument_index + 1} of {function}")
-            if isinstance(arg, generic.Mapping):
-                result: RT = function(**arg)
-            elif isinstance(arg, generic.Sequence) and len(arg) == 2 and isinstance(arg[0], generic.Sequence) and isinstance(arg[1], generic.Mapping):
-                result: RT = function(*arg[0], **arg[1])
-            elif isinstance(arg, generic.Sequence) and not isinstance(arg, str):
-                result: RT = function(*arg)
-            else:
-                result: RT = function(arg)
-            if settings.verbosity >= Verbosity.ALL:
-                LOGGER.debug(f"Completed iteration {argument_index + 1} of {function}")
-            results.append(result)
-
-    return results
 
 
 def expand_path(path: typing.Union[str, pathlib.Path], strict: bool = True) -> generic.Sequence[pathlib.Path]:
@@ -283,82 +259,6 @@ def find_candidate_paths(
     return possible_paths
 
 
-def starmap_threaded(
-    function: generic.Callable[[FunctionParameters], RT],
-    args: generic.Iterable[ArgsAndKwargs],
-    thread_count: int = None,
-    *,
-    thread_prefix: str = "starmap-threaded"
-) -> generic.Sequence[RT]:
-    """
-    Eagerly call the given function with each of sequence of positional arguments within a thread pool for a
-    degree of concurrency
-
-    :param function: The function to call
-    :param args: Each set of arguments to pass
-    :param thread_count: The maximum amount of threads to process at once
-    :param thread_prefix: A prefix used to identify common threads
-    :returns: The result of each function call
-    """
-    from post_processing.configuration import settings
-    from post_processing.enums import Verbosity
-
-    if not settings.allow_threading and settings.this_is_very_verbose:
-        LOGGER.warning(f"Threading is being called directly even though it is supposed to be disabled")
-
-    if thread_count is None:
-        thread_count = settings.maximum_additional_threads
-
-    results: list[RT] = []
-    import concurrent.futures
-    with concurrent.futures.ThreadPoolExecutor(max_workers=thread_count, thread_name_prefix=thread_prefix) as executor:
-        future_results: list[concurrent.futures.Future[RT]] = []
-        for arg in args:
-            arguments_are_keyword: bool = isinstance(arg, generic.Mapping)
-            arguments_are_positional: bool = isinstance(arg, generic.Sequence) and not isinstance(arg, str)
-            arguments_are_positional_and_keyword: bool = (
-                isinstance(arg, generic.Sequence)
-                    and len(arg) == 2
-                    and isinstance(arg[0], generic.Sequence) and not isinstance(arg[0], str)
-                    and isinstance(arg[1], generic.Mapping)
-            )
-            if arguments_are_keyword:
-                future_result: concurrent.futures.Future[RT] = executor.submit(
-                    function,
-                    **arg
-                )
-            elif arguments_are_positional_and_keyword:
-                future_result: concurrent.futures.Future[RT] = executor.submit(
-                    function,
-                    *arg[0],
-                    **arg[1]
-                )
-            elif arguments_are_positional:
-                future_result: concurrent.futures.Future[RT] = executor.submit(
-                    function,
-                    *arg
-                )
-            else:
-                future_result: concurrent.futures.Future[RT] = executor.submit(
-                    function,
-                    arg
-                )
-            future_results.append(future_result)
-
-        if settings.verbosity >= Verbosity.ALL:
-            LOGGER.debug(f"{len(future_results)} jobs have been scheduled for {function}")
-
-        results, exceptions = cycle_futures(futures=future_results)
-
-        if exceptions:
-            raise condense_exceptions(
-                f"Could not perform {function.__name__} across {len(args)} sets of arguments",
-                exceptions
-            )
-
-    return results
-
-
 def partition(
     condition: generic.Callable[[T], bool],
     collection: generic.Iterable[T]
@@ -432,298 +332,6 @@ def last(
         collection: generic.Sequence[T] = [value for value in collection if condition(value)]
 
     return collection[-1] if collection else None
-
-
-@typing.overload
-def cycle_future_list(
-    futures: list["PendingTaskResult[T]"],
-    *,
-    block_seconds: float = 1.0,
-    backoff_seconds: float = 1.0,
-    exception_handler: generic.Callable[[Exception], Exception] = None,
-) -> tuple[typing.Union[generic.Sequence[T], generic.Sequence[VT]], generic.Sequence[Exception]]:
-    ...
-
-@typing.overload
-def cycle_future_list(
-    futures: generic.Sequence["PendingTaskResult[T]"],
-    *,
-    transform: generic.Callable[[T, generic.Sequence[T]], VT],
-    block_seconds: float = 1.0,
-    backoff_seconds: float = 1.0,
-    exception_handler: generic.Callable[[Exception], Exception] = None,
-) -> tuple[typing.Union[generic.Sequence[T], generic.Sequence[VT]], generic.Sequence[Exception]]:
-    ...
-
-
-def cycle_future_list(
-    futures: generic.Iterable["PendingTaskResult[T]"],
-    *,
-    transform: generic.Callable[[T, generic.Sequence[T]], VT] = None,
-    block_seconds: float = 1.0,
-    backoff_seconds: float = 1.0,
-    exception_handler: generic.Callable[[Exception], Exception] = None,
-) -> tuple[typing.Union[generic.Sequence[T], generic.Sequence[VT]], generic.Sequence[Exception]]:
-    """
-    Cycle through the list of values and apply and transforms as the contents are generated
-
-    :param futures: The list of values to cycle through
-    :param transform: The function to apply to each value
-    :param block_seconds: The number of seconds to wait for a result
-    :param backoff_seconds: The number of seconds to wait after timing out while waiting for a result that just timed out
-    :param exception_handler: Special handling for exceptions
-    :returns: The results from all the futures
-    """
-    from concurrent.futures import Future
-    from post_processing.interfaces.work import PendingTaskResult
-    import time
-
-    if transform is None:
-        transform = lambda x, _: x
-    elif not callable(transform):
-        raise TypeError("transform must be callable")
-
-    if exception_handler is None:
-        exception_handler = lambda exc: exc
-    elif not callable(exception_handler):
-        raise ValueError(f"{exception_handler} (type={type(exception_handler)}) is not callable")
-
-    current_values: list[PendingTaskResult[T]] = list(futures)
-
-    results: list[VT] = []
-    last_item_id: typing.Optional[int] = None
-    exceptions: list[Exception] = []
-
-    while current_values:
-        value: PendingTaskResult[T] = current_values.pop(0)
-
-        try:
-            result: T = value.result(timeout=block_seconds)
-            transformed_result: VT = transform(result, results)
-            results.append(transformed_result)
-        except TimeoutError:
-            current_values.append(value)
-            future_id: int = id(value)
-            if future_id == last_item_id:
-                time.sleep(backoff_seconds)
-            last_item_id = future_id
-        except Exception as e:
-            processed_exception: Exception = exception_handler(e)
-            exceptions.append(processed_exception)
-
-    return results, exceptions
-
-@typing.overload
-def cycle_future_mapping(
-    futures: generic.Mapping[KT, "PendingTaskResult[T]"],
-    *,
-    block_seconds: float = 1.0,
-    backoff_seconds: int = 1.0,
-    exception_handler: generic.Callable[[Exception], Exception] = None,
-) -> tuple[typing.Union[generic.Sequence[T], generic.Sequence[VT]], generic.Sequence[Exception]]:
-    ...
-
-@typing.overload
-def cycle_future_mapping(
-    futures: generic.Mapping[KT, "PendingTaskResult[T]"],
-    *,
-    transform: generic.Callable[[KT, T, generic.Sequence[T]], VT],
-    block_seconds: float = 1.0,
-    backoff_seconds: int = 1.0,
-    exception_handler: generic.Callable[[Exception], Exception] = None,
-) -> tuple[typing.Union[generic.Sequence[T], generic.Sequence[VT]], generic.Sequence[Exception]]:
-    ...
-
-def cycle_future_mapping(
-    futures: generic.Mapping[KT, "PendingTaskResult[T]"],
-    *,
-    transform: generic.Callable[[KT, T, generic.Sequence[T]], VT] = None,
-    block_seconds: float = 1.0,
-    backoff_seconds: float = 1.0,
-    exception_handler: generic.Callable[[Exception], Exception] = None,
-) -> tuple[typing.Union[generic.Sequence[T], generic.Sequence[VT]], generic.Sequence[Exception]]:
-    """
-    Cycle through the list of values and apply and transforms as the contents are generated
-
-    :param futures: The list of values to cycle through
-    :param transform: The function to apply to each value
-    :param block_seconds: The number of seconds to wait for a result
-    :param backoff_seconds: The number of seconds to wait after timing out while waiting for a result that just timed out
-    :param exception_handler: Special handling for exceptions
-    :returns: The results from all the futures
-    """
-    from post_processing.interfaces.work import PendingTaskResult
-    import time
-
-    if transform is None:
-        transform = lambda _, future_result, __: future_result
-    elif not callable(transform):
-        raise TypeError("transform must be callable")
-
-    if exception_handler is None:
-        exception_handler = lambda exc: exc
-    elif not callable(exception_handler):
-        raise ValueError(f"{exception_handler} (type={type(exception_handler)}) is not callable")
-
-    current_values: dict[KT, PendingTaskResult[T]] = dict(**futures)
-
-    results: list[VT] = []
-    last_item_id: typing.Optional[int] = None
-    exceptions: list[Exception] = []
-
-    while current_values:
-        key, future = current_values.popitem()
-
-        try:
-            result: T = future.result(timeout=block_seconds)
-            transformed_result: VT = transform(key, result, results)
-            results.append(transformed_result)
-        except TimeoutError:
-            current_values[key] = future
-            future_id: int = id(key)
-            if future_id == last_item_id:
-                time.sleep(backoff_seconds)
-            last_item_id = future_id
-        except Exception as e:
-            processed_exception: Exception = exception_handler(e)
-            exceptions.append(processed_exception)
-
-    return results, exceptions
-
-
-@typing.overload
-def cycle_futures(
-    futures: generic.Sequence["PendingTaskResult[T]"],
-    *,
-    block_seconds: float = 1.0,
-    backoff_seconds: float = 1.0
-) -> tuple[generic.Sequence[T], generic.Sequence[Exception]]:
-    ...
-
-@typing.overload
-def cycle_futures(
-    futures: generic.Sequence["PendingTaskResult[T]"],
-    *,
-    transform: generic.Callable[[T, generic.Sequence[T]], VT],
-    block_seconds: float = 1.0,
-    backoff_seconds: float = 1.0
-) -> tuple[generic.Sequence[VT], generic.Sequence[Exception]]:
-    ...
-
-@typing.overload
-def cycle_futures(
-    futures: generic.Mapping[KT, "PendingTaskResult[T]"],
-    *,
-    block_seconds: float = 1.0,
-    backoff_seconds: int = 1.0,
-    exception_handler: generic.Callable[[Exception], Exception] = None,
-) -> tuple[generic.Sequence[T], generic.Sequence[Exception]]:
-    ...
-
-@typing.overload
-def cycle_futures(
-    futures: generic.Mapping[KT, "PendingTaskResult[T]"],
-    *,
-    transform: generic.Callable[[KT, T, generic.Sequence[T]], VT],
-    block_seconds: float = 1.0,
-    backoff_seconds: int = 1.0,
-    exception_handler: generic.Callable[[Exception], Exception] = None,
-) -> tuple[generic.Sequence[VT], generic.Sequence[Exception]]:
-    ...
-
-
-def cycle_futures(
-    futures: typing.Union[generic.Mapping[KT, "PendingTaskResult[T]"], generic.Sequence["PendingTaskResult[T]"]],
-    *,
-    transform: typing.Union[generic.Callable[[KT, T, generic.Sequence[T]], VT], generic.Callable[[T, generic.Sequence[T]], VT]] = None,
-    block_seconds: float = 1.0,
-    backoff_seconds: float = 1.0,
-    exception_handler: generic.Callable[[Exception], Exception] = None,
-) -> tuple[typing.Union[generic.Sequence[VT], generic.Sequence[T]], generic.Sequence[Exception]]:
-    """
-    Step through a collection of futures, trying to process and act on them as soon as possible rather than
-    waiting for each to finish
-
-    Similar to 'as_completed' but offers extra flexibility for error handling and processing
-
-    :param futures: The collection of futures
-    :param transform: An optional function to process results as they come in
-    :param block_seconds: How many seconds to wait for a future's result before timing out
-    :param backoff_seconds: How many seconds to wait for a future's result when before querying it again
-    :param exception_handler: An optional handler for any exceptions thrown
-    :returns: The results from all the futures along with all encountered exceptions
-    """
-    cycler: generic.Callable = cycle_future_mapping if isinstance(futures, generic.Mapping) else cycle_future_list
-
-    results, exceptions = cycler(
-        futures=futures,
-        transform=transform,
-        block_seconds=block_seconds,
-        backoff_seconds=backoff_seconds,
-        exception_handler=exception_handler,
-    )
-
-    assert isinstance(results, generic.Sequence)
-    assert isinstance(exceptions, generic.Sequence)
-    return results, exceptions
-
-@typing.overload
-def cycle_future(
-    future: "PendingTaskResult[T]",
-    *,
-    block_seconds: float = 1.0,
-    exception_handler: generic.Callable[[Exception], Exception] = None,
-) -> tuple[typing.Optional[T], typing.Optional[Exception]]:
-    ...
-
-@typing.overload
-def cycle_future(
-    future: "PendingTaskResult[T]",
-    *,
-    transform: generic.Callable[[T], VT],
-    block_seconds: float = 1.0,
-    exception_handler: generic.Callable[[Exception], Exception] = None
-) -> tuple[typing.Optional[VT], typing.Optional[Exception]]:
-    ...
-
-def cycle_future(
-    future: "PendingTaskResult[T]",
-    *,
-    transform: generic.Callable[[T], VT] = None,
-    block_seconds: float = 1.0,
-    exception_handler: generic.Callable[[Exception], Exception] = None,
-) -> tuple[typing.Optional[typing.Union[T, VT]], typing.Optional[BaseException]]:
-    """
-    Cycle through the list of values and apply and transforms as the contents are generated
-
-    :param future: The list of values to cycle through
-    :param transform: The function to apply to each value
-    :param block_seconds: The number of seconds to wait for a result
-    :param exception_handler: Special handling for exceptions
-    :returns: The results from all the futures
-    """
-    if transform is not None and not callable(transform):
-        raise TypeError("transform must be callable")
-
-    if exception_handler is not None and not callable(exception_handler):
-        raise ValueError(f"{exception_handler} (type={type(exception_handler)}) is not callable")
-
-    while True:
-        try:
-            result: T = future.result(timeout=block_seconds)
-            if transform is not None:
-                result = transform(result)
-            return result, None
-        except TimeoutError:
-            continue
-        except Exception as exception:
-            if exception_handler is not None:
-                exception = exception_handler(exception)
-            return None, exception
-        except BaseException as exception:
-            return None, exception
-
-    return None, RuntimeError(f"Results could not be gathered from a pending task")
 
 
 def get_property_values(obj: object) -> dict[str, typing.Any]:
@@ -934,19 +542,23 @@ def is_array_like(value: object) -> bool:
 
 
 def timed_function(
+    *,
     logger: typing.Optional[logging.Logger] = None,
-    level: typing.Optional[int] = None
+    level: typing.Optional[int] = None,
+    name: str = None
 ) -> generic.Callable[[generic.Callable[FunctionParameters, RT]], generic.Callable[FunctionParameters, RT]]:
     """
     Logs a function timing duration if timing recording is enabled and the given log level is allowable by the logger
 
     :param logger: The logger to use. Defaults to the logger for the file that defines this decorator
     :param level: A custom log level to record this timing at. Defaults to the system setting 'log_level'
+    :param name: A name to give the timed function that will appear in the logs. Defaults to the name of the passed function
     :returns: A function that records the time it takes to execute this function if timing is enabled, just the function otherwise
     """
     from post_processing.configuration import settings
     _logger = logger or logging.getLogger('TIMING')
     _level = _logger.getEffectiveLevel() if level is None else level
+    _function_name: str = name
 
     def decorator(func: generic.Callable[FunctionParameters, RT]) -> generic.Callable[FunctionParameters, RT]:
         """
@@ -962,7 +574,7 @@ def timed_function(
 
         code = func.__code__
         function_metadata: dict[str, typing.Any] = {
-            "functionName": func.__name__,
+            "functionName": _function_name or func.__name__,
             "moduleName": func.__module__,
             "path": code.co_filename,
             "lineNumber": code.co_firstlineno,
@@ -974,16 +586,17 @@ def timed_function(
             """
             Calls the input function with its given arguments and logs its runtime in ISO8601 duration format
             """
-            import time
 
-            start: float = time.perf_counter()
+            start: datetime = datetime.now().astimezone()
             successful: bool = False
             try:
                 result: RT = func(*args, **kwargs)
                 successful = True
                 return result
             finally:
-                seconds: float = time.perf_counter() - start
+                end: datetime = datetime.now().astimezone()
+                duration: timedelta = end - start
+                seconds: float = duration.total_seconds()
 
                 duration_description: str = "P"
                 days, seconds = divmod(seconds, 24.0 * 60.0 * 60.0)
@@ -1042,7 +655,7 @@ def timed_function(
                 function_description += ")"
                 _logger.log(
                     _level,
-                    f"{function_description} | {'successful' if successful else 'failed'} | {duration_description}",
+                    f"{function_description} | {'successful' if successful else 'failed'} | {duration_description} | {start.strftime('%Y-%m-%d %H:%M:%S%z')} | {end.strftime('%Y-%m-%d %H:%M:%S%z')}",
                     extra=function_metadata
                 )
 
