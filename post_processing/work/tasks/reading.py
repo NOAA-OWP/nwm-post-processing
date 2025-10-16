@@ -7,6 +7,8 @@ import typing
 import collections.abc as generic
 import dataclasses
 
+from typing import Concatenate
+
 import xarray
 import numpy
 
@@ -14,12 +16,17 @@ from post_processing.work.tasks import base
 from post_processing.utilities.logging import get_logger
 from post_processing.configuration import settings
 from post_processing.work import exceptions
+from post_processing.utilities.common import timed_function
+
+from post_processing.interfaces.aliases import DataArrayFunction
+from post_processing.interfaces.aliases import DatasetFunction
 
 T = typing.TypeVar("T")
+P = typing.ParamSpec("P")
 
 LOGGER: logging.Logger = get_logger(__file__)
 
-
+@timed_function()
 def _load(
     target: pathlib.Path | generic.Sequence[pathlib.Path],
     load_kwargs: dict[str, typing.Any] = None,
@@ -83,7 +90,8 @@ def _load(
             attempts += 1
             LOGGER.error(
                 f"Failed to load {target}{' due to ' + str(last_exception) if last_exception else ''}. "
-                f"Waiting and trying again..."
+                f"Waiting and trying again...",
+                exc_info=last_exception,
             )
             time.sleep(1)
 
@@ -110,7 +118,7 @@ class ArrayLoadTask(base.DataTask[numpy.typing.NDArray]):
     """
     Load and return the raw array for a Netcdf variable
     """
-
+    @timed_function()
     def __call__(self) -> T:
         with _load(target=self.target, load_kwargs=self.kwargs, full_load=False, chunks="auto", engine=self.engine) as data:
             if self.variable_name not in data:
@@ -137,6 +145,7 @@ class LoadTask(base.DataTask[xarray.Dataset]):
     The information needed to load xarray data from disk
     """
 
+    @timed_function()
     def __call__(self) -> T:
         return _load(target=self.target, full_load=self.full_load, engine=self.engine, **self.kwargs)
 
@@ -157,6 +166,7 @@ class LoadVariableTask(base.DataTask[xarray.DataArray]):
     variable_name: str
     full_load: bool = dataclasses.field(default=False)
 
+    @timed_function()
     def __call__(self) -> xarray.DataArray:
         with _load(target=self.target, load_kwargs=self.kwargs, full_load=False, chunks="auto", engine=self.engine) as data:
             if self.variable_name not in data:
@@ -169,6 +179,137 @@ class LoadVariableTask(base.DataTask[xarray.DataArray]):
                 variable = variable.load().copy(deep=True)
 
             return variable
+
+@dataclasses.dataclass
+class TransformDatasetTask(base.DataTask[T]):
+    """
+    Perform a quick operation on a dataset and return the result
+    """
+    function: DatasetFunction
+    load_kwargs: dict[str, typing.Any] = dataclasses.field(default_factory=dict)
+    full_load: bool = dataclasses.field(default=False)
+
+    def __str__(self):
+        arguments: str = ', '.join(map(
+            lambda pair: f"{pair[0]}={pair[1]}",
+            self.kwargs.items()
+        ))
+        return (
+            f"{self.__class__.__name__}: {self.function.__name__}(dataset{', ' + arguments if arguments else ''}) "
+            f"on '{self.target}', {'fully loaded' if self.full_load else 'lazily loaded'}, via '{self.engine}'"
+        )
+
+    def __post_init__(self):
+        super().__post_init__()
+
+        if not callable(self.function):
+            raise TypeError(
+                f"The function for a {self.__class__.__name__} is expected to be a function but is instead "
+                f"{self.function} (type={type(self.function)})"
+            )
+        if self.function.__name__ == "<lambda>":
+            raise TypeError(
+                f"The function for a {self.__class__.__name__} is expected to be a named function or constructor "
+                f"but is instead an anonymous function/lambda"
+            )
+
+        if self.kwargs is None:
+            self.kwargs = {}
+
+        if self.load_kwargs is None:
+            self.load_kwargs = {}
+
+    def __call__(self) -> T:
+        additional_arguments: dict[str, typing.Any] = {
+            "engine": self.engine,
+            "full_load": self.full_load,
+            "chunks": None if self.full_load else "auto",
+        }
+
+        with _load(target=self.target, load_kwargs=self.load_kwargs, **additional_arguments) as data:
+            result: T = self.function(data, **self.kwargs)
+
+            if isinstance(result, (xarray.DataArray, xarray.Dataset)):
+                LOGGER.debug(
+                    f"The result from '{self}' is of type "
+                    f"{type(result)} - there may be lingering connections to lazy elements or file caches that may "
+                    f"cause segfaults down the line."
+                )
+            return result
+
+@dataclasses.dataclass
+class TransformVariableTask(base.DataTask[T]):
+    """
+    Perform a quick operation on a variable and return the result
+    """
+    variable_name: str
+    function: DataArrayFunction
+    full_load: bool = dataclasses.field(default=False)
+    data_filter: typing.Optional[generic.Callable[[xarray.DataArray], xarray.DataArray]] = dataclasses.field(default=None)
+    selector: typing.Optional[typing.Dict[str, typing.Any]] = dataclasses.field(default=None)
+    selector_method: str = dataclasses.field(default=None)
+    drop_unselected: bool = dataclasses.field(default=True)
+
+    def __post_init__(self):
+        super().__post_init__()
+
+        if not callable(self.function):
+            raise TypeError(
+                f"The function for a {self.__class__.__name__} is expected to be a function but is instead "
+                f"{self.function} (type={type(self.function)})"
+            )
+        if self.function.__name__ == "<lambda>":
+            raise TypeError(
+                f"The function for a {self.__class__.__name__} is expected to be a named function or constructor "
+                f"but is instead an anonymous function/lambda"
+            )
+
+        if self.data_filter is not None and not callable(self.data_filter):
+            raise TypeError(
+                f"The data filter for {self.__class__.__name__} is supposed to be a callable object but is instead "
+                f"'{self.data_filter}' (type={type(self.data_filter)})"
+            )
+        if self.data_filter is not None and self.data_filter.__name__ == "<lambda>":
+            raise TypeError(
+                f"The data filter for a {self.__class__.__name__} is expected to be a named function "
+                f"but is instead an anonymous function/lambda"
+            )
+
+    @timed_function()
+    def __call__(self) -> T:
+        with _load(target=self.target, full_load=False, chunks="auto", engine=self.engine) as data:
+            if self.variable_name not in data:
+                raise KeyError(
+                    f"Cannot select '{self.variable_name}' from '{self.target}' - it is not a variable to select"
+                )
+            variable: xarray.DataArray = data[self.variable_name]
+
+            if isinstance(self.selector, generic.Mapping) and len(self.selector) > 0:
+                variable = variable.sel(self.selector, method=self.selector_method, drop=self.drop_unselected)
+
+            if self.data_filter is not None:
+                variable = self.data_filter(variable)
+
+            if self.full_load:
+                variable = variable.compute().copy(deep=True)
+
+            if settings.this_is_verbose:
+                LOGGER.debug(
+                    f"Calling {self.function.__qualname__}(<{self.variable_name}>"
+                    f"{', ' + ', '.join(map(str, self.kwargs)) if self.kwargs else ''})"
+                )
+
+            result: T = self.function(variable, **self.kwargs)
+
+            if isinstance(result, (xarray.DataArray, xarray.Dataset)):
+                LOGGER.debug(
+                    f"The result from '{self}' is of type "
+                    f"{type(result)} - there may be lingering connections to lazy elements or file caches that may "
+                    f"cause segfaults down the line."
+                )
+
+            return result
+
 
 @dataclasses.dataclass
 class SelectTask(base.DataTask[xarray.DataArray]):

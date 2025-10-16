@@ -4,6 +4,7 @@ Core wrappers around crucial netcdf operations
 import typing
 import logging
 import pathlib
+import collections.abc as generic
 
 from .operation_helpers import run_command
 from .operation_helpers import NCOFunction
@@ -17,7 +18,7 @@ LOGGER: logging.Logger = logging.getLogger(pathlib.Path(__file__).stem)
 def keep_only_variables(
     input_file: typing.Union[str, pathlib.Path],
     output_file: typing.Union[str, pathlib.Path],
-    variables: typing.Sequence[str]
+    variables: generic.Sequence[str]
 ) -> pathlib.Path:
     """
     Remove all variables from the input file that aren't in the variables list and move all the resulting data
@@ -172,7 +173,7 @@ def rename_variable(
 def reorder_dimensions(
     input_file: typing.Union[str, pathlib.Path],
     output_file: typing.Union[str, pathlib.Path],
-    dimension_order: typing.Sequence[str]
+    dimension_order: generic.Sequence[str]
 ) -> pathlib.Path:
     """
     Change the order of dimensions within the input file

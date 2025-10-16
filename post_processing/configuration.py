@@ -5,7 +5,7 @@ import logging
 import typing
 import os
 import pathlib
-import traceback
+import collections.abc as generic
 
 from collections import UserDict
 
@@ -42,7 +42,7 @@ def _get_env_from_os(key: str, default: typing.Any = None) -> typing.Any:
     if key in os.environ:
         return os.environ[key]
 
-    candidates: typing.Sequence[typing.Any] = list({
+    candidates: generic.Sequence[typing.Any] = list({
         value
         for env_key, value in os.environ.items()
         if env_key.upper() == key.upper()
@@ -64,7 +64,7 @@ def _set_env(key: str, value: typing.Any):
     :param key: The environment variable name whose value to set
     :param value: The new value of the environment variable
     """
-    candidate_keys: typing.Sequence[str] = [
+    candidate_keys: generic.Sequence[str] = [
         env_key
         for env_key in os.environ.keys()
         if key.upper() == env_key.upper()
@@ -121,7 +121,7 @@ class _Settings(UserDict):
     """
     An access point for application and environment settings
     """
-    def __init__(self, initial_values: typing.Mapping = None, **kwargs):
+    def __init__(self, initial_values: generic.Mapping = None, **kwargs):
         super().__init__()
 
         for key, value in os.environ.items():
@@ -144,7 +144,7 @@ class _Settings(UserDict):
 
         :param env_path: The path to the .env file
         """
-        configured_variables: typing.Mapping[str, typing.Any] = _parse_env_file(env_path=env_path)
+        configured_variables: generic.Mapping[str, typing.Any] = _parse_env_file(env_path=env_path)
 
         for key, value in configured_variables.items():
             matching_key: str = self._find_key(key)
@@ -345,13 +345,13 @@ class _Settings(UserDict):
         return pathlib.Path(post_processing.__file__).parent.parent
 
     @property
-    def loggers_to_quiet(self) -> typing.Sequence[str]:
+    def loggers_to_quiet(self) -> generic.Sequence[str]:
         """
         The names of all loggers that may output errors but not basic INFO
         """
         proposed_key: str = "{prefix}_loggers_to_quiet".format(prefix=self.prefix).lower()
         key: str = self._find_key(key=proposed_key)
-        entries: typing.Optional[typing.Sequence[str]] = self.get(key)
+        entries: typing.Optional[generic.Sequence[str]] = self.get(key)
 
         if entries is None:
             entries: list[str] = []
@@ -359,14 +359,14 @@ class _Settings(UserDict):
 
             if names_from_environment is not None:
                 import re
-                names: typing.Sequence[str] = re.split(r"[;,]+", names_from_environment)
+                names: generic.Sequence[str] = re.split(r"[;,]+", names_from_environment)
                 entries.extend(names)
             self.__setitem__(key, entries)
 
         return entries
 
     @loggers_to_quiet.setter
-    def loggers_to_quiet(self, entries: typing.Sequence[str]) -> None:
+    def loggers_to_quiet(self, entries: generic.Sequence[str]) -> None:
         proposed_key: str = "{prefix}_loggers_to_quiet".format(prefix=self.prefix).lower()
         key: str = self._find_key(key=proposed_key)
 

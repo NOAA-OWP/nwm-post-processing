@@ -376,10 +376,10 @@ class StreamOperation(base_profile.PathToPathOperation, base_profile.FileOutputM
         profile: base_profile.Profile,
         process_identifier: str,
         work_directory: pathlib.Path,
-        data: typing.Sequence[pathlib.Path],
+        data: generic.Sequence[pathlib.Path],
         previous_operations: list[base_profile.ProfileOperation],
         metadata: dict[str, typing.Any]
-    ) -> typing.Sequence[pathlib.Path]:
+    ) -> generic.Sequence[pathlib.Path]:
         from post_processing.utilities import netcdf
         available_calculation_types: dict[OnlineCalculationType, typing.Type[OnlineCalculation]] = get_stream_calculators()
 
@@ -466,7 +466,7 @@ def get_stream_calculators(
         for subclass in root.__subclasses__()
     }
 
-    immediate_subclasses: typing.Sequence[typing.Type[OnlineCalculation]] = list(subclasses.values())
+    immediate_subclasses: generic.Sequence[typing.Type[OnlineCalculation]] = list(subclasses.values())
 
     for subclass in immediate_subclasses:
         sub_subclasses: dict[OnlineCalculationType, typing.Type[OnlineCalculation]] = get_stream_calculators(

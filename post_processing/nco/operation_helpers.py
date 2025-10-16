@@ -7,12 +7,13 @@ import logging
 import pathlib
 import os
 import subprocess
+import collections.abc as generic
 
 from datetime import datetime
 
 LOGGER: logging.Logger = logging.getLogger(pathlib.Path(__file__).stem)
 
-from post_processing.utilities.common import starmap
+from post_processing.work import starmap
 from post_processing.utilities.common import program_exists
 
 
@@ -95,7 +96,7 @@ class NCOFunction(enum.StrEnum):
 
     @classmethod
     def is_usable(cls) -> bool:
-        programs_exist: typing.Sequence[bool] = starmap(
+        programs_exist: generic.Sequence[bool] = starmap(
             function=program_exists,
             args=[{"program_name": str(member.value)} for member in cls],
             thread_count=True

@@ -25,6 +25,7 @@ from post_processing import enums
 from post_processing.schema.base import BaseModel
 from post_processing.schema.base import member
 from post_processing.schema.base import get_fields
+from post_processing.schema.base import postprocessing_model
 
 from post_processing.enums import Region
 from post_processing.enums import ModelOutputType
@@ -33,13 +34,17 @@ from post_processing.enums import Configuration
 from post_processing import nco
 from post_processing import schema
 
-from post_processing.utilities.common import starmap
+from post_processing.work import starmap
+from post_processing.work import starmap_threaded
+from post_processing.work import cycle_futures
+from post_processing.work import cycle_future
+
 from post_processing.utilities.common import partition
 from post_processing.utilities.common import get_template_variables
 from post_processing.utilities.common import to_json
 from post_processing.utilities.common import timed_function
+
 from post_processing.configuration import settings
-from post_processing.utilities.common import starmap_threaded
 
 if typing.TYPE_CHECKING:
     from post_processing.transform import anomaly
@@ -47,6 +52,8 @@ if typing.TYPE_CHECKING:
 LOGGER: logging.Logger = logging.getLogger(pathlib.Path(__file__).stem)
 InputType = typing.TypeVar("InputType")
 OutputType = typing.TypeVar("OutputType")
+SeriesOfPaths = generic.Sequence[generic.Sequence[pathlib.Path]]
+
 OPERATION_KEY: typing.Final[str] = "operation"
 """The key for a ProfileOperation dictionary stating what the ProfileOperation is supposed to do"""
 
@@ -184,7 +191,7 @@ class FileOutputMixin:
         return work_directory / filename
 
     @property
-    def output_pattern_variables(self) -> typing.Sequence[str]:
+    def output_pattern_variables(self) -> generic.Sequence[str]:
         if self.output_pattern is None:
             return []
         return get_template_variables(self.output_pattern)
@@ -262,7 +269,7 @@ class ProfileOperation(BaseModel, OperationHandler[InputType, OutputType], abc.A
     """
     comment: typing.Optional[str] = dataclasses.field(default=None, kw_only=True)
     """A comment from the writer explaining what this operation does"""
-    operation_id: typing.Optional[str] = member(default=None, kw_only=True)
+    operation_id: typing.Optional[str] = member()
     """A specialized identifier for this operation"""
     disable: bool = dataclasses.field(default=False, kw_only=True)
     """Disable operation of this operation"""
@@ -286,11 +293,11 @@ class ProfileOperation(BaseModel, OperationHandler[InputType, OutputType], abc.A
             if not isinstance(attribute, typing.Iterable):
                 continue
 
-            values_are_operations: bool = isinstance(attribute, typing.Mapping) and all(
+            values_are_operations: bool = isinstance(attribute, generic.Mapping) and all(
                 isinstance(entry, ProfileOperation) for entry in attribute.values()
             )
-            values_are_lists_of_operations: bool = isinstance(attribute, typing.Mapping) and all(
-                isinstance(entry, typing.Sequence) and all(
+            values_are_lists_of_operations: bool = isinstance(attribute, generic.Mapping) and all(
+                isinstance(entry, generic.Sequence) and all(
                     isinstance(inner_entry, ProfileOperation)
                     for inner_entry in entry
                 )
@@ -320,7 +327,7 @@ class ProfileOperation(BaseModel, OperationHandler[InputType, OutputType], abc.A
     def operation(cls) -> OperationType:
         """Get the type of operation the ProfileOperation fulfills"""
 
-    def to_dict(self) -> typing.Mapping[str, typing.Any]:
+    def to_dict(self) -> generic.Mapping[str, typing.Any]:
         dictionary_representation: dict[str, typing.Any] = dict(super().to_dict())
         if 'operation' not in dictionary_representation:
             dictionary_representation['operation'] = self.operation()
@@ -335,8 +342,8 @@ class ProfileOperation(BaseModel, OperationHandler[InputType, OutputType], abc.A
 
     def visit(
         self,
-        operator: typing.Callable[["ProfileOperation"], typing.Any],
-        condition: typing.Callable[["ProfileOperation"], bool] = None
+        operator: generic.Callable[["ProfileOperation"], typing.Any],
+        condition: generic.Callable[["ProfileOperation"], bool] = None
     ) -> None:
         """
         Perform some action on the operation and all of its children that are also operations
@@ -353,7 +360,7 @@ class ProfileOperation(BaseModel, OperationHandler[InputType, OutputType], abc.A
         for attribute_name, attribute in self.__dict__.items():
             if not isinstance(attribute, typing.Iterable):
                 continue
-            if isinstance(attribute, typing.Mapping) and all(isinstance(entry, OperationHandler) for entry in attribute):
+            if isinstance(attribute, generic.Mapping) and all(isinstance(entry, OperationHandler) for entry in attribute):
                 for entry in attribute.values():
                     entry.visit(operator=operator, condition=condition)
             if all(isinstance(entry, OperationHandler) for entry in attribute):
@@ -384,7 +391,7 @@ class ProfileOperation(BaseModel, OperationHandler[InputType, OutputType], abc.A
         """
 
 
-@dataclasses.dataclass(unsafe_hash=True)
+@postprocessing_model(unsafe_hash=True)
 class EchoOperation(ProfileOperation[InputType, InputType]):
     """
     A profile operation that outputs formatted log messages. Useful for alerts and progress messages
@@ -421,7 +428,7 @@ class EchoOperation(ProfileOperation[InputType, InputType]):
         if isinstance(data, pathlib.Path):
             message_metadata['input_name'] = data.name
             message_metadata['input_path'] = str(data)
-        elif isinstance(data, typing.Sequence) and all(isinstance(path, pathlib.Path) for path in data):
+        elif isinstance(data, generic.Sequence) and all(isinstance(path, pathlib.Path) for path in data):
             message_metadata['input_name'] = ', '.join(map(lambda path: path.name, data))
             message_metadata['input_path'] = ', '.join(map(str, data))
         else:
@@ -451,8 +458,8 @@ class EchoOperation(ProfileOperation[InputType, InputType]):
         self._logger.log(self.level, formatted_message)
         return data
 
-    def __post_init__(self) -> None:
-        super().__post_init__()
+    def _validate(self) -> None:
+        super()._validate()
         if self.logger_name:
             self._logger = logging.getLogger(self.logger_name)
 
@@ -477,7 +484,7 @@ class EchoOperation(ProfileOperation[InputType, InputType]):
     logger_name: typing.Optional[str] = dataclasses.field(default=None)
     _logger: logging.Logger = member(default_factory=lambda: LOGGER)
 
-@dataclasses.dataclass(unsafe_hash=True)
+@postprocessing_model(unsafe_hash=True)
 class RaiseOperation(ProfileOperation[InputType, InputType]):
     """
     A profile operation that raises exceptions.
@@ -512,27 +519,24 @@ class RaiseOperation(ProfileOperation[InputType, InputType]):
     message: str
 
 
-class PathToPathOperation(ProfileOperation[typing.Sequence[pathlib.Path], typing.Sequence[pathlib.Path]]):
+class PathToPathOperation(ProfileOperation[generic.Sequence[pathlib.Path], generic.Sequence[pathlib.Path]], abc.ABC):
     """
     Base class for file-set to file-set operations
     """
-    @classmethod
-    def operation(cls) -> OperationType:
-        return OperationType.NCO
-
+    @abc.abstractmethod
     def __call__(
         self,
         profile: "Profile",
         process_identifier: str,
         work_directory: pathlib.Path,
-        data: typing.Sequence[pathlib.Path],
+        data: generic.Sequence[pathlib.Path],
         previous_operations: list["ProfileOperation"],
         metadata: dict[str, typing.Any]
-    ) -> typing.Sequence[pathlib.Path]:
+    ) -> generic.Sequence[pathlib.Path]:
         raise NotImplementedError(f"Cannot execute a plain {self.__class__.__qualname__}")
 
 
-@dataclasses.dataclass
+@postprocessing_model
 class DimensionAdjustmentOperation(PathToPathOperation, FileOutputMixin):
     @classmethod
     def operation(cls) -> OperationType:
@@ -543,10 +547,10 @@ class DimensionAdjustmentOperation(PathToPathOperation, FileOutputMixin):
         profile: "Profile",
         process_identifier: str,
         work_directory: pathlib.Path,
-        data: typing.Sequence[pathlib.Path],
+        data: generic.Sequence[pathlib.Path],
         previous_operations: list[ProfileOperation],
         metadata: dict[str, typing.Any]
-    ) -> typing.Sequence[pathlib.Path]:
+    ) -> generic.Sequence[pathlib.Path]:
         # TODO: Extract this into its own function
         frame_pattern: re.Pattern = re.compile(r"(?<=\.)(tm|f)\d+(?=\.)")
         def get_frame_identifier(filename: str) -> str:
@@ -610,7 +614,7 @@ class DimensionAdjustmentOperation(PathToPathOperation, FileOutputMixin):
     mapping: dict[str, list[str]]
 
 
-@dataclasses.dataclass(unsafe_hash=True)
+@postprocessing_model(unsafe_hash=True)
 class ReprojectionOperation(PathToPathOperation, FileOutputMixin):
     """
     Describes how to reproject data into a different coordinate reference system
@@ -662,10 +666,10 @@ class ReprojectionOperation(PathToPathOperation, FileOutputMixin):
         profile: "Profile",
         process_identifier: str,
         work_directory: pathlib.Path,
-        data: typing.Sequence[pathlib.Path],
+        data: generic.Sequence[pathlib.Path],
         previous_operations: list[ProfileOperation],
         metadata: dict[str, typing.Any]
-    ) -> typing.Sequence[pathlib.Path]:
+    ) -> generic.Sequence[pathlib.Path]:
         """
         Reproject one or more netcdf files into a new coordinate reference system
 
@@ -723,8 +727,8 @@ class ReprojectionOperation(PathToPathOperation, FileOutputMixin):
         )
         return updated_paths
 
-    def __post_init__(self) -> None:
-        super().__post_init__()
+    def _validate(self) -> None:
+        super()._validate()
         if isinstance(self.reference_dataset_path, str):
             self.reference_dataset_path = pathlib.Path(self.reference_dataset_path.format_map(settings.to_dict()))
         else:
@@ -748,7 +752,7 @@ class ReprojectionOperation(PathToPathOperation, FileOutputMixin):
     reference_y_variable: str = dataclasses.field(default="y")
     output_crs_variable_name: typing.Optional[str] = dataclasses.field(default=None)
 
-@dataclasses.dataclass
+@postprocessing_model
 class SubsetOperation(PathToPathOperation):
     """
     Describes how to slice a netcdf file and operate on individual pieces of data
@@ -763,10 +767,10 @@ class SubsetOperation(PathToPathOperation):
         profile: "Profile",
         process_identifier: str,
         work_directory: pathlib.Path,
-        data: typing.Sequence[pathlib.Path],
+        data: generic.Sequence[pathlib.Path],
         previous_operations: list[ProfileOperation],
         metadata: dict[str, typing.Any]
-    ) -> typing.Sequence[pathlib.Path]:
+    ) -> generic.Sequence[pathlib.Path]:
         """
         Split each received NWMFile into other files based on the collection of masks. There should be len(masks) * len(files) returned files
 
@@ -810,7 +814,7 @@ class SubsetOperation(PathToPathOperation):
 
                 subset_arguments.append(file_kwargs)
 
-            subset_paths: typing.Sequence[generic.Sequence[pathlib.Path]] = starmap_threaded(
+            subset_paths: SeriesOfPaths = starmap_threaded(
                 function=mask_dataset,
                 args=subset_arguments,
                 thread_count=settings.maximum_additional_threads
@@ -838,7 +842,7 @@ class SubsetOperation(PathToPathOperation):
                 for subset_path in collapsed_paths
             ]
 
-            results: typing.Sequence[typing.Sequence[typing.Union[pathlib.Path]]] = starmap_threaded(
+            results: SeriesOfPaths = starmap_threaded(
                 function=call_generic_operations,
                 args=arguments_on_each,
                 thread_count=settings.maximum_additional_threads
@@ -852,7 +856,7 @@ class SubsetOperation(PathToPathOperation):
         clean_masks()
         return [path for inner_results in results for path in inner_results]
 
-    def __post_init__(self):
+    def _validate(self):
         errors: list[Exception] = []
         from post_processing.utilities.common import expand_paths
 
@@ -914,7 +918,7 @@ class SubsetOperation(PathToPathOperation):
         if self.each:
             for operation_index, operation in enumerate(self.each):
                 try:
-                    if isinstance(operation, typing.Mapping):
+                    if isinstance(operation, generic.Mapping):
                         operation = load_operation(specification=operation)
                         self.each[operation_index] = operation
                     elif not isinstance(operation, ProfileOperation):
@@ -979,7 +983,7 @@ class SubsetOperation(PathToPathOperation):
     _mask_identifiers: dict[pathlib.Path, dict[str, typing.Any]] = member(default_factory=dict)
     """Identifiers that were lifted from the mask filename"""
 
-@dataclasses.dataclass
+@postprocessing_model
 class ExtractOperation(PathToPathOperation):
     """
     Describes how to extract and operate on individual pieces of data
@@ -994,10 +998,10 @@ class ExtractOperation(PathToPathOperation):
         profile: "Profile",
         process_identifier: str,
         work_directory: pathlib.Path,
-        data: typing.Sequence[pathlib.Path],
+        data: generic.Sequence[pathlib.Path],
         previous_operations: list[ProfileOperation],
         metadata: dict[str, typing.Any]
-    ) -> typing.Sequence[pathlib.Path]:
+    ) -> generic.Sequence[pathlib.Path]:
         """
         Split each received NWMFile into other files based on the collection of masks. There should be len(masks) * len(files) returned files
 
@@ -1039,7 +1043,7 @@ class ExtractOperation(PathToPathOperation):
             ]
 
             from post_processing.transform.subsetting.vector import subset_vector_file_into_file_by_value
-            subset_paths: typing.Sequence[pathlib.Path] = starmap(
+            subset_paths: generic.Sequence[pathlib.Path] = starmap(
                 function=subset_vector_file_into_file_by_value,
                 args=subset_arguments,
                 thread_count=settings.maximum_additional_threads
@@ -1063,7 +1067,7 @@ class ExtractOperation(PathToPathOperation):
                 for subset_path in subset_paths
             ]
 
-            results: typing.Sequence[typing.Sequence[typing.Union[pathlib.Path]]] = starmap(
+            results: SeriesOfPaths = starmap(
                 function=call_generic_operations,
                 args=arguments_for_each,
                 thread_count=settings.maximum_additional_threads
@@ -1078,7 +1082,7 @@ class ExtractOperation(PathToPathOperation):
 
         return [path for inner_results in results for path in inner_results]
 
-    def __post_init__(self):
+    def _validate(self):
         errors: list[Exception] = []
         from post_processing.utilities.common import expand_paths
         from post_processing.utilities.common import find_candidate_paths
@@ -1086,7 +1090,7 @@ class ExtractOperation(PathToPathOperation):
         expanded_paths: list[pathlib.Path] = expand_paths(self.masks)
 
         if len(expanded_paths) == 0:
-            candidate_paths: typing.Sequence[pathlib.Path] = find_candidate_paths(self.masks)
+            candidate_paths: generic.Sequence[pathlib.Path] = find_candidate_paths(self.masks)
 
             template_pattern: re.Pattern = re.compile(r"\{[^}]+}")
 
@@ -1152,7 +1156,7 @@ class ExtractOperation(PathToPathOperation):
         if self.each:
             for operation_index, operation in enumerate(self.each):
                 try:
-                    if isinstance(operation, typing.Mapping):
+                    if isinstance(operation, generic.Mapping):
                         operation = load_operation(specification=operation)
                         self.each[operation_index] = operation
                     elif not isinstance(operation, ProfileOperation):
@@ -1211,7 +1215,7 @@ class ExtractOperation(PathToPathOperation):
     _pattern: typing.Optional[re.Pattern] = member(default=None)
     _identifier_mapping: dict[pathlib.Path, dict[str, str]] = member(default_factory=dict)
 
-@dataclasses.dataclass(unsafe_hash=True)
+@postprocessing_model(unsafe_hash=True)
 class MergeOperation(PathToPathOperation):
     """
     Tells how to combine data
@@ -1229,10 +1233,10 @@ class MergeOperation(PathToPathOperation):
         profile: "Profile",
         process_identifier: str,
         work_directory: pathlib.Path,
-        data: typing.Sequence[pathlib.Path],
+        data: generic.Sequence[pathlib.Path],
         previous_operations: list[ProfileOperation],
         metadata: dict[str, typing.Any]
-    ) -> typing.Sequence[pathlib.Path]:
+    ) -> generic.Sequence[pathlib.Path]:
         """
         Combine all received files into one
 
@@ -1262,7 +1266,7 @@ class MergeOperation(PathToPathOperation):
     file_name_pattern: str = dataclasses.field()
 
 
-@dataclasses.dataclass(unsafe_hash=True)
+@postprocessing_model(unsafe_hash=True)
 class Peek(PathToPathOperation):
     """
 
@@ -1292,10 +1296,10 @@ class Peek(PathToPathOperation):
         profile: "Profile",
         process_identifier: str,
         work_directory: pathlib.Path,
-        data: typing.Sequence[pathlib.Path],
+        data: generic.Sequence[pathlib.Path],
         previous_operations: list[ProfileOperation],
         metadata: dict[str, typing.Any]
-    ) -> typing.Sequence[pathlib.Path]:
+    ) -> generic.Sequence[pathlib.Path]:
         from post_processing.utilities.netcdf import peek
         LOGGER.warning(f"Peeking into operations. Do not do this in production!")
 
@@ -1324,7 +1328,7 @@ Files:
             LOGGER.info(metadata_information)
         return data
 
-@dataclasses.dataclass
+@postprocessing_model
 class DropOperation(PathToPathOperation, FileOutputMixin):
     """
     Tells how to drop variables
@@ -1379,13 +1383,12 @@ class DropOperation(PathToPathOperation, FileOutputMixin):
 
             netcdf_without_dimensions: xarray.Dataset = netcdf_data.drop_dims(drop_dims=dimensions_to_remove)
 
-            from concurrent.futures import Future
-            future_output_path: Future[pathlib.Path] = netcdf.submit_write(
+            from post_processing.interfaces.work import PendingTaskResult
+            future_output_path: PendingTaskResult[pathlib.Path] = netcdf.submit_write(
                 dataset=netcdf_without_dimensions,
                 target=output_file
             )
 
-            from post_processing.utilities.common import cycle_future
             result, error = cycle_future(future_output_path)
 
             if error is not None:
@@ -1394,6 +1397,34 @@ class DropOperation(PathToPathOperation, FileOutputMixin):
                 raise FileNotFoundError(f"Could not find the path to the written data in {output_file}")
             output_file = result
         return output_file
+
+    @staticmethod
+    def _drop_variable(dataset: "xarray.Dataset", fields: list[str], exclude: bool = False) -> "xarray.Dataset":
+        if exclude:
+            variables_to_drop: list[str] = [
+                str(variable_name)
+                for variable_name in dataset.variables.keys()
+                if variable_name not in fields
+            ]
+        else:
+            missing_variables: list[str] = [
+                field_name
+                for field_name in fields
+                if field_name not in dataset.variables.keys()
+            ]
+            if missing_variables and settings.this_is_verbose:
+                LOGGER.debug(
+                    f"Cannot remove variables - the input file is missing the following variables: "
+                    f"'{', '.join(missing_variables)}'"
+                )
+            variables_to_drop: list[str] = list(
+                field
+                for field in fields
+                if field in dataset.variables.keys()
+            )
+
+        dataset = dataset.drop_vars(variables_to_drop)
+        return dataset
 
     def _remove_variables(
         self,
@@ -1407,45 +1438,20 @@ class DropOperation(PathToPathOperation, FileOutputMixin):
         :param output_file: Where to save the result
         :returns: The path to the updated data
         """
-
-        import xarray
         from post_processing.utilities import netcdf
-
-        netcdf_data: xarray.Dataset = netcdf.load(target=input_file, full_load=True)
-        if self.exclude:
-            variables_to_drop: list[str] = [
-                str(variable_name)
-                for variable_name in netcdf_data.variables.keys()
-                if variable_name not in self.fields
-            ]
-        else:
-            missing_variables: list[str] = [
-                field_name
-                for field_name in self.fields
-                if field_name not in netcdf_data.variables.keys()
-            ]
-            if missing_variables and settings.this_is_verbose:
-                LOGGER.debug(
-                    f"Cannot remove variables - '{input_file}' is missing the following variables: "
-                    f"'{', '.join(missing_variables)}'"
-                )
-            variables_to_drop: list[str] = list(
-                field
-                for field in self.fields
-                if field in netcdf_data.variables.keys()
-            )
-
-        updated_data = netcdf_data.drop_vars(variables_to_drop)
-
         from post_processing.interfaces.work import PendingTaskResult
-        future_path: PendingTaskResult[pathlib.Path] = netcdf.submit_write(
-            dataset=updated_data,
-            target=output_file,
-            compute=True
+
+        pending_result: PendingTaskResult[pathlib.Path] = netcdf.submit_dataset_operation(
+            target=input_file,
+            output_path=output_file,
+            function=self._drop_variable,
+            kwargs={
+                "fields": self.fields,
+                "exclude": self.exclude,
+            },
         )
 
-        from post_processing.utilities.common import cycle_future
-        result, error = cycle_future(future_path)
+        result, error = cycle_future(pending_result)
 
         if error is not None:
             raise error
@@ -1461,10 +1467,10 @@ class DropOperation(PathToPathOperation, FileOutputMixin):
         profile: "Profile",
         process_identifier: str,
         work_directory: pathlib.Path,
-        data: typing.Sequence[pathlib.Path],
+        data: generic.Sequence[pathlib.Path],
         previous_operations: list[ProfileOperation],
         metadata: dict[str, typing.Any]
-    ) -> typing.Sequence[pathlib.Path]:
+    ) -> generic.Sequence[pathlib.Path]:
         """
         Remove variables from netcdf files
 
@@ -1481,7 +1487,7 @@ class DropOperation(PathToPathOperation, FileOutputMixin):
             drop_function: generic.Callable[[pathlib.Path, pathlib.Path], pathlib.Path] = self._remove_variables
 
 
-        input_output_mapping: typing.Mapping[pathlib.Path, pathlib.Path] = {
+        input_output_mapping: generic.Mapping[pathlib.Path, pathlib.Path] = {
             file: self.get_output_path(
                 work_directory=work_directory,
                 input_path=file,
@@ -1500,7 +1506,7 @@ class DropOperation(PathToPathOperation, FileOutputMixin):
         ]
 
         try:
-            updated_files: typing.Sequence[pathlib.Path] = starmap_threaded(
+            updated_files: generic.Sequence[pathlib.Path] = starmap_threaded(
                 function=drop_function,
                 args=arguments,
                 thread_count=settings.maximum_additional_threads
@@ -1516,7 +1522,7 @@ class DropOperation(PathToPathOperation, FileOutputMixin):
     exclude: bool = dataclasses.field(default=False)
     drop_dimension: bool = dataclasses.field(default=False)
 
-@dataclasses.dataclass
+@postprocessing_model
 class RenameOperation(PathToPathOperation, FileOutputMixin):
     """
     Tells how to rename variables or dimensions
@@ -1527,7 +1533,7 @@ class RenameOperation(PathToPathOperation, FileOutputMixin):
 
     def __str__(self):
         prefix: str = f"{self.operation_id}: " if self.operation_id else ''
-        rename_mapping: typing.Sequence[str] = [
+        rename_mapping: generic.Sequence[str] = [
             f"the {'variable' if self.rename_variable else 'dimension'} '{key}' to '{value}'"
             for key, value in self.mapping.items()
         ]
@@ -1539,10 +1545,10 @@ class RenameOperation(PathToPathOperation, FileOutputMixin):
         profile: "Profile",
         process_identifier: str,
         work_directory: pathlib.Path,
-        data: typing.Sequence[pathlib.Path],
+        data: generic.Sequence[pathlib.Path],
         previous_operations: list[ProfileOperation],
         metadata: dict[str, typing.Any]
-    ) -> typing.Sequence[pathlib.Path]:
+    ) -> generic.Sequence[pathlib.Path]:
         """
         Rename variables from netcdf files
 
@@ -1590,7 +1596,7 @@ class RenameOperation(PathToPathOperation, FileOutputMixin):
         from post_processing.transform.rename import rename_dimension
 
         try:
-            new_files: typing.Sequence[pathlib.Path] = starmap(
+            new_files: generic.Sequence[pathlib.Path] = starmap(
                 function=rename_variable if self.rename_variable else rename_dimension,
                 args=arguments,
                 thread_count=settings.maximum_additional_threads
@@ -1608,7 +1614,7 @@ class RenameOperation(PathToPathOperation, FileOutputMixin):
     mapping: dict[str, str] = dataclasses.field()
     rename_variable: bool = dataclasses.field(default=True)
 
-@dataclasses.dataclass
+@postprocessing_model
 class UnitConversionOperation(PathToPathOperation, FileOutputMixin):
     """
     Tells how to rename variables or dimensions
@@ -1617,17 +1623,14 @@ class UnitConversionOperation(PathToPathOperation, FileOutputMixin):
     def operation(cls) -> OperationType:
         return OperationType.UNIT_CONVERSION
 
-    def __post_init__(self):
-        super().__post_init__()
+    def _validate(self):
+        super()._validate()
 
         for conversion_index, conversion in enumerate(self.conversions):
             if isinstance(conversion, generic.Mapping):
                 self.conversions[conversion_index] = ConversionMapping.from_dict(**conversion)
             elif not isinstance(conversion, ConversionMapping):
                 raise TypeError(f"Item {conversion_index} is not a ConversionMapping")
-
-    def _validate(self):
-        super()._validate()
 
         if not self.conversions:
             raise ValueError(
@@ -1652,10 +1655,10 @@ class UnitConversionOperation(PathToPathOperation, FileOutputMixin):
         profile: "Profile",
         process_identifier: str,
         work_directory: pathlib.Path,
-        data: typing.Sequence[pathlib.Path],
+        data: generic.Sequence[pathlib.Path],
         previous_operations: list[ProfileOperation],
         metadata: dict[str, typing.Any]
-    ) -> typing.Sequence[pathlib.Path]:
+    ) -> generic.Sequence[pathlib.Path]:
         """
         Rename variables from netcdf files
 
@@ -1685,7 +1688,7 @@ class UnitConversionOperation(PathToPathOperation, FileOutputMixin):
         ]
 
         try:
-            new_files: typing.Sequence[pathlib.Path] = starmap(
+            new_files: generic.Sequence[pathlib.Path] = starmap(
                 function=convert_file,
                 args=arguments
             )
@@ -1702,7 +1705,7 @@ class UnitConversionOperation(PathToPathOperation, FileOutputMixin):
     conversions: list[ConversionMapping]
 
 
-@dataclasses.dataclass(unsafe_hash=True)
+@postprocessing_model(unsafe_hash=True)
 class AttributeOperation(PathToPathOperation, FileOutputMixin):
     """
     Tells how to add, modify, or remove attributes on variables or globally
@@ -1732,10 +1735,10 @@ class AttributeOperation(PathToPathOperation, FileOutputMixin):
         profile: "Profile",
         process_identifier: str,
         work_directory: pathlib.Path,
-        data: typing.Sequence[pathlib.Path],
+        data: generic.Sequence[pathlib.Path],
         previous_operations: list[ProfileOperation],
         metadata: dict[str, typing.Any]
-    ) -> typing.Sequence[pathlib.Path]:
+    ) -> generic.Sequence[pathlib.Path]:
         """
         Add, update, or remove attributes on variables or globally
 
@@ -1765,7 +1768,7 @@ class AttributeOperation(PathToPathOperation, FileOutputMixin):
         ]
 
         try:
-            new_paths: typing.Sequence[pathlib.Path] = starmap_threaded(
+            new_paths: generic.Sequence[pathlib.Path] = starmap_threaded(
                 function=nco.add_or_modify_attribute,
                 args=arguments,
                 thread_count=settings.maximum_additional_threads
@@ -1777,7 +1780,7 @@ class AttributeOperation(PathToPathOperation, FileOutputMixin):
 
         return new_paths
 
-    def __post_init__(self):
+    def _validate(self):
         errors: list[Exception] = []
         if not isinstance(self.attribute_type, nco.NetcdfType):
             try:
@@ -1814,7 +1817,7 @@ class AttributeOperation(PathToPathOperation, FileOutputMixin):
     mode: nco.EditMode = dataclasses.field(default_factory=lambda: nco.EditMode.OVERWRITE)
 
 
-@dataclasses.dataclass
+@postprocessing_model
 class SaveOperation(PathToPathOperation):
     """
     Save the given files in another location
@@ -1830,7 +1833,7 @@ class SaveOperation(PathToPathOperation):
             f"following file name pattern: {self.filename_pattern}"
         )
 
-    def __post_init__(self):
+    def _validate(self):
         errors: list[Exception] = []
         if self.identifier_pattern:
             try:
@@ -1860,10 +1863,10 @@ class SaveOperation(PathToPathOperation):
         profile: "Profile",
         process_identifier: str,
         work_directory: pathlib.Path,
-        data: typing.Sequence[pathlib.Path],
+        data: generic.Sequence[pathlib.Path],
         previous_operations: list[ProfileOperation],
         metadata: dict[str, typing.Any]
-    ) -> typing.Sequence[pathlib.Path]:
+    ) -> generic.Sequence[pathlib.Path]:
         """
         Save the given files in another location
 
@@ -2026,8 +2029,8 @@ class SaveOperation(PathToPathOperation):
     _compiled_pattern: typing.Optional[re.Pattern] = member(default=None)
 
 
-@dataclasses.dataclass
-class BranchOperation(ProfileOperation[InputType, typing.Sequence[pathlib.Path]]):
+@postprocessing_model
+class BranchOperation(ProfileOperation[InputType, generic.Sequence[pathlib.Path]]):
     """
     An operation that lets you feed input data through multiple mutually exclusive operations
     """
@@ -2050,7 +2053,7 @@ class BranchOperation(ProfileOperation[InputType, typing.Sequence[pathlib.Path]]
 
     def __str__(self):
         prefix: str = f"{self.operation_id}: " if self.operation_id else ""
-        branch_descriptions: typing.Sequence[str] = [
+        branch_descriptions: generic.Sequence[str] = [
             (
                 f"{name}:{os.linesep}"
                 f"{'=' * len(name)}{os.linesep}"
@@ -2070,7 +2073,7 @@ class BranchOperation(ProfileOperation[InputType, typing.Sequence[pathlib.Path]]
     def operation(cls) -> OperationType:
         return OperationType.BRANCH
 
-    def __post_init__(self):
+    def _validate(self):
         errors: list[Exception] = []
 
         for branch_name, branch_logic in self.branches.items():
@@ -2081,7 +2084,7 @@ class BranchOperation(ProfileOperation[InputType, typing.Sequence[pathlib.Path]]
 
             for operation_index, operation in enumerate(branch_logic):
                 try:
-                    if isinstance(operation, typing.Mapping):
+                    if isinstance(operation, generic.Mapping):
                         operation = load_operation(specification=operation)
                         self.branches[branch_name][operation_index] = operation
                     elif not isinstance(operation, ProfileOperation):
@@ -2139,7 +2142,8 @@ class BranchOperation(ProfileOperation[InputType, typing.Sequence[pathlib.Path]]
         :returns: The Paths for each created object
         """
         import concurrent.futures
-        future_results: dict[str, concurrent.futures.Future[typing.Sequence[pathlib.Path]]] = {}
+        from post_processing.interfaces.work import PendingTaskResult
+        future_results: dict[str, PendingTaskResult[generic.Sequence[pathlib.Path]]] = {}
 
         try:
             with concurrent.futures.ThreadPoolExecutor() as executor:
@@ -2164,13 +2168,11 @@ class BranchOperation(ProfileOperation[InputType, typing.Sequence[pathlib.Path]]
                     )
                     return condense_exceptions(new_error_message, [error])
 
-                from post_processing.utilities.common import cycle_futures
-
                 def log_duplicates(
                     branch: str,
-                    returned_paths: typing.Sequence[pathlib.Path],
-                    current_paths: typing.Sequence[typing.Sequence[pathlib.Path]]
-                ) -> typing.Sequence[pathlib.Path]:
+                    returned_paths: generic.Sequence[pathlib.Path],
+                    current_paths: SeriesOfPaths
+                ) -> generic.Sequence[pathlib.Path]:
                     current_paths = set(path for resultant_paths in current_paths for path in resultant_paths)
                     preexisting_paths, new_paths = partition(lambda path: path in current_paths, returned_paths)
                     if preexisting_paths:
@@ -2194,9 +2196,9 @@ class BranchOperation(ProfileOperation[InputType, typing.Sequence[pathlib.Path]]
                         exceptions
                     )
 
-                melted_results: typing.Sequence[pathlib.Path] = list(set([
+                melted_results: generic.Sequence[pathlib.Path] = list(set([
                     path
-                    for branch_results in results
+                    for branch_results in results.values()
                     for path in branch_results
                 ]))
         except Exception as exception:
@@ -2296,7 +2298,7 @@ class BranchOperation(ProfileOperation[InputType, typing.Sequence[pathlib.Path]]
         return results
 
 
-@dataclasses.dataclass(unsafe_hash=True)
+@postprocessing_model(unsafe_hash=True)
 class LoadOperation(ProfileOperation[typing.Sequence[pathlib.Path], typing.Iterator[xarray.Dataset]]):
     """
     An operation that loads data within paths into a single xarray dataset
@@ -2335,7 +2337,7 @@ class LoadOperation(ProfileOperation[typing.Sequence[pathlib.Path], typing.Itera
         return data
 
 
-@dataclasses.dataclass
+@postprocessing_model
 class OnEachOperation(
     ProfileOperation[typing.Union[typing.Iterable[InputType]], typing.Union[typing.Iterable[OutputType]]]
 ):
@@ -2350,7 +2352,7 @@ class OnEachOperation(
     def operation(cls) -> OperationType:
         return OperationType.ON_EACH
 
-    def __post_init__(self):
+    def _validate(self):
         errors: list[Exception] = []
         if len(self.on_each) == 0:
             errors.append(
@@ -2437,7 +2439,7 @@ class OnEachOperation(
     thread_count: int = dataclasses.field(default_factory=lambda: settings.maximum_additional_threads)
 
 
-@dataclasses.dataclass
+@postprocessing_model
 class AnomalyOperation(PathToPathOperation):
     """
     Attaches anomaly variables to netcdf files based on thresholds
@@ -2478,7 +2480,7 @@ class AnomalyOperation(PathToPathOperation):
     def operation(cls) -> OperationType:
         return OperationType.ANOMALY
 
-    def __post_init__(self):
+    def _validate(self):
         errors: list[Exception] = []
 
         if len(self.thresholds) == 0:
@@ -2522,8 +2524,6 @@ class AnomalyOperation(PathToPathOperation):
         """
 
         """
-        from post_processing.interfaces.work import PendingTaskResult
-        from post_processing.utilities.common import cycle_futures
         from post_processing.utilities import netcdf
         from post_processing.transform import anomaly
         import numpy
@@ -2599,8 +2599,6 @@ class AnomalyOperation(PathToPathOperation):
                 for input_path in data
             ]
 
-            from post_processing.utilities.common import starmap_threaded
-
             output_paths: generic.Sequence[pathlib.Path] = starmap_threaded(
                 function=anomaly.calculate_anomaly,
                 args=arguments,
@@ -2618,7 +2616,7 @@ class AnomalyOperation(PathToPathOperation):
         return output_paths
 
 
-@dataclasses.dataclass
+@postprocessing_model
 class FunctionOperation(ProfileOperation[InputType, OutputType]):
     """
     Pass input through python code by passing preconfigured keyword arguments and mapped variables
@@ -2659,7 +2657,7 @@ class FunctionOperation(ProfileOperation[InputType, OutputType]):
         function_description: str = f"{self.function_name}({os.linesep}    {mapping_description}{os.linesep})"
         return f"{prefix}Call {function_description}"
 
-    def __post_init__(self):
+    def _validate(self):
         self._function = get_function_by_name(function_name=self.function_name)
 
     def __call__(
@@ -2793,7 +2791,7 @@ class Profile(BaseModel):
             operation.assign_id(parent_id=str(initial_id))
             initial_id += 1
 
-    def __post_init__(self):
+    def _validate(self):
         errors: list[Exception] = []
 
         if not isinstance(self.configuration, Configuration):
@@ -3263,7 +3261,8 @@ def call_generic_operations(
     work_directory: pathlib.Path,
     data: InputType,
     previous_operations: list[ProfileOperation],
-    metadata: dict[str, typing.Any]
+    metadata: dict[str, typing.Any],
+    on_complete: generic.Iterable[tuple[typing.Callable, generic.Mapping] | typing.Callable] = None
 ) -> OutputType:
     """
     Call operations sequentially without regard for input and output data
@@ -3275,8 +3274,39 @@ def call_generic_operations(
     :param data: The data that should flow into the operations
     :param previous_operations: A record of what operations have been performed
     :param metadata: Decorative metadata that may be used to generate names
+    :param on_complete: A series on operations to perform specifically for this group 
     :returns: The result of the last operation after the input data has been pushed through each ProfileOperation
     """
+    if on_complete is None:
+        on_complete = []
+
+    on_complete_updates: list[tuple[int, tuple[typing.Callable, generic.Mapping]]] = []
+
+    for handler_index, handler in enumerate(on_complete):
+        if callable(handler):
+            on_complete_updates.append((handler_index, (handler, {})))
+            continue
+
+        handler_pair_is_valid: bool = True
+        if not isinstance(handler, generic.Sequence):
+            handler_pair_is_valid = False
+        elif len(handler) != 2:
+            handler_pair_is_valid = False
+        elif not callable(handler[0]):
+            handler_pair_is_valid = False
+        elif not isinstance(handler[1], generic.Mapping):
+            handler_pair_is_valid = False
+
+        if not handler_pair_is_valid:
+            raise ValueError(
+                f"Cannot call generic operations from stage {metadata['stage']} - "
+                f"on_complete handler {handler_index} must either be a function or a function and keyword "
+                f"arguments and instead received (type={type(handler)}) '{handler}'"
+            )
+
+    for index_to_update, new_pair in on_complete_updates:
+        on_complete[index_to_update] = new_pair
+
     current_data = data
 
     for operation in operations:
@@ -3315,18 +3345,11 @@ def call_generic_operations(
                 f"there is already a record"
             )
 
+    for handler, kwargs in on_complete:
+        updated_data = handler(current_data, **kwargs)
+        if updated_data is not None:
+            current_data = updated_data
     return current_data
-
-
-def assign_stage(path: pathlib.Path, stage: str):
-    """
-    Assign the stage attribute to the netcdf file at the given path
-
-    :param path: The path to a netcdf file
-    :param stage: The identifier for the stage of the profile that was just completed
-    """
-    from post_processing.nco import add_or_modify_attribute
-    add_or_modify_attribute(input_file=path, attribute_name=STAGE_ATTRIBUTE, attribute_value=stage)
 
 
 def get_profile(

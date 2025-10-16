@@ -20,7 +20,7 @@ import requests
 from post_processing.configuration import settings
 from post_processing.enums import Configuration
 from post_processing.enums import ModelOutputType
-from post_processing.utilities.common import starmap
+from post_processing.work import starmap
 
 if __name__ == "__main__":
     logging.basicConfig(
