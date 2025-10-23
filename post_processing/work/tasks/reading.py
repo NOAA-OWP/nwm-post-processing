@@ -299,7 +299,12 @@ class TransformVariableTask(base.DataTask[T]):
                     f"{', ' + ', '.join(map(str, self.kwargs)) if self.kwargs else ''})"
                 )
 
-            result: T = self.function(variable, **self.kwargs)
+            try:
+                result: T = self.function(variable, **self.kwargs)
+            except Exception as e:
+                import os
+                LOGGER.error(f"Failed to perform '{self.function}' due to {e}. Data: {os.linesep}{repr(data)}")
+                raise e
 
             if isinstance(result, (xarray.DataArray, xarray.Dataset)):
                 LOGGER.debug(

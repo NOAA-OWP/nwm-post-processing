@@ -134,7 +134,7 @@ def get_floor_and_maximum_time(
     # Don't check for ints because knowing the start time can be a mess
     if not numpy.issubdtype(variable.dtype, numpy.datetime64):
         raise TypeError(
-            f"The input array needed to determine the time floor must be a datetime64 but was instead "
+            f"The input array needed to determine the time floor ({variable.name}) must be a datetime64 but was instead "
             f"'{variable.dtype}' (type={type(variable.dtype)})"
         )
 
@@ -411,6 +411,31 @@ class GroupByLeadOperation(base_profile.PathToPathOperation, base_profile.FileOu
             thread_count=settings.maximum_additional_threads
         )
 
+        if self.include_time_bounds:
+            final_results: generic.Sequence[pathlib.Path] = self._add_time_bounds_to_results(
+                results=results,
+                file_groups=file_groups,
+                keyword_arguments=keyword_arguments,
+                work_directory=work_directory
+            )
+        else:
+            final_results: list[pathlib.Path] = []
+            for key, files in results.items():
+                if isinstance(files, pathlib.Path):
+                    final_results.append(files)
+                else:
+                    final_results.extend(files)
+
+
+        return final_results
+
+    def _add_time_bounds_to_results(
+        self,
+        results: generic.Mapping[str, typing.Sequence[pathlib.Path] | pathlib.Path],
+        file_groups: generic.Mapping[str, generic.Sequence[pathlib.Path] | pathlib.Path],
+        keyword_arguments: generic.Mapping[str, generic.Mapping[str, typing.Any]],
+        work_directory: pathlib.Path
+    ) -> generic.Sequence[pathlib.Path]:
         from post_processing.utilities.netcdf import submit_dataset_operation
         from post_processing.interfaces.work import PendingTaskResult
 
@@ -495,6 +520,8 @@ class GroupByLeadOperation(base_profile.PathToPathOperation, base_profile.FileOu
     """The amount of time units that individual inputs were formulated/aggregated over"""
     period: typing.Union[str, timedelta, "numpy.timedelta64"] = dataclasses.field(default="PT1H", kw_only=True)
     """The amount of time to group individual inputs over"""
+    include_time_bounds: bool = dataclasses.field(default=False, kw_only=True)
+    """Whether to include a time bound for each group"""
     time_bound_name: str = dataclasses.field(default="time_bounds", kw_only=True)
     """The name of the variable that will describe the bookends for each group"""
     time_bound_dimensions: typing.Optional[generic.Sequence[str]] = dataclasses.field(default=None, kw_only=True)
