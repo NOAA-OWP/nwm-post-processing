@@ -626,10 +626,6 @@ def load_metadata(
     metadata: dict[str, typing.Any] = {}
     for source_path, file_metadata in metadata_from_paths.items():
         metadata.update(file_metadata)
-        metadata.update({
-            f"{source_path.name}.{key}": value
-            for key, value in file_metadata.items()
-        })
 
     return metadata
 

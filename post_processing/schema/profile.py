@@ -2925,7 +2925,7 @@ class Profile(BaseModel):
         input_metadata.update(metadata)
 
         # TODO: Make the identifier deterministic
-        process_identifier: str = str(hash((
+        process_identifier: str = str(abs(hash((
             cycle,
             self.configuration,
             self.output_type,
@@ -2933,7 +2933,7 @@ class Profile(BaseModel):
             self.member,
             *files,
             *self.operations
-        )))
+        ))))
 
         work_directory: pathlib.Path = self.intermediate_directory / process_identifier
         work_directory.mkdir(parents=True, exist_ok=True)

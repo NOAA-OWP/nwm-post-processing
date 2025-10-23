@@ -1,10 +1,92 @@
 {
     "operations": [
         {
-            "operation": "echo",
-            "message": "An output for 'nwm.t<cycle>z.medium_range_blend.forcing.day1.alaska.nc' should be generated, as defined in {source_file}.",
-            "level": "error",
-            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/WMS/medium_range_blend/fe/nwm.t2025060718z.medium_range_blend.forcing.day1.alaska.aprfc.nc"
+            "operation": "drop",
+            "exclude": true,
+            "fields": [
+                "time",
+                "x",
+                "y",
+                "reference_time",
+                "crs",
+                "RAINRATE"
+            ]
+        },
+        {
+            "operation": "total_over_time",
+            "rate_variable_name": "RAINRATE",
+            "total_variable_name": "PRECIP",
+            "output_unit": "mm",
+            "input_quantity_unit": "mm",
+            "input_time_unit": "seconds",
+            "time_unit": "hours",
+            "amount_of_time": 1,
+            "total_variable_attributes": {
+                "standard_name": "rainfall_amount",
+                "long_name": "accumulated liquid precipitation"
+            }
+        },
+        {
+            "operation": "drop",
+            "fields": ["RAINRATE"]
+        },
+        {
+            "operation": "branch",
+            "branches": {
+                "WMS": [
+                    {
+                        "operation": "drop",
+                        "fields": [
+                            "reference_time"
+                        ],
+                        "drop_dimension": true
+                    },
+                    {
+                        "operation": "reproject",
+                        "reference_dataset_path": "{resource_path}/projections/alaska_mercator.nc",
+                        "reference_crs_variable": "mercator"
+                    },
+                    {
+                        "operation": "group_by",
+                        "time_unit": "days",
+                        "include_time_bounds": false,
+                        "on_each": [
+                            {
+                                "operation": "stream",
+                                "streams": [
+                                    {
+                                        "input_variable": "PRECIP",
+                                        "calculation_type": "mean"
+                                    }
+                                ],
+                                "output_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.{group}.alaska.nc"
+                            }
+                        ]
+                    },
+                    {
+                        "operation": "drop",
+                        "fields": [
+                            "time"
+                        ]
+                    },
+                    {
+                        "operation": "save",
+                        "filename_pattern": "{file_name}",
+                        "directory": "{output_path}/"
+                    }
+                ],
+                "RFC": [
+                    {
+                        "operation": "reproject",
+                        "reference_dataset_path": "{resource_path}/projections/alaska_sphere_stereographic.nc"
+                    },
+                    {
+                        "operation": "save",
+                        "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.f{frame}.alaska.aprfc.nc",
+                        "directory": "{output_path}/"
+                    }
+                ]
+            }
         }
     ],
     "configuration": "medium_range_blend",
