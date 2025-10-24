@@ -247,12 +247,6 @@ def submit_dataset_transformation(
     future_result: PendingTaskResult[T] = __IO_GATEWAY.enqueue(task=task)
     return future_result
 
-
-@typing.runtime_checkable
-class DatasetMutator(typing.Protocol[VariableParameters]):
-    def __call__(self, dataset: "xarray.Dataset", **kwargs: VariableParameters.kwargs) -> "xarray.Dataset":
-        ...
-
 def submit_dataset_operation(
     target: pathlib.Path,
     output_path: pathlib.Path,

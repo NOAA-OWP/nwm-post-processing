@@ -54,7 +54,7 @@ class Gateway(abc.ABC):
     @abc.abstractmethod
     def can_queue_task(self, task: DataTask[T] | None) -> bool:
         ...
-
+    # This is essentially concurrent.futures.Executor.submit. This entire thing can probably be represented by an Executor
     def enqueue(self, task: DataTask[T] | None) -> PendingTaskResult[T]:
         if task is not None and not isinstance(task, DataTask):
             raise TypeError(
@@ -275,6 +275,7 @@ def get_gateway(queue_length: int = DEFAULT_QUEUE_LENGTH, wait_seconds: float = 
             "Cannot create a communication gateway - process communication has not been implemented"
         )
     if communication.COMMUNICATE_VIA_NODES:
+        # this is going to be the mpi4py.futures executor object
         raise NotImplementedError(
             "Cannot create a communication gateway - node communication has not been implemented"
         )
