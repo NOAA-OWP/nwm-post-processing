@@ -80,21 +80,21 @@ def accumulate_variable(
         if accumulated_data.dtype == numpy.float64:
             accumulated_data = accumulated_data.astype(numpy.float32)
 
+        accumulated_data.attrs = {
+            key: f"Accumulated {value}" if isinstance(value, str) and 'name' in key.lower() else value
+            for key, value in variable.attrs.items()
+        }
+        accumulated_data.attrs['cell_methods'] = "time: sum"
+        accumulated_data.attrs['units'] = quantity_unit
+
+        accumulated_data.attrs.update(attributes)
+
         if quantity_unit != target_unit:
             accumulated_data = convert_variable_unit(
                 variable=accumulated_data,
                 to_unit=target_unit,
                 from_unit=quantity_unit
             )
-
-        accumulated_data.attrs = {
-            key: f"Accumulated {value}" if isinstance(value, str) and 'name' in key.lower() else value
-            for key, value in variable.attrs.items()
-        }
-        accumulated_data.attrs['cell_methods'] = "time: sum"
-        accumulated_data.attrs['units'] = target_unit
-
-        accumulated_data.attrs.update(attributes)
 
         netcdf_data[output_variable_name] = accumulated_data
         netcdf_data[output_variable_name].encoding = {

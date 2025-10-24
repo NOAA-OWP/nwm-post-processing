@@ -1,6 +1,7 @@
 """
 Functions and objects to convert from one unit to another
 """
+import os
 import typing
 import pathlib
 import logging
@@ -160,7 +161,13 @@ def convert_variable_unit(
     :return: The converted variable
     """
     if UNIT_NAME_ATTRIBUTE not in variable.attrs and UNIT_NAME_ATTRIBUTE not in variable.encoding:
-        raise KeyError(f"Cannot convert the values in '{variable.name}' to '{to_unit}' - there are no defined units.")
+        raise KeyError(
+            f"Cannot convert the values in '{variable.name}' to '{to_unit}' - there are no defined units.{os.linesep}"
+            f"Metadata:{os.linesep}"
+            f"    - {(os.linesep + '    - ').join(map(lambda kv: str(kv[0]) + '=' + str(kv[1]), variable.attrs.items()))}{os.linesep}"
+            f"Encoding:{os.linesep}"
+            f"    - {(os.linesep + '    - ').join(map(lambda kv: str(kv[0]) + '=' + str(kv[1]), variable.encoding.items()))}"
+        )
 
     if not from_unit:
         from_unit: str = str((variable.attrs | variable.encoding)[UNIT_NAME_ATTRIBUTE])

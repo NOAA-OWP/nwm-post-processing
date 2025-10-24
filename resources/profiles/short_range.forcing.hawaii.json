@@ -1,10 +1,139 @@
 {
     "operations": [
         {
-            "operation": "echo",
-            "message": "An output for 'nwm.t<cycle>z.short_range.forcing.48hour.hawaii.nc' should be generated, as defined in {source_file}.",
-            "level": "error",
-            "original_link": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/WMS/short_range/fe/nwm.t2025060800z.short_range.forcing.48hour.hawaii.nc"
+            "operation": "drop",
+            "exclude": true,
+            "fields": [
+                "time",
+                "x",
+                "y",
+                "reference_time",
+                "crs",
+                "T2D",
+                "RAINRATE"
+            ]
+        },
+        {
+            "operation": "total_over_time",
+            "rate_variable_name": "RAINRATE",
+            "total_variable_name": "PRECIP",
+            "output_unit": "mm",
+            "input_quantity_unit": "mm",
+            "input_time_unit": "seconds",
+            "time_unit": "hours",
+            "amount_of_time": 1,
+            "total_variable_attributes": {
+                "standard_name": "rainfall_amount",
+                "long_name": "accumulated liquid precipitation"
+            }
+        },
+        {
+            "operation": "drop",
+            "fields": [
+                "RAINRATE"
+            ]
+        },
+        {
+            "operation": "branch",
+            "branches": {
+                "WMS": [
+                    {
+                        "operation": "unit_conversion",
+                        "conversions": [
+                            {
+                                "variable_name": "PRECIP",
+                                "target_unit": "in"
+                            }
+                        ]
+                    },
+                    {
+                        "operation": "drop",
+                        "fields": [
+                            "T2D"
+                        ]
+                    },
+                    {
+                        "operation": "reproject",
+                        "reference_dataset_path": "{resource_path}/projections/hawaii_mercator.nc"
+                    },
+                    {
+                        "operation": "branch",
+                        "branches": {
+                            "daily": [
+                                {
+                                    "operation": "group_by",
+                                    "time_unit": "days",
+                                    "on_each": [
+                                        {
+                                            "operation": "stream",
+                                            "streams": [
+                                                {
+                                                    "input_variable": "PRECIP",
+                                                    "calculation_type": "mean"
+                                                }
+                                            ],
+                                            "output_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.{group}.hawaii.nc"
+                                        }
+                                    ]
+                                }
+                            ],
+                            "full": [
+                                {
+                                    "operation": "group_by",
+                                    "time_unit": "hours",
+                                    "amount_of_time": 48,
+                                    "on_each": [
+                                        {
+                                            "operation": "stream",
+                                            "streams": [
+                                                {
+                                                    "input_variable": "PRECIP",
+                                                    "calculation_type": "mean"
+                                                }
+                                            ],
+                                            "output_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.{group}.hawaii.nc"
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "operation": "save",
+                        "directory": "{output_path}/",
+                        "filename_pattern": "{file_name}"
+                    }
+                ],
+                "RFC": [
+                    {
+                        "operation": "rename",
+                        "mapping": {
+                            "T2D": "TEMPERATURE"
+                        }
+                    },
+                    {
+                        "operation": "unit_conversion",
+                        "conversions": [
+                            {
+                                "variable_name": "TEMPERATURE",
+                                "target_unit": "C"
+                            }
+                        ]
+                    },
+                    {
+                        "operation": "reproject",
+                        "reference_dataset_path": "{resource_path}/projections/hawaii_sphere_lambert.nc"
+                    },
+                    {
+                        "operation": "calculate_time_bound"
+                    },
+                    {
+                        "operation": "save",
+                        "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.f{frame}.aprfc.nc",
+                        "directory": "{output_path}/"
+                    }
+                ]
+            }
         }
     ],
     "configuration": "short_range",
