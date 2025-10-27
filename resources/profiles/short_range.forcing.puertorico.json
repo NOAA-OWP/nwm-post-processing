@@ -9,7 +9,8 @@
                 "y",
                 "reference_time",
                 "crs",
-                "RAINRATE"
+                "RAINRATE",
+                "T2D"
             ]
         },
         {
@@ -33,56 +34,90 @@
             ]
         },
         {
-            "operation": "reproject",
-            "reference_dataset_path": "{resource_path}/projections/prvi_mercator.nc"
-        },
-        {
             "operation": "branch",
             "branches": {
-                "daily": [
+                "WMS": [
                     {
-                        "operation": "group_by",
-                        "time_unit": "days",
-                        "on_each": [
-                            {
-                                "operation": "stream",
-                                "streams": [
-                                    {
-                                        "input_variable": "PRECIP",
-                                        "calculation_type": "mean"
-                                    }
-                                ],
-                                "output_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.{group}.{Region}.nc"
-                            }
-                        ]
+                        "operation": "reproject",
+                        "reference_dataset_path": "{resource_path}/projections/prvi_mercator.nc"
+                    },
+                    {
+                        "operation": "branch",
+                        "branches": {
+                            "daily": [
+                                {
+                                    "operation": "group_by",
+                                    "time_unit": "days",
+                                    "on_each": [
+                                        {
+                                            "operation": "stream",
+                                            "streams": [
+                                                {
+                                                    "input_variable": "PRECIP",
+                                                    "calculation_type": "mean"
+                                                }
+                                            ],
+                                            "output_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.{group}.{Region}.nc"
+                                        }
+                                    ]
+                                }
+                            ],
+                            "full": [
+                                {
+                                    "operation": "group_by",
+                                    "time_unit": "hours",
+                                    "amount_of_time": 48,
+                                    "on_each": [
+                                        {
+                                            "operation": "stream",
+                                            "streams": [
+                                                {
+                                                    "input_variable": "PRECIP",
+                                                    "calculation_type": "mean"
+                                                }
+                                            ],
+                                            "output_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.{group}.{Region}.nc"
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "operation": "save",
+                        "directory": "{output_path}/",
+                        "filename_pattern": "{file_name}"
                     }
                 ],
-                "full": [
+                "RFC": [
                     {
-                        "operation": "group_by",
-                        "time_unit": "hours",
-                        "amount_of_time": 48,
-                        "on_each": [
+                        "operation": "rename",
+                        "mapping": {
+                            "T2D": "TEMPERATURE"
+                        }
+                    },
+                    {
+                        "operation": "unit_conversion",
+                        "conversions": [
                             {
-                                "operation": "stream",
-                                "streams": [
-                                    {
-                                        "input_variable": "PRECIP",
-                                        "calculation_type": "mean"
-                                    }
-                                ],
-                                "output_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.{group}.{Region}.nc"
+                                "variable_name": "TEMPERATURE",
+                                "target_unit": "C"
                             }
                         ]
+                    },
+                    {
+                        "operation": "reproject",
+                        "reference_dataset_path": "{resource_path}/projections/prvi_sphere_lambert.nc"
+                    },
+                    {
+                        "operation": "save",
+                        "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.{slice}.puertorico.serfc.nc",
+                        "directory": "{output_path}/"
                     }
                 ]
             }
-        },
-        {
-            "operation": "save",
-            "directory": "{output_path}/",
-            "filename_pattern": "{file_name}"
         }
+
     ],
     "configuration": "short_range",
     "output_type": "forcing",
