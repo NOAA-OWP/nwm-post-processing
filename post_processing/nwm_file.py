@@ -135,7 +135,9 @@ class NWMFile:
         name += "."
 
         if self.frame is not None:
-            if self.region in (enums.Region.Hawaii, enums.Region.HawaiiAPRFC):
+            # Hawaii channel_rt and land both have frames formatted like "f[HHH][MM]" and everything else has "fHHH",
+            # where "H" is 'hour' and "MM" is 'minute'
+            if self.region in (enums.Region.Hawaii, enums.Region.HawaiiAPRFC) and self.model_output_type != enums.ModelOutputType.Forcing:
                 name += f"f{str(self.frame).zfill(5)}"
             else:
                 name += f"f{str(self.frame).zfill(2)}"
