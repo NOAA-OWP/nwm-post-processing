@@ -90,7 +90,7 @@
                     },
                     {
                         "operation": "save",
-                        "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.{frame}.puertorico.serfc.nc",
+                        "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.{slice}.puertorico.serfc.nc",
                         "directory": "{output_path}/"
                     }
                 ]

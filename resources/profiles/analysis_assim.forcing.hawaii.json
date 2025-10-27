@@ -90,7 +90,7 @@
                     },
                     {
                         "operation": "save",
-                        "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.{frame}.aprfc.nc",
+                        "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.{slice}.aprfc.nc",
                         "directory": "{output_path}/"
                     }
                 ]
