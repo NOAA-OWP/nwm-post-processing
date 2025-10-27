@@ -38,6 +38,12 @@
             "branches": {
                 "WMS": [
                     {
+                        "operation": "drop",
+                        "fields": [
+                            "T2D"
+                        ]
+                    },
+                    {
                         "operation": "reproject",
                         "reference_dataset_path": "{resource_path}/projections/prvi_mercator.nc"
                     },
