@@ -121,7 +121,7 @@
             }
         }
     ],
-    "configuration": "medium_range_blend",
+    "configuration": "medium_range_ndfd",
     "output_type": "forcing",
     "region": "conus",
     "member": null
