@@ -27,8 +27,7 @@
                     {
                         "operation": "save",
                         "filename_pattern": "nwm.t{cycle}z.{Configuration}.{ModelOutputType}.tm{tminus}.{Region}.nc",
-                        "directory": "{output_path}/",
-                        "return_new_paths": false
+                        "directory": "{output_path}/"
                     }
                 ],
                 "RFC": [
