@@ -9,7 +9,6 @@
                 "y",
                 "reference_time",
                 "crs",
-                "T2D",
                 "RAINRATE"
             ]
         },
@@ -38,12 +37,6 @@
             "branches": {
                 "WMS": [
                     {
-                        "operation": "drop",
-                        "fields": [
-                            "T2D"
-                        ]
-                    },
-                    {
                         "operation": "reproject",
                         "reference_dataset_path": "{resource_path}/projections/mercator.nc"
                     },
@@ -70,21 +63,6 @@
                     }
                 ],
                 "RFC": [
-                    {
-                        "operation": "rename",
-                        "mapping": {
-                            "T2D": "TEMPERATURE"
-                        }
-                    },
-                    {
-                        "operation": "unit_conversion",
-                        "conversions": [
-                            {
-                                "variable_name": "TEMPERATURE",
-                                "target_unit": "C"
-                            }
-                        ]
-                    },
                     {
                         "operation": "reproject",
                         "reference_dataset_path": "{resource_path}/projections/sphere_lambert.nc"
