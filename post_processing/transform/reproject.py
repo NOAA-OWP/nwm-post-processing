@@ -242,6 +242,11 @@ class _ProjectionStore:
 ProjectionStore: _ProjectionStore = _ProjectionStore()
 """A central store for common projections"""
 
+def clean():
+    import os
+    LOGGER.info(f"Removing the ProjectionStore on PID {os.getpid()}")
+    ProjectionStore.clean()
+
 def remove_projection(
         path: pathlib.Path,
         x_variable_name: str = None,

@@ -137,11 +137,11 @@ class BaseModel:
     _raw_configuration: typing.Optional[str] = member()
 
     @classmethod
-    def get_model_fields(cls) -> generic.Sequence[dataclasses.Field]:
+    def get_model_fields(cls) -> generic.Mapping[str, dataclasses.Field]:
         """
         Get all dataclass fields for this model
         """
-        return list(getattr(cls, "__dataclass_fields__"))
+        return dict(getattr(cls, "__dataclass_fields__"))
 
     @property
     def raw_configuration(self) -> typing.Optional[str]:
@@ -283,7 +283,7 @@ class BaseModel:
     def __getstate__(self):
         member_fields: set[str] = {
             field.name
-            for field in self.get_model_fields()
+            for field_name, field in self.get_model_fields().items()
             if not field.init and MEMBER_FIELD_KEY in field.metadata
         }
         vanilla_state: dict[str, typing.Any] = {
@@ -295,10 +295,7 @@ class BaseModel:
 
     def __setstate__(self, state):
         for key, value in state.items():
-            if hasattr(self, key):
-                setattr(self, key, value)
-            else:
-                raise ValueError(f"Cannot set the '{key}' value on a '{type(self)}' - that field does not exist")
+            setattr(self, key, value)
         self.__load_members__()
 
     def to_dict(self) -> generic.Mapping[str, typing.Any]:
@@ -311,7 +308,7 @@ class BaseModel:
         """
         fields = [
             field
-            for field in self.get_model_fields()
+            for field in self.get_model_fields().values()
             if field.init
                 and MEMBER_FIELD_KEY not in field.metadata
                 and not field.name.startswith("_")

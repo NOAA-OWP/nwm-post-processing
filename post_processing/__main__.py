@@ -29,6 +29,9 @@ from post_processing.schema import InputManifest
 from post_processing.schema.profile import Profile
 from post_processing.schema.profile import get_profile
 
+if typing.TYPE_CHECKING:
+    from concurrent.futures import Executor
+
 faulthandler.enable(all_threads=True)
 
 if __name__.endswith("__main__"):
@@ -77,11 +80,40 @@ class Arguments:
             return
 
         if not self.source_file.exists():
-            messages.append(f"Cannot process data within the '{self.source_file}' file - it does not exist")
+            missing_input_message: str | None = None
+            from post_processing.nwm_file import NWMFile
+            try:
+                parsed_name: NWMFile = NWMFile.parse(self.source_file)
+                possible_corrected_path: pathlib.Path = self.source_file.parent / str(parsed_name)
+                if possible_corrected_path.is_file():
+                    missing_input_message = (
+                        f"'{self.source_file}' does not exist and cannot be accepted as valid input. "
+                        f"Did you mean to use '{possible_corrected_path}'?"
+                    )
+                    messages.append(missing_input_message)
+            except:
+                pass
+
+            if missing_input_message is None:
+                messages.append(f"Cannot accept '{self.source_file}' as input for post processing - it does not exist")
+
         if self.source_file.is_dir():
             messages.append(
-                f"Cannot process data from within '{self.source_file}' - it is a directory but a file is required"
+                f"Cannot use '{self.source_file}' as input for post processing - "
+                f"it is a directory but a file is required"
             )
+
+        if self.source_file.is_file():
+            try:
+                with open(self.source_file, 'rb') as source:
+                    head_bytes: bytes = source.read(4)
+
+                if head_bytes not in (b'CDF\x01', b'CDF\x02', b'\x89HDF'):
+                    messages.append(
+                        f"Cannot use '{self.source_file}' as input - it does not appear to be a valid Netcdf file. Head bytes were '{repr(head_bytes)}'"
+                    )
+            except:
+                pass
         
         if messages:
             raise ArgumentValidationException(__file__, messages=messages)
@@ -243,12 +275,37 @@ def shutdown():
         LOGGER.debug(f"The gateway was closed")
 
 
+def clean(executor: typing.Optional["Executor"]):
+    if executor is None:
+        LOGGER.info(f"There was no executor to shut down")
+        return
+
+    LOGGER.info(f"Shutting down '{executor}'")
+    from post_processing.work.orchestration import starmap_executor
+    from post_processing.transform.subsetting.cache import clean as remove_masks
+    from post_processing.transform.reproject import clean as remove_projections
+    from post_processing.utilities.netcdf import close_gateway
+
+    mask_removals = starmap_executor(remove_masks, args=[[]] * os.cpu_count() * 3, executor=executor)
+    projection_removals = starmap_executor(remove_projections, args=[[]] * os.cpu_count() * 3, executor=executor)
+    close_results = starmap_executor(close_gateway, args=[[]] * os.cpu_count() * 3, executor=executor)
+
+    LOGGER.info(f"Removed masks '{len(mask_removals)}' times")
+    LOGGER.info(f"Removed projections {len(projection_removals)} times")
+    LOGGER.info(f"Closed gateways '{len(close_results)}' times")
+
+
 def main() -> int:
     """
     The entry point of the script
 
     :returns: The status code of the application run
     """
+    if settings.mpi_is_available:
+        from mpi4py import MPI
+        communicator: MPI.Intracomm = MPI.COMM_WORLD
+        LOGGER.debug(f"MPI is available on Rank {communicator.Get_rank()}, out of {communicator.Get_size()}")
+
     start_time = datetime.now()
     try:
         arguments: Arguments = Arguments()
@@ -346,11 +403,13 @@ def main() -> int:
                     if settings.debug:
                         LOGGER.info(f"Running the profile from {profile.source_file}")
 
-                    outputs: generic.Sequence[pathlib.Path] = profile.run(
-                        cycle=manifest.cycle,
-                        files=manifest.files,
-                        output_path=arguments.destination
-                    )
+                    with profile:
+                        outputs: generic.Sequence[pathlib.Path] = profile.run(
+                            cycle=manifest.cycle,
+                            files=manifest.files,
+                            output_path=arguments.destination
+                        )
+                        clean(profile.executor)
                     LOGGER.info(
                         f"The results for the profile for {profile.output_type.describe()} data run within the "
                         f"{profile.configuration.describe()} configuration across {profile.region.describe()} were written to:{os.linesep}"

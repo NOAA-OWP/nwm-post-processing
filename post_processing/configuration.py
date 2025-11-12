@@ -138,6 +138,8 @@ class _Settings(UserDict):
         env_file: pathlib.Path = self.application_path / ".env"
         self.apply_env(env_path=env_file)
 
+        self.__non_configurable_values: dict[str, typing.Any] = {}
+
     def apply_env(self, env_path: pathlib.Path):
         """
         Apply settings from a .env file
@@ -158,6 +160,23 @@ class _Settings(UserDict):
         :returns: The appropriate key
         """
         return next(filter(lambda contained_key: contained_key.lower() == key.lower(), self.keys()), key)
+
+    @property
+    def mpi_is_available(self) -> bool:
+        """
+        Whether MPI is available within this process
+
+        NOTE: MPI may be available within the environment, but not necessarily the process
+        """
+        key: str = "MPI_IS_AVAILABLE"
+        if key not in self.__non_configurable_values:
+            try:
+                from mpi4py import MPI
+                self.__non_configurable_values[key] = True
+            except:
+                self.__non_configurable_values[key] = False
+
+        return bool(self.__non_configurable_values[key])
 
     @property
     def base_path(self) -> pathlib.Path:

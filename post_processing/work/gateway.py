@@ -218,7 +218,7 @@ class ThreadedGateway(Gateway):
         with self.__lock:
             if self.__thread is not None and self.__thread.is_alive():
                 if settings.this_is_verbose:
-                    LOGGER.debug(f"Shutting down {self.__class__.__name__}")
+                    LOGGER.debug(f"Shutting down {self.__class__.__name__} on PID {os.getpid()}")
                 self._should_operate.clear()
                 try:
                     self.enqueue(None)

@@ -132,3 +132,8 @@ class _MaskProvider:
         return self.__mask_metadata[path].dimensions
 
 MASK_PROVIDER = _MaskProvider()
+
+def clean():
+    import os
+    LOGGER.info(f"Emptying the mask provider on PID: {os.getpid()}")
+    MASK_PROVIDER.clean()
