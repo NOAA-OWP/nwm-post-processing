@@ -180,7 +180,7 @@ def expand_path(path: typing.Union[str, pathlib.Path], strict: bool = True) -> g
 
 def _default_initializer(*args, **kwargs):
     import os
-    print(f"Initializing multiprocessor on PID: {os.getpid()}")
+    LOGGER.debug(f"Initializing multiprocessor on PID: {os.getpid()}")
 
 
 def get_multiprocessor(
@@ -224,16 +224,25 @@ def get_multiprocessor(
                         f"be issued."
                     )
                 return None
+            max_available_workers: int = max(0, int(os.getenv("MPI4PY_FUTURES_MAX_WORKERS", 0)))
+            if max_available_workers > 0:
+                if settings.this_is_verbose:
+                    LOGGER.debug(f"An MPIPoolExecutor is being used")
+                executor_args["max_workers"] = min(
+                    max_available_workers,
+                    executor_args.get("max_workers", max_available_workers)
+                )
+                return MPIPoolExecutor(**executor_args)
             if settings.this_is_verbose:
                 LOGGER.debug(
                     f"MPI is available, but there are not enough nodes to justify an MPI multiprocessor. "
                     f"Checking to see if a regular multiprocessor may be used."
                 )
-        except:
+        except Exception as e:
             if settings.this_is_verbose:
                 LOGGER.debug(
                     f"MPI is supposed to be available but it could not be imported. Something is wrong. "
-                    f"Moving on to alternative multiprocessing solutions."
+                    f"Moving on to alternative multiprocessing solutions. {e}", exc_info=True
                 )
 
     if any(shutil.which(command) for command in ["srun", "sbatch", "qsub", "bsub"]):
