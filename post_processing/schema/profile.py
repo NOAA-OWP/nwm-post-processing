@@ -7,6 +7,7 @@ import itertools
 import os
 import re
 import shutil
+import threading
 import types
 import typing
 import dataclasses
@@ -14,6 +15,7 @@ import enum
 import pathlib
 import logging
 import functools
+import concurrent.futures
 
 import collections.abc as generic
 
@@ -23,9 +25,9 @@ import xarray
 
 from post_processing import enums
 from post_processing.schema.base import BaseModel
-from post_processing.schema.base import member
 from post_processing.schema.base import get_fields
 from post_processing.schema.base import postprocessing_model
+from post_processing.schema.base import member as member_field
 
 from post_processing.enums import Region
 from post_processing.enums import ModelOutputType
@@ -36,6 +38,7 @@ from post_processing import schema
 
 from post_processing.work import starmap
 from post_processing.work import starmap_threaded
+from post_processing.work import starmap_executor
 from post_processing.work import cycle_futures
 from post_processing.work import cycle_future
 
@@ -48,6 +51,7 @@ from post_processing.configuration import settings
 
 if typing.TYPE_CHECKING:
     from post_processing.transform import anomaly
+    import weakref
 
 LOGGER: logging.Logger = logging.getLogger(pathlib.Path(__file__).stem)
 InputType = typing.TypeVar("InputType")
@@ -147,6 +151,8 @@ class OperationType(enum.StrEnum):
     """Stream arrays one by one into online transform algorithms"""
     COMBINE = "combine"
     """Combine two variables into one"""
+    FILE_FILTER = "file_filter"
+    """Filter out what files may pass on to the next operations"""
 
 
 @dataclasses.dataclass
@@ -269,7 +275,7 @@ class ProfileOperation(BaseModel, OperationHandler[InputType, OutputType], abc.A
     """
     comment: typing.Optional[str] = dataclasses.field(default=None, kw_only=True)
     """A comment from the writer explaining what this operation does"""
-    operation_id: typing.Optional[str] = member()
+    operation_id: typing.Optional[str] = dataclasses.field(default=None, kw_only=True)
     """A specialized identifier for this operation"""
     disable: bool = dataclasses.field(default=False, kw_only=True)
     """Disable operation of this operation"""
@@ -482,7 +488,7 @@ class EchoOperation(ProfileOperation[InputType, InputType]):
     level: typing.Union[int, str] = dataclasses.field(default=logging.INFO)
     verbosity: typing.Union[int, str] = dataclasses.field(default=enums.Verbosity.NORMAL)
     logger_name: typing.Optional[str] = dataclasses.field(default=None)
-    _logger: logging.Logger = member(default_factory=lambda: LOGGER)
+    _logger: logging.Logger = member_field(default_factory=lambda: LOGGER)
 
 @postprocessing_model(unsafe_hash=True)
 class RaiseOperation(ProfileOperation[InputType, InputType]):
@@ -701,10 +707,11 @@ class ReprojectionOperation(PathToPathOperation, FileOutputMixin):
         ]
 
         try:
-            updated_paths: generic.Sequence[pathlib.Path] = starmap_threaded(
+            updated_paths: generic.Sequence[pathlib.Path] = starmap_executor(
                 function=self._reproject_file,
                 args=kwargs,
-                thread_count=settings.maximum_additional_threads
+                executor=profile.executor,
+                fallback_to_threads=True
             )
         except Exception as exception:
             LOGGER.error(
@@ -814,10 +821,11 @@ class SubsetOperation(PathToPathOperation):
 
                 subset_arguments.append(file_kwargs)
 
-            subset_paths: SeriesOfPaths = starmap_threaded(
+            subset_paths: SeriesOfPaths = starmap_executor(
                 function=mask_dataset,
                 args=subset_arguments,
-                thread_count=settings.maximum_additional_threads
+                executor=profile.executor,
+                fallback_to_threads=True
             )
 
             collapsed_paths: list[pathlib.Path] = [
@@ -842,10 +850,11 @@ class SubsetOperation(PathToPathOperation):
                 for subset_path in collapsed_paths
             ]
 
-            results: SeriesOfPaths = starmap_threaded(
+            results: SeriesOfPaths = starmap_executor(
                 function=call_generic_operations,
                 args=arguments_on_each,
-                thread_count=settings.maximum_additional_threads
+                executor=profile.executor,
+                fallback_to_threads=True
             )
         except Exception as exception:
             if 'failure in' not in str(exception).lower():
@@ -978,9 +987,9 @@ class SubsetOperation(PathToPathOperation):
     """A pattern used to describe how output filenames should look"""
     identifier_pattern: typing.Optional[str] = dataclasses.field(default=None)
     """A pattern used to extract metadata from the mask filename"""
-    _pattern: typing.Optional[re.Pattern] = member(default=None)
+    _pattern: typing.Optional[re.Pattern] = member_field(default=None)
     """The generated pattern that may be used to pull identifiers from """
-    _mask_identifiers: dict[pathlib.Path, dict[str, typing.Any]] = member(default_factory=dict)
+    _mask_identifiers: dict[pathlib.Path, dict[str, typing.Any]] = member_field(default_factory=dict)
     """Identifiers that were lifted from the mask filename"""
 
 @postprocessing_model
@@ -1043,10 +1052,10 @@ class ExtractOperation(PathToPathOperation):
             ]
 
             from post_processing.transform.subsetting.vector import subset_vector_file_into_file_by_value
-            subset_paths: generic.Sequence[pathlib.Path] = starmap(
+            subset_paths: generic.Sequence[pathlib.Path] = starmap_executor(
                 function=subset_vector_file_into_file_by_value,
                 args=subset_arguments,
-                thread_count=settings.maximum_additional_threads
+                executor=profile.executor
             )
 
             arguments_for_each: list[dict[str, typing.Any]] = [
@@ -1067,10 +1076,10 @@ class ExtractOperation(PathToPathOperation):
                 for subset_path in subset_paths
             ]
 
-            results: SeriesOfPaths = starmap(
+            results: SeriesOfPaths = starmap_executor(
                 function=call_generic_operations,
                 args=arguments_for_each,
-                thread_count=settings.maximum_additional_threads
+                executor=profile.executor
             )
         except Exception as exception:
             if 'failure in' not in str(exception).lower():
@@ -1212,8 +1221,8 @@ class ExtractOperation(PathToPathOperation):
     each: list[typing.Union[ProfileOperation]]
     dimension: str = dataclasses.field(default="feature_id")
     mask_coordinate: typing.Optional[str] = dataclasses.field(default=None)
-    _pattern: typing.Optional[re.Pattern] = member(default=None)
-    _identifier_mapping: dict[pathlib.Path, dict[str, str]] = member(default_factory=dict)
+    _pattern: typing.Optional[re.Pattern] = member_field(default=None)
+    _identifier_mapping: dict[pathlib.Path, dict[str, str]] = member_field(default_factory=dict)
 
 @postprocessing_model(unsafe_hash=True)
 class MergeOperation(PathToPathOperation):
@@ -1601,10 +1610,10 @@ class RenameOperation(PathToPathOperation, FileOutputMixin):
         from post_processing.transform.rename import rename_dimension
 
         try:
-            new_files: generic.Sequence[pathlib.Path] = starmap(
+            new_files: generic.Sequence[pathlib.Path] = starmap_executor(
                 function=rename_variable if self.rename_variable else rename_dimension,
                 args=arguments,
-                thread_count=settings.maximum_additional_threads
+                executor=profile.executor
             )
         except Exception as exception:
             if 'failure in' not in str(exception):
@@ -1693,9 +1702,10 @@ class UnitConversionOperation(PathToPathOperation, FileOutputMixin):
         ]
 
         try:
-            new_files: generic.Sequence[pathlib.Path] = starmap(
+            new_files: generic.Sequence[pathlib.Path] = starmap_executor(
                 function=convert_file,
-                args=arguments
+                args=arguments,
+                executor=profile.executor
             )
         except Exception as exception:
             if 'failure in' not in str(exception):
@@ -2031,7 +2041,7 @@ class SaveOperation(PathToPathOperation):
     return_new_paths: bool = dataclasses.field(default=True)
     identifier_pattern: typing.Optional[str] = dataclasses.field(default=None)
     include_conditions: dict[str, typing.Any] = dataclasses.field(default_factory=dict)
-    _compiled_pattern: typing.Optional[re.Pattern] = member(default=None)
+    _compiled_pattern: typing.Optional[re.Pattern] = member_field(default=None)
 
 
 @postprocessing_model
@@ -2719,7 +2729,7 @@ class FunctionOperation(ProfileOperation[InputType, OutputType]):
     function_name: str
     kwargs: dict[str, typing.Any] = dataclasses.field(default_factory=dict)
     argument_mapping: dict[str, str] = dataclasses.field(default_factory=dict)
-    _function: PythonHandler[InputType, OutputType] = member(default=None)
+    _function: PythonHandler[InputType, OutputType] = member_field(default=None)
 
     def __hash__(self):
         try:
@@ -2851,6 +2861,8 @@ class Profile(BaseModel):
     intermediate_directory: typing.Optional[pathlib.Path] = dataclasses.field(default_factory=lambda: settings.intermediate_directory)
     source_file: typing.Optional[pathlib.Path] = dataclasses.field(default=None)
     comment: typing.Optional[str] = dataclasses.field(default=None, kw_only=True)
+    executor: typing.Optional[concurrent.futures.Executor] = member_field()
+    _lock: threading.RLock = member_field(default_factory=threading.RLock)
 
     def __str__(self):
         description = (
@@ -2961,6 +2973,40 @@ class Profile(BaseModel):
             raise errors[0]
         elif errors:
             raise ExceptionGroup(f"Encountered an improper Profile", errors)
+
+        from concurrent.futures import Executor
+        self.executor: Executor | None = None
+
+    def start(self):
+        with self._lock:
+            LOGGER.info(f"Starting the executor for the profile at {self.source_file}")
+            if self.executor is None:
+                from post_processing.utilities.common import get_multiprocessor
+                self.executor = get_multiprocessor()
+                if self.executor is None:
+                    LOGGER.info(f"The profile for {self.source_file} is not eligible for a multiprocessor")
+            else:
+                LOGGER.info(f"There is already a running executor for the profile at {self.source_file}")
+
+    def stop(self):
+        with self._lock:
+            LOGGER.info(f"Stopping the executor for the profile at '{self.source_file}'")
+            if self.executor is not None:
+                self.executor.shutdown(cancel_futures=True)
+                self.executor = None
+            else:
+                LOGGER.info(f"There is not executor to stop for the profile at '{self.source_file}'")
+
+    def __enter__(self):
+        self.start()
+
+    def __exit__(
+        self,
+        exc_type: typing.Type[BaseException] | None = None,
+        exc_val: BaseException | None = None,
+        exc_tb = None
+    ):
+        self.stop()
 
     @timed_function()
     def run(
@@ -3407,6 +3453,9 @@ def call_generic_operations(
         if operation.disable:
             LOGGER.warning(f"{operation.__class__.__qualname__} disabled:{os.linesep}{operation}")
             continue
+
+        if operation.operation_id is None:
+            LOGGER.error(f"An operation from '{profile.source_file}' is missing an operation ID: '{operation}'")
 
         stage_working_directory: pathlib.Path = work_directory / operation.operation_id
         stage_working_directory.mkdir(parents=True, exist_ok=True)

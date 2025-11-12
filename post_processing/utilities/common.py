@@ -19,6 +19,7 @@ LOGGER: logging.Logger = logging.getLogger(pathlib.Path(__file__).stem)
 if typing.TYPE_CHECKING:
     import numpy
     import numpy.typing
+    import concurrent.futures
     import xarray
 
 T = typing.TypeVar("T")
@@ -175,6 +176,110 @@ def expand_path(path: typing.Union[str, pathlib.Path], strict: bool = True) -> g
             or not strict
     ]
     return matching_paths
+
+
+def _default_initializer(*args, **kwargs):
+    import os
+    print(f"Initializing multiprocessor on PID: {os.getpid()}")
+
+
+def get_multiprocessor(
+    max_workers: int = None,
+    initializer: generic.Callable[..., typing.Any] | None = None,
+    initargs: generic.Iterable | None = None,
+) -> typing.Optional["concurrent.futures.Executor"]:
+    """
+    Gets a multiprocess function executor if it is supported within the current process
+
+    NOTE: The caller is responsible for closing this multiprocessor
+
+    :param max_workers: The maximum number of workers that the multiprocessor may have
+    :param initializer: A function to run immediately within each new processor
+    :param initargs: Positional arguments for the initializer
+    :returns: A multiprocessing Executor if one is allowed within this runtime context
+    """
+    executor_args: dict = {
+        "initargs": tuple() if initargs is None else initargs,
+        "initializer": initializer or _default_initializer
+    }
+    if max_workers is not None:
+        executor_args['max_workers'] = max_workers
+
+    from post_processing.configuration import settings
+    import shutil
+
+    if settings.mpi_is_available:
+        try:
+            from mpi4py.futures import MPIPoolExecutor
+            from mpi4py import MPI
+            communicator: MPI.Intracomm = MPI.COMM_WORLD
+            if communicator.Get_rank() == 0 and communicator.Get_size() > 1:
+                if settings.this_is_verbose:
+                    LOGGER.debug(f"An MPIPoolExecutor is being used")
+                return MPIPoolExecutor(**executor_args)
+            if communicator.Get_rank() > 0:
+                if settings.this_is_verbose:
+                    LOGGER.debug(
+                        f"MPI is enabled, but this is rank {communicator.Get_rank()} - a multiprocessor will not "
+                        f"be issued."
+                    )
+                return None
+            if settings.this_is_verbose:
+                LOGGER.debug(
+                    f"MPI is available, but there are not enough nodes to justify an MPI multiprocessor. "
+                    f"Checking to see if a regular multiprocessor may be used."
+                )
+        except:
+            if settings.this_is_verbose:
+                LOGGER.debug(
+                    f"MPI is supposed to be available but it could not be imported. Something is wrong. "
+                    f"Moving on to alternative multiprocessing solutions."
+                )
+
+    if any(shutil.which(command) for command in ["srun", "sbatch", "qsub", "bsub"]):
+        LOGGER.debug(
+            f"The prescence of 'srun', 'sbatch', 'qsub', or 'bsub' while not running with mpi support looks like "
+            f"this is running in an HPC environment without MPI. Multiprocessing will not be enabled for this."
+        )
+        return None
+
+    import multiprocessing
+    if multiprocessing.parent_process() is not None:
+        LOGGER.debug(
+            f"This process is the child of this application - multiprocessors may only be created here for the root process."
+        )
+        return None
+
+    serverless_variables: generic.Iterable[str] = (
+        "AWS_LAMBDA_FUNCTION_NAME",
+        "FUNCTION_NAME",
+        "K_SERVICE",
+        "AZURE_FUNCTIONS_ENVIRONMENT"
+    )
+    if any(variable in os.environ for variable in serverless_variables):
+        LOGGER.debug(
+            f"The existence of one of the following environment variables makes it look like this is running in a "
+            f"serverless environment where implicit multiprocessing is not allowed: {', '.join(serverless_variables)}"
+        )
+        return None
+
+    notebook_variables: generic.Iterable[str] = (
+        "COLAB_GPU",
+        "KAGGLE_KERNEL_RUN_TYPE",
+        "JUPYTERHUB_USER"
+    )
+
+    if any(variable in os.environ for variable in notebook_variables):
+        LOGGER.info(
+            f"The existence of one of the following environment variables makes it look like this is running in a "
+            f"shared notebook environment, so implicit multiprocessing will not be used: "
+            f"{', '.join(notebook_variables)}"
+        )
+        return None
+
+    import concurrent.futures
+    LOGGER.info(f"A ProcessPoolExecutor will be used for communication")
+    return concurrent.futures.ProcessPoolExecutor(**executor_args)
 
 
 def expand_paths(
