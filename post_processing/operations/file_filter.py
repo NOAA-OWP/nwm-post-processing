@@ -11,7 +11,7 @@ import operator
 from functools import cache
 import os
 
-from nwm_file import NWMFile
+from post_processing.nwm_file import NWMFile
 from post_processing.utilities.logging import get_logger
 from post_processing.schema import base as base_schema
 from post_processing.schema import profile as profiles
