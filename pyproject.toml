@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nwm-post-processing"
-version = "0.0.1"
+version = "1.0.0rc1"
 dependencies = [
     "netCDF4",
     "xarray",
@@ -18,7 +18,7 @@ dependencies = [
 description = "Takes National Water Model data, combines the output, and subsets them based on region in order to make model data easier to work with"
 license = { file = "LICENSE" }
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 classifiers = [
     "Intended Audience :: Science/Research",
     "License :: OSI Approved :: Apache Software License",
