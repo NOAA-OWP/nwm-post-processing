@@ -169,26 +169,26 @@ class ThresholdDefinition:
 
             day_range: list[int] | int = []
 
-            if day_of_year == 0:
-                day_range.append(0)
+            if day_of_year == 1:
+                day_range.append(1)
+                if 2 not in self._data:
+                    day_range.append(2)
+                if 3 not in self._data:
+                    day_range.append(3)
+            elif day_of_year == 366:
+                day_range.append(366)
                 if 1 not in self._data:
                     day_range.append(1)
                 if 2 not in self._data:
                     day_range.append(2)
-            elif day_of_year == 365:
-                day_range.append(365)
-                if 0 not in self._data:
-                    day_range.append(0)
-                if 1 not in self._data:
-                    day_range.append(1)
             else:
                 day_range.append(day_of_year)
 
-                next_day: int = day_of_year + 1 if day_of_year < 365 else 0
+                next_day: int = day_of_year + 1 if day_of_year < 366 else 1
                 if next_day not in self._data:
                     day_range.append(next_day)
 
-                next_day: int = next_day + 1 if day_of_year < 365 else 0
+                next_day: int = next_day + 1 if day_of_year < 366 else 1
                 if next_day not in self._data:
                     day_range.append(next_day)
 
