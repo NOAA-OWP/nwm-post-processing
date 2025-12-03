@@ -135,6 +135,19 @@ class ThresholdDefinition:
                 # Everything has already been loaded
                 return
 
+            invalid_days_of_year: list[int] = [
+                day_of_year
+                for day_of_year in days_of_year
+                if day_of_year < 1
+                   or day_of_year > 366
+            ]
+
+            if invalid_days_of_year:
+                raise IndexError(
+                    f"Thresholds for the following days were requested but the days are out of range - "
+                    f"valid range is [1, 366]: {invalid_days_of_year}"
+                )
+
             if len(days_of_year) == 1:
                 days_of_year = days_of_year[0]
 
