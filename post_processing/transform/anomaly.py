@@ -142,12 +142,19 @@ class ThresholdDefinition:
             import xarray
             from post_processing.utilities import netcdf
 
-            specific_statistics: xarray.DataArray = netcdf.select(
-                target=file_path,
-                variable_name=self.variable,
-                criteria={self.time_coordinate: days_of_year},
-                transformation=lambda array: array.astype(numpy.float32),
-            )
+            try:
+                specific_statistics: xarray.DataArray = netcdf.select(
+                    target=file_path,
+                    variable_name=self.variable,
+                    criteria={self.time_coordinate: days_of_year},
+                    transformation=lambda array: array.astype(numpy.float32),
+                )
+            except Exception as e:
+                LOGGER.error(
+                    f"Could not select values from '{file_path.name}::{self.variable} where the "
+                    f"'{self.time_coordinate}' value(s) was/were: {days_of_year}"
+                )
+                raise e
 
             if self.time_coordinate in specific_statistics.dims:
                 for day in days_of_year:
