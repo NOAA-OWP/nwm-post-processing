@@ -2512,6 +2512,78 @@ class AnomalyOperation(PathToPathOperation):
                 exceptions=errors
             )
 
+    @classmethod
+    def standardize_days_of_the_year(cls, array: xarray.DataArray) -> xarray.DataArray:
+        """
+        Standardize the days of the year in a DataArray of dates so that they are the same within a leap and without
+
+        :param array: An xarray DataArray of numpy.datetime64
+        :returns: An xarray DataArray of numpy.int32
+        """
+        import numpy
+
+        if not numpy.issubdtype(array.dtype, numpy.datetime64):
+            raise TypeError(
+                f"'get_minimum_day_of_year' may only be used on datetime variables - "
+                f"the passed variable was {array.name}({', '.join(array.sizes.keys())}) -> {array.dtype}"
+            )
+        days_of_year: xarray.DataArray = array.dt.dayofyear
+        is_leap_year: bool = array.dt.is_leap_year
+
+        # Encode the month and day as an integer - for instance January 1st becomes 101 and December 31st becomes 1231
+        month_day_codes: xarray.DataArray = (
+            array.dt.month * 100 + array.dt.day
+        )
+
+        # Flag the collected days of the year as either being on or before February 28
+        is_on_or_before_february_28: xarray.DataArray = month_day_codes <= 228
+
+        # Create a new array where the day numbers are left alone if they are on a leap year or are on or before 
+        # February 28th, otherwise increase the number by 1
+        universal_days_of_the_year: xarray.DataArray = days_of_year.where(
+            is_leap_year | is_on_or_before_february_28,
+            real_day + 1
+        )
+
+        # Enforce a reasonable dtype
+        universal_days_of_the_year = universal_days_of_the_year.astype("int32")
+        return universal_days_of_the_year
+        
+    @classmethod
+    def get_maximum_day_of_year(cls, array: xarray.DataArray, *args, **kwargs) -> int:
+        import numpy
+        if not numpy.issubdtype(array.dtype, numpy.datetime64):
+            raise TypeError(
+                f"'get_maximum_day_of_year' may only be used on datetime variables - "
+                f"the passed variable was {array.name}({', '.join(array.sizes.keys())}) -> {array.dtype}"
+            )
+        universal_days_of_the_year: xarray.DataArray = cls.standardize_days_of_the_year(array=array)
+        return numpy.min(universal_days_of_the_year)
+
+    @classmethod
+    def get_minimum_day_of_year(cls, array: xarray.DataArray, *args, **kwargs) -> int:
+        import numpy
+        if not numpy.issubdtype(array.dtype, numpy.datetime64):
+            raise TypeError(
+                f"'get_minimum_day_of_year' may only be used on datetime variables - "
+                f"the passed variable was {array.name}({', '.join(array.sizes.keys())}) -> {array.dtype}"
+            )
+        universal_days_of_the_year: xarray.DataArray = cls.standardize_days_of_the_year(array=array)
+        return numpy.min(universal_days_of_the_year)
+    
+    @classmethod
+    def get_minimum_and_maximum_day_of_year(cls, array: xarray.DataArray, *args, **kwargs) -> tuple[int, int]:
+        import numpy
+        if not numpy.issubdtype(array.dtype, numpy.datetime64):
+            raise TypeError(
+                f"'get_minimum_and_maximum_day_of_year' may only be used on datetime variables - "
+                f"the passed variable was {array.name}({', '.join(array.sizes.keys())}) -> {array.dtype}"
+            )
+        universal_days_of_the_year: xarray.DataArray = cls.standardize_days_of_the_year(array=array)
+        return numpy.min(universal_days_of_the_year), numpy.max(universal_days_of_the_year)
+
+
+
     def __call__(
         self,
         profile: "Profile",
@@ -2526,6 +2598,7 @@ class AnomalyOperation(PathToPathOperation):
         """
         from post_processing.utilities import netcdf
         from post_processing.transform import anomaly
+        from post_processing.work import PendingTaskResult
         import numpy
         output_paths: generic.Sequence[pathlib.Path] = []
         frame_pattern: re.Pattern = re.compile(
@@ -2541,16 +2614,49 @@ class AnomalyOperation(PathToPathOperation):
             earliest_path: pathlib.Path = sorted_files[0]
             latest_path: pathlib.Path = sorted_files[-1]
 
-            earliest_day: int = netcdf.load_array(
-                target=earliest_path,
-                variable_name=self.time_variable,
-                transformation=lambda array: numpy.min(array).astype("M8[ms]").item().timetuple().tm_yday
-            )
-            latest_day: int = netcdf.load_array(
-                target=latest_path,
-                variable_name=self.time_variable,
-                transformation=lambda array: numpy.max(array).astype("M8[ms]").item().timetuple().tm_yday
-            )
+            if earliest_path == latest_path:
+                future_earliest_and_latest: PendingTaskResult[tuple[int, int]] = netcdf.submit_variable_transformation(
+                    target=earliest_path,
+                    variable_name=self.time_variable,
+                    function=self.__class__.get_minimum_and_maximum_day_of_year
+                )
+                minimum_and_maximum, error = cycle_future(future=future_earliest_and_latest)
+
+                if error is not None:
+                    raise error
+                
+                earliest_day, latest_day = minimum_and_maximum
+            else:
+                earliest_key: str = "earliest"
+                latest_key: str = "latest"
+                future_earliest_day: PendingTaskResult[int] = netcdf.submit_variable_transformation(
+                    target=earliest_path,
+                    variable_name=self.time_variable,
+                    function=self.__class__.get_minimum_day_of_year
+                )
+                future_latest_day: PendingTaskResult[int] = netcdf.submit_variable_transformation(
+                    target=latest_path,
+                    variable_name=self.time_variable,
+                    function=self.__class__.get_maximum_day_of_year
+                )
+                pending_results: generic.Mapping[str, PendingTaskResult[int]] = {
+                    earliest_key: future_earliest_day,
+                    latest_key: future_latest_day
+                }
+                results, errors = cycle_futures(futures=pending_results)
+
+                if errors is not None and len(errors) == 1:
+                    raise errors[0]
+                elif errors is not None and len(errors) > 1:
+                    from post_processing.utilities.common import condense_exceptions
+                    condensed_exceptions: ExceptionGroup = condense_exceptions(
+                        message=f"Could not collect the lowest day number and greatest day number from '{earliest_path}' and '{latest_path}'",
+                        exceptions=errors
+                    )
+                    raise condensed_exceptions
+                
+                earliest_day: int = results[earliest_key]
+                latest_day: int = results[latest_key]
 
             all_metadata: dict[pathlib.Path, dict[str, typing.Any]] = {}
 
