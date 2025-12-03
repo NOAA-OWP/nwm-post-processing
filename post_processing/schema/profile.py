@@ -2525,7 +2525,7 @@ class AnomalyOperation(PathToPathOperation):
         if not numpy.issubdtype(array.dtype, numpy.datetime64):
             raise TypeError(
                 f"'get_minimum_day_of_year' may only be used on datetime variables - "
-                f"the passed variable was {array.name}({', '.join(array.sizes.keys())}) -> {array.dtype}"
+                f"the passed variable was {array.name}({', '.join(map(str, array.sizes.keys()))}) -> {array.dtype}"
             )
         days_of_year: xarray.DataArray = array.dt.dayofyear
         is_leap_year: bool = array.dt.is_leap_year
