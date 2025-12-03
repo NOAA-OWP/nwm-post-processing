@@ -2542,7 +2542,7 @@ class AnomalyOperation(PathToPathOperation):
         # February 28th, otherwise increase the number by 1
         universal_days_of_the_year: xarray.DataArray = days_of_year.where(
             is_leap_year | is_on_or_before_february_28,
-            real_day + 1
+            days_of_year + 1
         )
 
         # Enforce a reasonable dtype
@@ -2551,25 +2551,41 @@ class AnomalyOperation(PathToPathOperation):
         
     @classmethod
     def get_maximum_day_of_year(cls, array: xarray.DataArray, *args, **kwargs) -> int:
+        """
+        Get the last day of the year within a DataArray of dates
+
+        Day numbers will be the same regardless of leap year status
+
+        :param array: A DataArray full of dates
+        :returns: The universal, standardized day of the year, within [1, 366]
+        """
         import numpy
         if not numpy.issubdtype(array.dtype, numpy.datetime64):
             raise TypeError(
                 f"'get_maximum_day_of_year' may only be used on datetime variables - "
-                f"the passed variable was {array.name}({', '.join(array.sizes.keys())}) -> {array.dtype}"
+                f"the passed variable was {array.name}({', '.join(map(str, array.sizes.keys()))}) -> {array.dtype}"
             )
         universal_days_of_the_year: xarray.DataArray = cls.standardize_days_of_the_year(array=array)
-        return numpy.min(universal_days_of_the_year)
+        return numpy.min(universal_days_of_the_year).item()
 
     @classmethod
     def get_minimum_day_of_year(cls, array: xarray.DataArray, *args, **kwargs) -> int:
+        """
+        Get the first day of the year within a DataArray of dates
+
+        Day numbers will be the same regardless of leap year status
+
+        :param array: A DataArray full of dates
+        :returns: The universal, standardized day of the year, within [1, 366]
+        """
         import numpy
         if not numpy.issubdtype(array.dtype, numpy.datetime64):
             raise TypeError(
                 f"'get_minimum_day_of_year' may only be used on datetime variables - "
-                f"the passed variable was {array.name}({', '.join(array.sizes.keys())}) -> {array.dtype}"
+                f"the passed variable was {array.name}({', '.join(map(str, array.sizes.keys()))}) -> {array.dtype}"
             )
         universal_days_of_the_year: xarray.DataArray = cls.standardize_days_of_the_year(array=array)
-        return numpy.min(universal_days_of_the_year)
+        return numpy.min(universal_days_of_the_year).item()
     
     @classmethod
     def get_minimum_and_maximum_day_of_year(cls, array: xarray.DataArray, *args, **kwargs) -> tuple[int, int]:
@@ -2577,10 +2593,10 @@ class AnomalyOperation(PathToPathOperation):
         if not numpy.issubdtype(array.dtype, numpy.datetime64):
             raise TypeError(
                 f"'get_minimum_and_maximum_day_of_year' may only be used on datetime variables - "
-                f"the passed variable was {array.name}({', '.join(array.sizes.keys())}) -> {array.dtype}"
+                f"the passed variable was {array.name}({', '.join(map(str, array.sizes.keys()))}) -> {array.dtype}"
             )
         universal_days_of_the_year: xarray.DataArray = cls.standardize_days_of_the_year(array=array)
-        return numpy.min(universal_days_of_the_year), numpy.max(universal_days_of_the_year)
+        return numpy.min(universal_days_of_the_year).item(), numpy.max(universal_days_of_the_year).item()
 
 
 
@@ -2598,7 +2614,7 @@ class AnomalyOperation(PathToPathOperation):
         """
         from post_processing.utilities import netcdf
         from post_processing.transform import anomaly
-        from post_processing.work import PendingTaskResult
+        from post_processing.interfaces.work import PendingTaskResult
         import numpy
         output_paths: generic.Sequence[pathlib.Path] = []
         frame_pattern: re.Pattern = re.compile(

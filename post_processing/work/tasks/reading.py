@@ -300,7 +300,10 @@ class TransformVariableTask(base.DataTask[T]):
                 )
 
             try:
-                result: T = self.function(variable, **self.kwargs)
+                if self.kwargs:
+                    result: T = self.function(variable, **self.kwargs)
+                else:
+                    result: T = self.function(variable)
             except Exception as e:
                 import os
                 LOGGER.error(f"Failed to perform '{self.function}' due to {e}. Data: {os.linesep}{repr(data)}")
