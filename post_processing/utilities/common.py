@@ -206,7 +206,14 @@ def get_multiprocessor(
     :param initargs: Positional arguments for the initializer
     :returns: A multiprocessing Executor if one is allowed within this runtime context
     """
+    if max_workers == 1:
+        return None
+
     from post_processing.configuration import settings
+
+    if not settings.allow_multiprocessing:
+        return None
+
     import shutil
 
     executor_args: dict = {

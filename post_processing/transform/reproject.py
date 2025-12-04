@@ -246,7 +246,7 @@ ProjectionStore: _ProjectionStore = _ProjectionStore()
 @atexit.register
 def clean():
     import os
-    LOGGER.info(f"Removing the ProjectionStore on PID {os.getpid()}")
+    LOGGER.debug(f"Removing the ProjectionStore on PID {os.getpid()}")
     ProjectionStore.clean()
 
 def remove_projection(
