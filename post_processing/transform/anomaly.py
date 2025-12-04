@@ -33,7 +33,7 @@ class ThresholdDefinition:
     time_coordinate: str = dataclasses.field(default='time')
     # TODO: Should this be a dict of numpy arrays rather than data arrays?
     _data: dict[int, "xarray.DataArray"] = member(default_factory=dict)
-    _lock: RLock = member(default_factory=RLock)
+    _lock: RLock = member(default_factory=RLock, metadata={"serialize": False})
 
     def __del__(self):
         with self._lock:
@@ -42,6 +42,35 @@ class ThresholdDefinition:
                 array: "xarray.DataArray" = self._data.pop(key)
                 array.close()
                 del array
+
+    def __setstate__(self, state: generic.Mapping[str, typing.Any]):
+        member_fields: dict[str, typing.Any] = {}
+
+        for field in dataclasses.fields(self.__class__):
+            if field.metadata and not field.metadata.get("serialize", True):
+                if field.default is not dataclasses.MISSING:
+                    member_fields[field.name] = field.default
+                elif callable(field.default_factory):
+                    member_fields[field.name] = field.default_factory()
+
+        for key, value in state.items():
+            if key in member_fields:
+                setattr(self, key, member_fields[key])
+            else:
+                setattr(self, key, value)
+
+    def __getstate__(self) -> generic.Mapping[str, typing.Any]:
+        member_fields: set[str] = {
+            field.name
+            for field in dataclasses.fields(self.__class__)
+            if field.metadata
+                and not field.metadata.get("serialize", True)
+        }
+        vanilla_state: dict[str, typing.Any] = {
+            key: None if key in member_fields else value
+            for key, value in typing.cast(dict, super().__getstate__()).items()
+        }
+        return vanilla_state
 
     @classmethod
     def generate_init_key(

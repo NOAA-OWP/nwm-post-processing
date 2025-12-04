@@ -22,6 +22,7 @@ from post_processing.utilities.common import NWM_FILENAME_PATTERN
 from post_processing.transform.unit_conversion import convert_variable_unit
 
 from post_processing.enums import TimeUnit
+from post_processing.work import starmap_executor
 
 LOGGER: logging.Logger = logging.get_logger(__file__)
 
@@ -169,9 +170,11 @@ class TotalOverTimeOperation(base_profiles.PathToPathOperation, base_profiles.Fi
 
             arguments.append(path_arguments)
 
-        files_with_accumulated_rates: generic.Sequence[pathlib.Path] = starmap_threaded(
+        files_with_accumulated_rates: generic.Sequence[pathlib.Path] = starmap_executor(
             function=accumulate_variable,
-            args=arguments
+            args=arguments,
+            executor=profile.executor,
+            fallback_to_threads=True
         )
 
         return files_with_accumulated_rates

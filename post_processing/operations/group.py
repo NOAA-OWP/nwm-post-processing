@@ -17,6 +17,7 @@ from post_processing.schema import profile as base_profile
 from post_processing.enums import TimeUnit
 from post_processing.schema.base import member
 from post_processing.work import starmap
+from post_processing.work import starmap_executor
 from post_processing.utilities.common import timed_function
 from post_processing.configuration import settings
 
@@ -405,10 +406,11 @@ class GroupByLeadOperation(base_profile.PathToPathOperation, base_profile.FileOu
                 "metadata": group_metadata
             }
 
-        results: generic.Mapping[str, generic.Sequence[pathlib.Path]] = starmap(
+        results: generic.Mapping[str, generic.Sequence[pathlib.Path]] = starmap_executor(
             function=base_profile.call_generic_operations,
             args=keyword_arguments,
-            thread_count=settings.maximum_additional_threads
+            executor=profile.executor,
+            fallback_to_threads=True
         )
 
         if self.include_time_bounds:

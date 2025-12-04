@@ -287,15 +287,27 @@ class BaseModel:
             if not field.init and MEMBER_FIELD_KEY in field.metadata
         }
         vanilla_state: dict[str, typing.Any] = {
-            key: value
+            key: None if key in member_fields else value
             for key, value in typing.cast(dict, super().__getstate__()).items()
-            if key not in member_fields
         }
         return vanilla_state
 
     def __setstate__(self, state):
+        member_fields: dict[str, typing.Any] = {}
+
+        for field_name, field in self.get_model_fields().items():
+            if field.init or MEMBER_FIELD_KEY not in field.metadata:
+                continue
+            if field.default is not dataclasses.MISSING:
+                member_fields[field_name] = field.default
+            elif callable(field.default_factory):
+                member_fields[field_name] = field.default_factory()
+
         for key, value in state.items():
-            setattr(self, key, value)
+            if key in member_fields:
+                setattr(self, key, member_fields[key])
+            else:
+                setattr(self, key, value)
         self.__load_members__()
 
     def to_dict(self) -> generic.Mapping[str, typing.Any]:
