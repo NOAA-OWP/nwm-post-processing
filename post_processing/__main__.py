@@ -2,6 +2,7 @@
 """
 The entrypoint for the core post-processing application
 """
+import concurrent.futures
 import os
 import typing
 import argparse
@@ -39,6 +40,20 @@ if __name__.endswith("__main__"):
 
 LOGGER: logging.Logger = logging.getLogger("post-process")
 
+EXECUTOR: concurrent.futures.Executor | None = None
+"""
+A global executor to be used if this is the runner. This is global as a safety maneuver to ensure it gets cleaned 
+up on shutdown
+"""
+
+WORKER_COUNT: int = 0
+"""
+The maximum number of workers to use for a global executor. Stored here since the interface for the executor does 
+not provide it and having it available provides the means for a defensive shutdown
+"""
+
+NEEDS_CLEANUP: bool = True
+
 class Arguments:
     """
     Command line input
@@ -60,7 +75,8 @@ class Arguments:
         """Just validate to make sure that all profiles are valid"""
         self.analyze: bool = False
         """Whether to analyze performance"""
-        self.env_file: pathlib.Path | None = None
+        self.maximum_workers: int = settings.default_worker_count
+        """The default maximum number of multiprocessed workers that may be used"""
 
         self.__parse(args=args)
         self.__validate()
@@ -71,10 +87,8 @@ class Arguments:
         """
         messages: list[str] = []
 
-        if isinstance(self.env_file, pathlib.Path) and self.env_file.is_dir():
-            raise FileNotFoundError(f"Cannot use '{self.env_file}' as a .env file - it is a directory, not a file")
-        elif isinstance(self.env_file, pathlib.Path) and self.env_file.is_file():
-            settings.apply_env(self.env_file)
+        global WORKER_COUNT
+        WORKER_COUNT = self.maximum_workers
 
         if self.settings or self.version or self.validate:
             return
@@ -143,7 +157,7 @@ class Arguments:
                 f"  version  :  Print out version information about the application and what commit is in use{os.linesep}"
                 f"  validate :  Make sure all profiles are valid"
             ),
-            formatter_class=argparse.RawDescriptionHelpFormatter,
+            formatter_class=argparse.ArgumentDefaultsHelpFormatter,
         )
 
         parser.add_argument(
@@ -165,12 +179,11 @@ class Arguments:
         )
 
         parser.add_argument(
-            "--env-file",
-            "-e",
-            dest="env_file",
-            type=pathlib.Path,
-            default=None,
-            help="A path to an optional env file to use for additional configuration"
+            "--max-workers",
+            dest="maximum_workers",
+            type=int,
+            default=self.maximum_workers,
+            help="The number of workers that may be used if multiprocessing is allowed"
         )
 
         parser.add_argument(
@@ -267,32 +280,29 @@ def shutdown():
 
     Registered for 'atexit' AND during 'main' to ensure all bases are covered in order to exit cleanly
     """
-    from post_processing.utilities import netcdf
-    if settings.this_is_verbose:
-        LOGGER.debug(f"Shutting down the gateway")
-    netcdf.close_gateway()
-    if settings.this_is_verbose:
-        LOGGER.debug(f"The gateway was closed")
+    global NEEDS_CLEANUP
 
-
-def clean(executor: typing.Optional["Executor"]):
-    if executor is None:
-        LOGGER.info(f"There was no executor to shut down")
+    if not NEEDS_CLEANUP:
         return
 
-    LOGGER.info(f"Shutting down '{executor}'")
-    from post_processing.work.orchestration import starmap_executor
-    from post_processing.transform.subsetting.cache import clean as remove_masks
-    from post_processing.transform.reproject import clean as remove_projections
-    from post_processing.utilities.netcdf import close_gateway
+    try:
+        from post_processing.utilities import netcdf
+        if settings.this_is_very_verbose:
+            LOGGER.debug(f"Shutting down the gateway")
+        netcdf.close_gateway()
+        if settings.this_is_very_verbose:
+            LOGGER.debug(f"The gateway was closed")
+    except BaseException as gateway_exception:
+        LOGGER.error(f"Could not close the netcdf gateway: {gateway_exception}", exc_info=True)
 
-    mask_removals = starmap_executor(remove_masks, args=[[]] * os.cpu_count() * 3, executor=executor)
-    projection_removals = starmap_executor(remove_projections, args=[[]] * os.cpu_count() * 3, executor=executor)
-    close_results = starmap_executor(close_gateway, args=[[]] * os.cpu_count() * 3, executor=executor)
+    from post_processing.work.orchestration import shutdown_executor
+    global EXECUTOR
 
-    LOGGER.info(f"Removed masks '{len(mask_removals)}' times")
-    LOGGER.info(f"Removed projections {len(projection_removals)} times")
-    LOGGER.info(f"Closed gateways '{len(close_results)}' times")
+    if EXECUTOR is not None:
+        shutdown_executor(executor=EXECUTOR)
+        EXECUTOR = None
+
+    NEEDS_CLEANUP = False
 
 
 def main() -> int:
@@ -391,62 +401,77 @@ def main() -> int:
     )
 
     profiles: generic.Sequence[Profile] = get_profile(manifest=manifest)
-    
+
+    global EXECUTOR
+
     try:
-        if profiles:
-            for profile in profiles:
-                try:
-                    if arguments.summarize:
-                        print(str(profile))
-                        continue
+        try:
+            from post_processing.utilities.common import get_multiprocessor
+            EXECUTOR = get_multiprocessor(max_workers=arguments.maximum_workers)
+        except Exception as e:
+            LOGGER.error(
+                f"An error occurred when trying to get a multiprocessing executor. Multiprocessing will not be used: {e}",
+                exc_info=True
+            )
 
-                    if settings.debug:
-                        LOGGER.info(f"Running the profile from {profile.source_file}")
+        try:
+            if profiles:
+                for profile in profiles:
+                    try:
+                        if arguments.summarize:
+                            print(str(profile))
+                            continue
 
-                    with profile:
-                        outputs: generic.Sequence[pathlib.Path] = profile.run(
-                            cycle=manifest.cycle,
-                            files=manifest.files,
-                            output_path=arguments.destination
+                        if settings.debug:
+                            LOGGER.info(f"Running the profile from {profile.source_file}")
+                        profile.executor = EXECUTOR
+                        with profile:
+                            outputs: generic.Sequence[pathlib.Path] = profile.run(
+                                cycle=manifest.cycle,
+                                files=manifest.files,
+                                output_path=arguments.destination
+                            )
+                        LOGGER.info(
+                            f"The results for the profile for {profile.output_type.describe()} data run within the "
+                            f"{profile.configuration.describe()} configuration across {profile.region.describe()} were written to:{os.linesep}"
+                            f"    - {(os.linesep + '    - ').join(map(str, outputs))}"
                         )
-                        clean(profile.executor)
-                    LOGGER.info(
-                        f"The results for the profile for {profile.output_type.describe()} data run within the "
-                        f"{profile.configuration.describe()} configuration across {profile.region.describe()} were written to:{os.linesep}"
-                        f"    - {(os.linesep + '    - ').join(map(str, outputs))}"
-                    )
 
-                    if arguments.peek:
-                        for output in outputs:
-                            from post_processing.utilities.netcdf import peek
-                            representation: str = peek(output)
-                            LOGGER.info(f"Output: {output}:{os.linesep}{representation}")
-                    elif settings.debug:
-                        for output in outputs[:5]:
-                            from post_processing.utilities.netcdf import peek
-                            representation: str = peek(output)
-                            LOGGER.info(f"Output: {output}:{os.linesep}{representation}")
+                        if arguments.peek:
+                            for output in outputs:
+                                from post_processing.utilities.netcdf import peek
+                                representation: str = peek(output)
+                                LOGGER.info(f"Output: {output}:{os.linesep}{representation}")
+                        elif settings.debug:
+                            for output in outputs[:5]:
+                                if not output.is_file():
+                                    LOGGER.error(f"Could not peek into '{output}' the data is missing for some reason")
+                                    continue
+                                from post_processing.utilities.netcdf import peek
+                                representation: str = peek(output)
+                                LOGGER.info(f"Output: {output}:{os.linesep}{representation}")
 
-                except:
-                    if profile.raw_configuration:
-                        LOGGER.debug(
-                            f"Could not execute the following Profile:{os.linesep}"
-                            f"{profile.raw_configuration}"
-                        )
-                    raise
-        else:
-            LOGGER.warning(f"No profiles were found for '{manifest}'. Nothing will be processed")
-    except BaseException as exception:
-        LOGGER.error(exception, exc_info=True)
-        LOGGER.critical(f"National Water Model Post Processing could not provide outputs", exc_info=False)
-        shutdown()
-        return 1
-    LOGGER.info(f"Operation complete in {datetime.now() - start_time}")
-    try:
-        # TODO: Make `shutdown` a `finally` call
-        shutdown()
-    except BaseException as exception:
-        LOGGER.error(exception, exc_info=True)
+                    except:
+                        if profile.raw_configuration:
+                            LOGGER.debug(
+                                f"Could not execute the following Profile:{os.linesep}"
+                                f"{profile.raw_configuration}"
+                            )
+                        raise
+            else:
+                LOGGER.warning(f"No profiles were found for '{manifest}'. Nothing will be processed")
+        except BaseException as exception:
+            LOGGER.error(exception, exc_info=True)
+            LOGGER.critical(f"National Water Model Post Processing could not provide outputs", exc_info=False)
+            shutdown()
+            return 1
+
+        LOGGER.info(f"Operation complete in {datetime.now() - start_time}")
+    finally:
+        try:
+            shutdown()
+        except BaseException as exception:
+            LOGGER.error(f"The shutdown operation failed: {exception}", exc_info=True)
 
     if profiler is not None:
         profiler.disable()

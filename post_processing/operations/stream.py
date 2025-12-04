@@ -427,6 +427,8 @@ class StreamOperation(base_profile.PathToPathOperation, base_profile.FileOutputM
                         **metadata
                     )
 
+                    LOGGER.info(f"Updated values from {path}")
+
                     netcdf.write(
                         dataset=input_data,
                         target=output_path,

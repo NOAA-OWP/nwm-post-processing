@@ -41,7 +41,7 @@ def mask_array(
     :return: A new data array with the originals metadata, but with all values not makes set to NaN
     """
     encoding: dict[str, typing.Any] = input_data.encoding.copy()
-    masked_data: xarray.DataArray = input_data * mask
+    masked_data: xarray.DataArray = input_data.where(mask)
     masked_data.attrs = input_data.attrs.copy()
     masked_data.encoding = encoding
 
@@ -94,6 +94,7 @@ def mask_dataset(
     if settings.this_is_verbose:
         LOGGER.debug(f"Subsetting '{input_path}' by {len(masks)} masks")
 
+    # TODO: Using a transform function rather than a full load may relieve memory pressure
     with load(target=input_path, full_load=True, load_kwargs=dict(chunks=None)) as input_data:
         if settings.this_is_very_verbose:
             LOGGER.debug(f"Loaded '{input_path}'")
@@ -179,10 +180,12 @@ def mask_dataset(
             write_task: PendingTaskResult[pathlib.Path] = submit_write(dataset=copied_input_data, target=output_path)
             write_tasks.append(write_task)
 
+        LOGGER.debug(f"Now waiting for subset files to be written for stage {metadata['stage']}")
         masked_files, errors = cycle_future_list(futures=write_tasks)
 
         if len(errors) == 1:
             raise errors[0]
+
         if errors:
             raise condense_exceptions(
                 f"{len(errors)} errors were encountered trying to save masked datasets",

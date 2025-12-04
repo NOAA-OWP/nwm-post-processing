@@ -144,6 +144,14 @@ def _default_initializer(*args, **kwargs):
     import os
     LOGGER.debug(f"Initializing multiprocessor on PID: {os.getpid()}")
 
+def _default_mpi_initializer(*args, **kwargs):
+    import os
+    from mpi4py import MPI
+    communicator: MPI.Intracomm = MPI.COMM_WORLD
+    LOGGER.debug(
+        f"Initializing MPI worker on PID {os.getpid()}, rank {communicator.Get_rank()}"
+    )
+
 
 def get_multiprocessor(
     max_workers: int = None,
@@ -160,25 +168,21 @@ def get_multiprocessor(
     :param initargs: Positional arguments for the initializer
     :returns: A multiprocessing Executor if one is allowed within this runtime context
     """
-    executor_args: dict = {
-        "initargs": tuple() if initargs is None else initargs,
-        "initializer": initializer or _default_initializer
-    }
-    if max_workers is not None:
-        executor_args['max_workers'] = max_workers
-
     from post_processing.configuration import settings
     import shutil
+
+    executor_args: dict = {
+        "initargs": tuple() if initargs is None else initargs,
+        "initializer": initializer,
+        "max_workers": max_workers or settings.default_worker_count
+    }
 
     if settings.mpi_is_available:
         try:
             from mpi4py.futures import MPIPoolExecutor
             from mpi4py import MPI
             communicator: MPI.Intracomm = MPI.COMM_WORLD
-            if communicator.Get_rank() == 0 and communicator.Get_size() > 1:
-                if settings.this_is_verbose:
-                    LOGGER.debug(f"An MPIPoolExecutor is being used")
-                return MPIPoolExecutor(**executor_args)
+
             if communicator.Get_rank() > 0:
                 if settings.this_is_verbose:
                     LOGGER.debug(
@@ -186,14 +190,13 @@ def get_multiprocessor(
                         f"be issued."
                     )
                 return None
-            max_available_workers: int = max(0, int(os.getenv("MPI4PY_FUTURES_MAX_WORKERS", 0)))
-            if max_available_workers > 0:
+
+            if executor_args['max_workers'] > 0:
                 if settings.this_is_verbose:
-                    LOGGER.debug(f"An MPIPoolExecutor is being used")
-                executor_args["max_workers"] = min(
-                    max_available_workers,
-                    executor_args.get("max_workers", max_available_workers)
-                )
+                    LOGGER.debug(f"An MPIPoolExecutor with {executor_args.get('max_workers')} workers is being used")
+
+                if not executor_args.get("initializer"):
+                    executor_args['initializer'] = _default_mpi_initializer
                 return MPIPoolExecutor(**executor_args)
             if settings.this_is_verbose:
                 LOGGER.debug(
@@ -207,7 +210,7 @@ def get_multiprocessor(
                     f"Moving on to alternative multiprocessing solutions. {e}", exc_info=True
                 )
 
-    if any(shutil.which(command) for command in ["srun", "sbatch", "qsub", "bsub"]):
+    if any(shutil.which(command) for command in ["srun", "sbatch", "qsub", "bsub", "aprun"]):
         LOGGER.debug(
             f"The prescence of 'srun', 'sbatch', 'qsub', or 'bsub' while not running with mpi support looks like "
             f"this is running in an HPC environment without MPI. Multiprocessing will not be enabled for this."
@@ -250,6 +253,8 @@ def get_multiprocessor(
 
     import concurrent.futures
     LOGGER.info(f"A ProcessPoolExecutor will be used for communication")
+    if not executor_args.get("initializer"):
+        executor_args['initializer'] = _default_initializer
     return concurrent.futures.ProcessPoolExecutor(**executor_args)
 
 

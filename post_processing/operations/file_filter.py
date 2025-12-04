@@ -126,7 +126,9 @@ class AndCondition(base_schema.BaseModel):
 class FilterOperation(profiles.PathToPathOperation):
     def _validate(self):
         #TODO: write logic here to handle FilterCondition, AndCondition, and OrCondition objects
-        ...
+        raise NotImplementedError(
+            f"The {self.__class__.__qualname__} has not been fully implemented and is not yet ready for use."
+        )
 
     def __call__(
         self,

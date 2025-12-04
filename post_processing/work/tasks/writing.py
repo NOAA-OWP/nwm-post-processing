@@ -20,15 +20,55 @@ VariableParameters = typing.ParamSpec("VariableParameters")
 LOGGER: logging.Logger = get_logger(__file__)
 TMP_FILE_SUFFIX: str = ".incomplete"
 
+
+def _debug_path(path: pathlib.Path) -> None:
+    import socket
+    parent = path.parent
+    try:
+        stat_result = parent.stat()
+        LOGGER.error(
+            "DEBUG path: host=%s pid=%d path=%s exists=%s "
+            "parent_exists=%s mode=%o uid=%d gid=%d "
+            "can_write=%s can_exec=%s",
+            socket.gethostname(),
+            os.getpid(),
+            str(path),
+            path.exists(),
+            parent.exists(),
+            stat_result.st_mode,
+            stat_result.st_uid,
+            stat_result.st_gid,
+            os.access(parent, os.W_OK),
+            os.access(parent, os.X_OK),
+        )
+    except Exception as error:
+        LOGGER.exception(
+            "Failed to stat parent directory for %s: %r",
+            path,
+            error,
+        )
+
 def _write_to_disk(dataset: xarray.Dataset, target: pathlib.Path, **write_arguments) -> None:
     kwargs = write_arguments or {}
     target.parent.mkdir(parents=True, exist_ok=True)
+
     temporary_output_path: pathlib.Path = target.parent / f"{target.name}{TMP_FILE_SUFFIX}"
+
+    if temporary_output_path.exists():
+        raise FileExistsError(f"The temporary file at {temporary_output_path} already exists. Ensure data and names are unique. Target was supposed to be: {target}")
+
     try:
+        #_debug_path(temporary_output_path)
         dataset.compute().to_netcdf(temporary_output_path, **kwargs)
-        os.replace(temporary_output_path, target)
-    finally:
-        temporary_output_path.unlink(missing_ok=True)
+    except (PermissionError, KeyError) as error:
+        LOGGER.error(
+            f"Could not write to '{temporary_output_path}' with the given parameters:{os.linesep}"
+            f"    - {(os.linesep + '    - ').join([str(key) + ': ' + str(value) for key, value in kwargs.items()])}"
+        )
+        _debug_path(temporary_output_path)
+        raise
+
+    os.replace(temporary_output_path, target)
 
 @dataclasses.dataclass
 class SaveTask(base.DataTask[pathlib.Path]):

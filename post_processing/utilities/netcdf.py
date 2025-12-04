@@ -18,6 +18,7 @@ from post_processing.interfaces.aliases import DataArrayFunction
 
 VariableParameters = typing.ParamSpec("VariableParameters")
 T = typing.TypeVar("T")
+
 if typing.TYPE_CHECKING:
     import xarray
     import numpy
@@ -603,6 +604,10 @@ def load_metadata(
             target=source_path,
             function=_load_metadata_from_dataset,
             engine=engine,
+            load_kwargs={
+                "mask_and_scale": None,
+                "chunks": None
+            },
         )
         for source_path in path
     }

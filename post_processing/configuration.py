@@ -173,10 +173,40 @@ class _Settings(UserDict):
             try:
                 from mpi4py import MPI
                 self.__non_configurable_values[key] = True
-            except:
+            except ImportError:
                 self.__non_configurable_values[key] = False
+            except RuntimeError as runtime_error:
+                if "cannot load mpi library" in str(runtime_error).lower():
+                    self.__non_configurable_values[key] = False
+                else:
+                    raise
 
         return bool(self.__non_configurable_values[key])
+
+    @property
+    def default_worker_count(self) -> int:
+        """
+        The number of workers that may be used when not explicitly indicated
+        """
+        proposed_key: str = f"{self.prefix}_DEFAULT_WORKER_COUNT".lower()
+        key: str = self._find_key(key=proposed_key)
+
+        if key not in self.__non_configurable_values:
+            max_workers: str | int | None = os.environ.get("MPI4PY_FUTURES_MAX_WORKERS")
+            logging.debug(f"The configured value for $MPI4PY_FUTURES_MAX_WORKERS is: {max_workers}")
+            if max_workers is not None and max_workers != "":
+                max_workers = int(max_workers)
+            else:
+                print(f"Found a configuration for MPI4PY at {max_workers} in length")
+
+            if not isinstance(max_workers, int) or max_workers <= 1:
+                logging.debug(f"The value for 'max_workers' was deemed invalid since it was either not an int or too low: {max_workers}")
+                max_workers = max(1, int(os.environ.get("NPROCS", os.environ.get("NCPUS", min(os.cpu_count(), 12))) - 1))
+                logging.debug(f"Evaluated the number of optimal max workers to '{max_workers}'")
+
+            self.__non_configurable_values[key] = max_workers
+
+        return int(self.__non_configurable_values[key])
 
     @property
     def base_path(self) -> pathlib.Path:
@@ -227,6 +257,61 @@ class _Settings(UserDict):
         The prefix of important application environment parameters
         """
         return "PP"
+
+    @property
+    def allow_multiprocessing(self) -> bool:
+        """
+        Whether to allow multiprocessing
+        """
+        proposed_key: str = f"{self.prefix}_allow_multiprocessing"
+        key: str = self._find_key(key=proposed_key)
+
+        if key not in self.keys():
+            import multiprocessing
+            import shutil
+            allowed: bool = True
+
+            if any(shutil.which(command) for command in ["srun", "sbatch", "qsub", "bsub", "aprun"]):
+                allowed: bool = False
+
+            if multiprocessing.parent_process() is not None:
+                allowed = False
+
+            serverless_variables: generic.Iterable[str] = (
+                "AWS_LAMBDA_FUNCTION_NAME",
+                "FUNCTION_NAME",
+                "K_SERVICE",
+                "AZURE_FUNCTIONS_ENVIRONMENT"
+            )
+            if any(variable in os.environ for variable in serverless_variables):
+                allowed = False
+
+            notebook_variables: generic.Iterable[str] = (
+                "COLAB_GPU",
+                "KAGGLE_KERNEL_RUN_TYPE",
+                "JUPYTERHUB_USER"
+            )
+
+            if any(variable in os.environ for variable in notebook_variables):
+                allowed = False
+
+            if allowed and self.mpi_is_available:
+                from mpi4py import MPI
+                communicator: MPI.Intracomm = MPI.COMM_WORLD
+                allowed = communicator.Get_rank() == 0
+
+            self.__setitem__(key=key, item=allowed)
+
+        stored_value: typing.Any = self.__getitem__(key=key)
+
+        return str(stored_value).lower() in ('true', 't', '1', 'yes', 'y', 'on')
+
+    @allow_multiprocessing.setter
+    def allow_multiprocessing(self, value: bool):
+        proposed_key: str = f"{self.prefix}_allow_multiprocessing"
+        key: str = self._find_key(key=proposed_key)
+        self.__setitem__(key, value)
+
 
     @property
     def allow_threading(self) -> bool:

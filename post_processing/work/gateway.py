@@ -268,6 +268,12 @@ def get_gateway(queue_length: int = DEFAULT_QUEUE_LENGTH, wait_seconds: float = 
     :param wait_seconds: The amount of seconds to wait for the polling thread to complete
     :returns: The appropriate gateway implementation
     """
+    import xarray
+
+    # Read patterns are generally 'read once, throw away', so set the cache to 0 so it doesn't keep hold of memory
+    # too terribly long
+    xarray.set_options(file_cache_maxsize=1)
+
     if communication.COMMUNICATE_VIA_THREADS:
         return ThreadedGateway(queue_length=queue_length, wait_seconds=wait_seconds)
     if communication.COMMUNICATE_VIA_PROCESSES:

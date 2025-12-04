@@ -186,15 +186,19 @@ class Arguments:
         
         if self.member and self.member < 1:
             raise ValueError(f"The minimum ensemble member is 1 - received {self.member}")
-        
+
+        if self.configuration == Configuration.LongRange and self.member is None:
+            raise ValueError(f"A member must be given if selecting long range data")
         if self.configuration == Configuration.LongRange and self.member > 4:
             raise ValueError(f"The maximum ensemble member for long range data is 4 - received {self.member}")
-        
-        if self.configuration == Configuration.MediumRange and self.member > 6:
+
+        if self.configuration == Configuration.MediumRange and self.output_type == ModelOutputType.Forcing and self.member is not None:
+            raise ValueError(f"Cannot select a member when using medium range forcing data")
+
+        if self.configuration == Configuration.MediumRange and self.output_type != ModelOutputType.Forcing and self.member is None:
+            raise ValueError(f"A member must be given if selecting medium range data")
+        if self.configuration == Configuration.MediumRange and self.output_type != ModelOutputType.Forcing and self.member > 6:
             raise ValueError(f"The maximum ensemble member for medium range data is 6 - received {self.member}")
-        
-        #if self.configuration in (Configuration.ExtendedAnalysisAssimilation, Configuration.ExtendedAnalysisAssimilationNoDA):
-        #    raise ValueError(f"The downloading of {str(self.configuration).replace('_', ' ').title()} data is not yet supported")
 
         if not NUMERIC_PATTERN_PATTERN.match(self.frame):
             raise argparse.ArgumentTypeError(

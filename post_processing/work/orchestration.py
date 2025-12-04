@@ -39,11 +39,46 @@ Either a series of positional arguments, a dictionary of keyword arguments,
 or a tuple of the first item being positional arguments and the second being keyword arguments
 """
 
+def shutdown_executor(executor: typing.Optional["Executor"] = None, worker_count: int | None = None):
+    """
+    Ensure that any passed executor is properly shutdown
+
+    :param executor: The executor to try and shutdown. This is a noop if there is no executor
+    :param worker_count: The number of workers the executor uses. Defaults to the number of CPUs as the best guess
+        if none is passed. This may not be enough if the executor is oversubscribed.
+    """
+    if not isinstance(executor, concurrent.futures.Executor):
+        LOGGER.debug(f"There was no executor to shut down")
+        return
+
+    LOGGER.debug(f"Shutting down '{executor}'")
+
+    if worker_count is None or worker_count < 1:
+        import os
+        worker_count = os.cpu_count()
+
+    from post_processing.transform.subsetting.cache import clean as remove_masks
+    from post_processing.transform.reproject import clean as remove_projections
+    from post_processing.utilities.netcdf import close_gateway
+
+    # The cleanup functions don't take arguments, but the number of calls queued is based off of the number of argument
+    # sequences passed. We multiply the empty sequences by the number of workers, then multiply THAT to ensure timing
+    # doesn't possibly exclude any workers
+    cleanup_stub_arguments: generic.Sequence[generic.Sequence] = [[]] * worker_count * 2
+
+    #mask_removals = starmap_executor(remove_masks, args=cleanup_stub_arguments, executor=executor)
+    #projection_removals = starmap_executor(remove_projections, args=cleanup_stub_arguments, executor=executor)
+    close_results = starmap_executor(close_gateway, args=cleanup_stub_arguments, executor=executor)
+
+    #LOGGER.debug(f"Removed masks '{len(mask_removals)}' times")
+    #LOGGER.debug(f"Removed projections {len(projection_removals)} times")
+    LOGGER.debug(f"Closed gateways '{len(close_results)}' times")
+
 @typing.overload
 def starmap_executor(
     function: generic.Callable[FunctionParameters, RT],
     args: generic.Mapping[KT, RT],
-    executor: typing.Optional["Executor"] = None,
+    executor: typing.Optional["Executor"],
     fallback_to_threads: bool = False,
 ) -> generic.Mapping[KT, RT]:
     ...
@@ -52,7 +87,7 @@ def starmap_executor(
 def starmap_executor(
     function: generic.Callable[FunctionParameters, RT],
     args: generic.Iterable[ArgsAndKwargs],
-    executor: typing.Optional["Executor"] = None,
+    executor: typing.Optional["Executor"],
     fallback_to_threads: bool = False,
 ) -> generic.Sequence[RT]:
     ...
@@ -60,7 +95,7 @@ def starmap_executor(
 def starmap_executor(
     function: generic.Callable[FunctionParameters, RT],
     args: generic.Mapping[KT, ArgsAndKwargs] | generic.Iterable[ArgsAndKwargs],
-    executor: typing.Optional["Executor"] = None,
+    executor: typing.Optional["Executor"],
     fallback_to_threads: bool = False,
 ) -> generic.Mapping[KT, RT] | generic.Sequence[RT]:
     """
