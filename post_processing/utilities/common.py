@@ -19,6 +19,7 @@ LOGGER: logging.Logger = logging.getLogger(pathlib.Path(__file__).stem)
 if typing.TYPE_CHECKING:
     import numpy
     import numpy.typing
+    import xarray
 
 T = typing.TypeVar("T")
 """A generic type"""
@@ -84,6 +85,43 @@ def parse_timedelta(period: str) -> timedelta:
     }
 
     return timedelta(**parameters)
+
+def standardize_days_of_the_year(array: "xarray.DataArray") -> "xarray.DataArray":
+    """
+    Standardize the days of the year in a DataArray of dates so that they are the same within a leap and without
+
+    :param array: An xarray DataArray of numpy.datetime64
+    :returns: An xarray DataArray of numpy.int32
+    """
+    import numpy
+    import xarray
+
+    if not numpy.issubdtype(array.dtype, numpy.datetime64):
+        raise TypeError(
+            f"'get_minimum_day_of_year' may only be used on datetime variables - "
+            f"the passed variable was {array.name}({', '.join(map(str, array.sizes.keys()))}) -> {array.dtype}"
+        )
+    days_of_year: xarray.DataArray = array.dt.dayofyear
+    is_leap_year: bool = array.dt.is_leap_year
+
+    # Encode the month and day as an integer - for instance January 1st becomes 101 and December 31st becomes 1231
+    month_day_codes: xarray.DataArray = (
+        array.dt.month * 100 + array.dt.day
+    )
+
+    # Flag the collected days of the year as either being on or before February 28
+    is_on_or_before_february_28: xarray.DataArray = month_day_codes <= 228
+
+    # Create a new array where the day numbers are left alone if they are on a leap year or are on or before
+    # February 28th, otherwise increase the number by 1
+    universal_days_of_the_year: xarray.DataArray = days_of_year.where(
+        is_leap_year | is_on_or_before_february_28,
+        days_of_year + 1
+    )
+
+    # Enforce a reasonable dtype
+    universal_days_of_the_year = universal_days_of_the_year.astype("int32")
+    return universal_days_of_the_year
 
 
 def is_nan_safe(value: typing.Any) -> bool:
