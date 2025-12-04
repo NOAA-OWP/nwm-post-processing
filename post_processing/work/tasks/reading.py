@@ -79,7 +79,8 @@ def _load(
                         dataset: xarray.Dataset = xarray.load_dataset(target, engine=engine, **load_kwargs).copy(deep=True)
                         dataset.close()
                 else:
-                    LOGGER.debug(f"Loading '{target} lazily...")
+                    if settings.this_is_very_verbose:
+                        LOGGER.debug(f"Loading '{target} lazily...")
                     dataset: xarray.Dataset = xarray.open_dataset(
                         target,
                         engine=engine,

@@ -1464,6 +1464,7 @@ class DropOperation(PathToPathOperation, FileOutputMixin):
             elif result is None:
                 raise FileNotFoundError(f"Could not find the path to the written data in {output_file}")
             output_file = result
+        LOGGER.debug(f"Dropped the {', '.join(dimensions_to_remove)} dimensions from '{input_file}'")
         return output_file
 
     @staticmethod
@@ -1529,6 +1530,11 @@ class DropOperation(PathToPathOperation, FileOutputMixin):
             raise FileNotFoundError(f"Did not get a reference to data written to '{output_file}'")
 
         output_file = result
+
+        if exclude and settings.this_is_verbose:
+            LOGGER.debug(f"Dropped all variables except {', '.join(fields)} from {input_file}")
+        elif settings.this_is_verbose:
+            LOGGER.debug(f"Dropped the following variables from {input_file}: {', '.join(fields)}")
 
         return output_file
 

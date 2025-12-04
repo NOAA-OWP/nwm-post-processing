@@ -223,7 +223,7 @@ class ThreadedGateway(Gateway):
                 try:
                     self.enqueue(None)
                 except:
-                    LOGGER.debug(f"Could not enqueue 'None' - {self.__class__.__name__} must be already shutting down")
+                    pass
 
                 # Try to dump all passed in jobs
                 while True:
