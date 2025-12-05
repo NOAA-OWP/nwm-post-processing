@@ -20,6 +20,7 @@ if typing.TYPE_CHECKING:
     import numpy
     import numpy.typing
     import concurrent.futures
+    import xarray
 
 T = typing.TypeVar("T")
 """A generic type"""
@@ -86,6 +87,43 @@ def parse_timedelta(period: str) -> timedelta:
 
     return timedelta(**parameters)
 
+def standardize_days_of_the_year(array: "xarray.DataArray") -> "xarray.DataArray":
+    """
+    Standardize the days of the year in a DataArray of dates so that they are the same within a leap and without
+
+    :param array: An xarray DataArray of numpy.datetime64
+    :returns: An xarray DataArray of numpy.int32
+    """
+    import numpy
+    import xarray
+
+    if not numpy.issubdtype(array.dtype, numpy.datetime64):
+        raise TypeError(
+            f"'get_minimum_day_of_year' may only be used on datetime variables - "
+            f"the passed variable was {array.name}({', '.join(map(str, array.sizes.keys()))}) -> {array.dtype}"
+        )
+    days_of_year: xarray.DataArray = array.dt.dayofyear
+    is_leap_year: bool = array.dt.is_leap_year
+
+    # Encode the month and day as an integer - for instance January 1st becomes 101 and December 31st becomes 1231
+    month_day_codes: xarray.DataArray = (
+        array.dt.month * 100 + array.dt.day
+    )
+
+    # Flag the collected days of the year as either being on or before February 28
+    is_on_or_before_february_28: xarray.DataArray = month_day_codes <= 228
+
+    # Create a new array where the day numbers are left alone if they are on a leap year or are on or before
+    # February 28th, otherwise increase the number by 1
+    universal_days_of_the_year: xarray.DataArray = days_of_year.where(
+        is_leap_year | is_on_or_before_february_28,
+        days_of_year + 1
+    )
+
+    # Enforce a reasonable dtype
+    universal_days_of_the_year = universal_days_of_the_year.astype("int32")
+    return universal_days_of_the_year
+
 
 def is_nan_safe(value: typing.Any) -> bool:
     """
@@ -138,131 +176,6 @@ def expand_path(path: typing.Union[str, pathlib.Path], strict: bool = True) -> g
             or not strict
     ]
     return matching_paths
-
-
-def _default_initializer(*args, **kwargs):
-    import os
-    LOGGER.debug(f"Initializing multiprocessor on PID: {os.getpid()}")
-
-def _default_mpi_initializer(*args, **kwargs):
-    import os
-    from mpi4py import MPI
-    communicator: MPI.Intracomm = MPI.COMM_WORLD
-    LOGGER.debug(
-        f"Initializing MPI worker on PID {os.getpid()}, rank {communicator.Get_rank()}"
-    )
-
-
-def get_multiprocessor(
-    max_workers: int = None,
-    initializer: generic.Callable[..., typing.Any] | None = None,
-    initargs: generic.Iterable | None = None,
-) -> typing.Optional["concurrent.futures.Executor"]:
-    """
-    Gets a multiprocess function executor if it is supported within the current process
-
-    NOTE: The caller is responsible for closing this multiprocessor
-
-    :param max_workers: The maximum number of workers that the multiprocessor may have
-    :param initializer: A function to run immediately within each new processor
-    :param initargs: Positional arguments for the initializer
-    :returns: A multiprocessing Executor if one is allowed within this runtime context
-    """
-    if max_workers == 1:
-        return None
-
-    from post_processing.configuration import settings
-
-    if not settings.allow_multiprocessing:
-        return None
-
-    import shutil
-
-    executor_args: dict = {
-        "initargs": tuple() if initargs is None else initargs,
-        "initializer": initializer,
-        "max_workers": max_workers or settings.default_worker_count
-    }
-
-    if settings.mpi_is_available:
-        try:
-            from mpi4py.futures import MPIPoolExecutor
-            from mpi4py import MPI
-            communicator: MPI.Intracomm = MPI.COMM_WORLD
-
-            if communicator.Get_rank() > 0:
-                if settings.this_is_verbose:
-                    LOGGER.debug(
-                        f"MPI is enabled, but this is rank {communicator.Get_rank()} - a multiprocessor will not "
-                        f"be issued."
-                    )
-                return None
-
-            if executor_args['max_workers'] > 0:
-                if settings.this_is_verbose:
-                    LOGGER.debug(f"An MPIPoolExecutor with {executor_args.get('max_workers')} workers is being used")
-
-                if not executor_args.get("initializer"):
-                    executor_args['initializer'] = _default_mpi_initializer
-                return MPIPoolExecutor(**executor_args)
-            if settings.this_is_verbose:
-                LOGGER.debug(
-                    f"MPI is available, but there are not enough nodes to justify an MPI multiprocessor. "
-                    f"Checking to see if a regular multiprocessor may be used."
-                )
-        except Exception as e:
-            if settings.this_is_verbose:
-                LOGGER.debug(
-                    f"MPI is supposed to be available but it could not be imported. Something is wrong. "
-                    f"Moving on to alternative multiprocessing solutions. {e}", exc_info=True
-                )
-
-    if any(shutil.which(command) for command in ["srun", "sbatch", "qsub", "bsub", "aprun"]):
-        LOGGER.debug(
-            f"The prescence of 'srun', 'sbatch', 'qsub', or 'bsub' while not running with mpi support looks like "
-            f"this is running in an HPC environment without MPI. Multiprocessing will not be enabled for this."
-        )
-        return None
-
-    import multiprocessing
-    if multiprocessing.parent_process() is not None:
-        LOGGER.debug(
-            f"This process is the child of this application - multiprocessors may only be created here for the root process."
-        )
-        return None
-
-    serverless_variables: generic.Iterable[str] = (
-        "AWS_LAMBDA_FUNCTION_NAME",
-        "FUNCTION_NAME",
-        "K_SERVICE",
-        "AZURE_FUNCTIONS_ENVIRONMENT"
-    )
-    if any(variable in os.environ for variable in serverless_variables):
-        LOGGER.debug(
-            f"The existence of one of the following environment variables makes it look like this is running in a "
-            f"serverless environment where implicit multiprocessing is not allowed: {', '.join(serverless_variables)}"
-        )
-        return None
-
-    notebook_variables: generic.Iterable[str] = (
-        "COLAB_GPU",
-        "KAGGLE_KERNEL_RUN_TYPE",
-        "JUPYTERHUB_USER"
-    )
-
-    if any(variable in os.environ for variable in notebook_variables):
-        LOGGER.info(
-            f"The existence of one of the following environment variables makes it look like this is running in a "
-            f"shared notebook environment, so implicit multiprocessing will not be used: "
-            f"{', '.join(notebook_variables)}"
-        )
-        return None
-
-    import concurrent.futures
-    LOGGER.info(f"A ProcessPoolExecutor will be used for communication")
-    if not executor_args.get("initializer"):
-        executor_args['initializer'] = _default_initializer
-    return concurrent.futures.ProcessPoolExecutor(**executor_args)
 
 
 def expand_paths(

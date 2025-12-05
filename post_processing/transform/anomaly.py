@@ -164,6 +164,19 @@ class ThresholdDefinition:
                 # Everything has already been loaded
                 return
 
+            invalid_days_of_year: list[int] = [
+                day_of_year
+                for day_of_year in days_of_year
+                if day_of_year < 1
+                   or day_of_year > 366
+            ]
+
+            if invalid_days_of_year:
+                raise IndexError(
+                    f"Thresholds for the following days were requested but the days are out of range - "
+                    f"valid range is [1, 366]: {invalid_days_of_year}"
+                )
+
             if len(days_of_year) == 1:
                 days_of_year = days_of_year[0]
 
@@ -171,12 +184,19 @@ class ThresholdDefinition:
             import xarray
             from post_processing.utilities import netcdf
 
-            specific_statistics: xarray.DataArray = netcdf.select(
-                target=file_path,
-                variable_name=self.variable,
-                criteria={self.time_coordinate: days_of_year},
-                transformation=lambda array: array.astype(numpy.float32),
-            )
+            try:
+                specific_statistics: xarray.DataArray = netcdf.select(
+                    target=file_path,
+                    variable_name=self.variable,
+                    criteria={self.time_coordinate: days_of_year},
+                    transformation=lambda array: array.astype(numpy.float32),
+                )
+            except Exception as e:
+                LOGGER.error(
+                    f"Could not select values from '{file_path.name}::{self.variable} where the "
+                    f"'{self.time_coordinate}' value(s) was/were: {days_of_year}"
+                )
+                raise e
 
             if self.time_coordinate in specific_statistics.dims:
                 for day in days_of_year:
@@ -191,6 +211,12 @@ class ThresholdDefinition:
         Get statistical value from a netcdf file based on the day of the year
         """
         with self._lock:
+            if day_of_year > 366:
+                raise KeyError(
+                    f"The statistics for day {day_of_year} within {self.data_path.name}::{self.variable} in invalid "
+                    f"- the maximum day is 366."
+                )
+
             if day_of_year in self._data:
                 return self._data[day_of_year]
 
@@ -217,7 +243,7 @@ class ThresholdDefinition:
                 if next_day not in self._data:
                     day_range.append(next_day)
 
-                next_day: int = next_day + 1 if day_of_year < 366 else 1
+                next_day: int = next_day + 1 if next_day < 366 else 1
                 if next_day not in self._data:
                     day_range.append(next_day)
 
@@ -289,10 +315,11 @@ def get_day_of_year(dataset: "xarray.Dataset", variable: str) -> int:
     """
     assert variable in dataset, f"There is not '{variable}' variable in the given dataset"
     assert dataset[variable].shape == (1,), f"Cannot find the day of year in the '{variable}' variable - there is more than one value"
-    day_of_year: numpy.ndarray = dataset[variable].dt.dayofyear.values
-    if isinstance(day_of_year, generic.Sequence):
-        day_of_year = day_of_year[0]
-    day: int = day_of_year.item()
+
+    import xarray
+    from post_processing.utilities.common import standardize_days_of_the_year
+    days_of_the_year: xarray.DataArray = standardize_days_of_the_year(array=dataset[variable])
+    day: int = days_of_the_year.item()
     return day
 
 @timed_function()
@@ -362,7 +389,14 @@ def calculate_anomaly(
     # TODO: Initial threshold processing can probably be multithreaded
     #   NOTE: Multithreading will likely lead to segfaults based on how data is loaded. Expect this refactor to be complicated
     thresholds = sorted(thresholds, key=lambda threshold: threshold.level, reverse=True)
+
     day_of_year: int = get_day_of_year(dataset=dataset, variable=time_variable)
+
+    if day_of_year > 366:
+        raise ValueError(
+            f"{input_path}::{time_variable} data is invalid - the reported day of the year of the given "
+            f"data is outside the range of valid days. The maximum is 366 but received {day_of_year}"
+        )
 
     for threshold in thresholds:
         daily_values: xarray.DataArray = threshold.get_stats(day_of_year=day_of_year, **operational_metadata)

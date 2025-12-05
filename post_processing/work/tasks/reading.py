@@ -355,10 +355,35 @@ class SelectTask(base.DataTask[xarray.DataArray]):
                     f"Cannot select data - the following dimensional criteria are not valid on '{self.variable_name}': "
                     f"{missing_dimensions}"
                 )
-            selected_data: xarray.DataArray = variable.sel(
-                self.criteria,
-                method=self.method,
-                drop=self.drop
-            ).compute().copy(deep=True)
+
+            try:
+                selected_data: xarray.DataArray = variable.sel(
+                    self.criteria,
+                    method=self.method,
+                    drop=self.drop
+                ).compute().copy(deep=True)
+            except Exception as e:
+                message: str = (
+                    f"Failed to select data from '{self.target}::{self.variable_name}' based on criteria selecting "
+                    f"labels from the following coordinates: {', '.join(map(str, self.criteria.keys()))}. "
+                    f"Available coordinates are: {', '.join(map(str, variable.coords.keys()))}."
+                )
+
+                if len(self.criteria) == 1:
+                    coordinate, desired_labels = list(self.criteria.items())[0]
+
+                    if isinstance(desired_labels, generic.Sequence) and not isinstance(desired_labels, str) and len(desired_labels) < 10:
+                        label_descriptions: list[str] = [
+                            f"{label} (dtype={type(label)})"
+                            for label in desired_labels
+                        ]
+                        message += (
+                            f" Desired values for '{coordinate}' are: {', '.join(label_descriptions)}"
+                        )
+                    elif isinstance(desired_labels, str) or not isinstance(desired_labels, generic.Sequence):
+                        message += f" The desired value for '{coordinate}' is: {desired_labels} (type={type(desired_labels)})"
+
+                LOGGER.error(message)
+                raise e
             data.close()
             return selected_data
