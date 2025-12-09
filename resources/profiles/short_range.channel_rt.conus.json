@@ -6,48 +6,6 @@
             "fields": ["feature_id", "time", "reference_time", "streamflow", "crs"]
         },
         {
-            "operation": "anomaly",
-            "variable_name": "streamflow",
-            "default_score": 3,
-            "output_pattern": "{stage}_nwm.t{cycle}z.{Configuration}.{ModelOutputType}.f{frame}.{region}.nc",
-            "time_variable": "time",
-            "dimension_names": "feature_id",
-            "output_variable_name": "streamflow_anomaly",
-            "comment": "The previous version of CONUS excluded the 50th percentile, so this will as well. Data from in (25th, 75th] is the IQR, which is considered 'fairly normal'. This variable is for identifying 'weird' values, so the IQR is set at a value of '0.0'",
-            "thresholds": [
-                {
-                    "data_path": "{threshold_path}/p05.nc",
-                    "level": -5.0,
-                    "variable": "streamflow_0_4"
-                },
-                {
-                    "data_path": "{threshold_path}/p10.nc",
-                    "level": -3.0,
-                    "variable": "streamflow_5_9"
-                },
-                {
-                    "data_path": "{threshold_path}/p25.nc",
-                    "level": -1.25,
-                    "variable": "streamflow_10_24"
-                },
-                {
-                    "data_path": "{threshold_path}/p75.nc",
-                    "level": 0.0,
-                    "variable": "streamflow_50_75"
-                },
-                {
-                    "data_path": "{threshold_path}/p90.nc",
-                    "level": 0.5,
-                    "variable": "streamflow_76_90"
-                },
-                {
-                    "data_path": "{threshold_path}/p95.nc",
-                    "level": 1.5,
-                    "variable": "streamflow_91_95"
-                }
-            ]
-        },
-        {
             "operation": "merge",
             "file_name_pattern": "nwm.t{cycle}z.{ModelOutputType}.{Configuration}.{Region}.nc"
         },
@@ -71,10 +29,6 @@
                     }
                 ],
                 "RFC": [
-                    {
-                        "operation": "drop",
-                        "fields": ["streamflow_anomaly"]
-                    },
                     {
                         "operation": "function",
                         "function_name": "post_processing.transform.calculate_upstream_flow.calculate_upstream_flow_binned",
