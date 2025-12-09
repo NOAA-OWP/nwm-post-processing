@@ -211,9 +211,6 @@ def get_multiprocessor(
 
     from post_processing.configuration import settings
 
-    if not settings.allow_multiprocessing:
-        return None
-
     import shutil
 
     executor_args: dict = {
@@ -294,6 +291,10 @@ def get_multiprocessor(
             f"shared notebook environment, so implicit multiprocessing will not be used: "
             f"{', '.join(notebook_variables)}"
         )
+        return None
+
+    if not settings.allow_multiprocessing:
+        LOGGER.debug("A multiprocessor will not be acquired - `allow_multiprocessing` is `False`")
         return None
 
     import concurrent.futures
