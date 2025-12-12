@@ -123,6 +123,7 @@ class _Settings(UserDict):
     """
     def __init__(self, initial_values: generic.Mapping = None, **kwargs):
         super().__init__()
+        self.__non_configurable_values: dict[str, typing.Any] = {}
 
         for key, value in os.environ.items():
             self.__setitem__(key=key, item=value)
@@ -137,8 +138,6 @@ class _Settings(UserDict):
 
         env_file: pathlib.Path = self.application_path / ".env"
         self.apply_env(env_path=env_file)
-
-        self.__non_configurable_values: dict[str, typing.Any] = {}
 
     def apply_env(self, env_path: pathlib.Path):
         """
@@ -159,7 +158,23 @@ class _Settings(UserDict):
         :param key: The name of the environment variable to find
         :returns: The appropriate key
         """
-        return next(filter(lambda contained_key: contained_key.lower() == key.lower(), self.keys()), key)
+        configured_key: str | None = next(
+            filter(lambda contained_key: contained_key.lower() == key.lower(), self.keys()),
+            None
+        )
+
+        if configured_key:
+            return configured_key
+
+        derived_key: str | None = next(
+            filter(lambda contained_key: contained_key.lower() == key.lower(), self.__non_configurable_values.keys()),
+            None
+        )
+
+        if derived_key:
+            return derived_key
+
+        return key
 
     @property
     def mpi_is_available(self) -> bool:
@@ -192,21 +207,49 @@ class _Settings(UserDict):
         key: str = self._find_key(key=proposed_key)
 
         if key not in self.__non_configurable_values:
-            max_workers: str | int | None = os.environ.get("MPI4PY_FUTURES_MAX_WORKERS")
-            logging.debug(f"The configured value for $MPI4PY_FUTURES_MAX_WORKERS is: {max_workers}")
-            if max_workers is not None and max_workers != "":
-                max_workers = int(max_workers)
-            else:
-                print(f"Found a configuration for MPI4PY at {max_workers} in length")
+            mpi4py_worker_key: str = self._find_key("MPI4PY_FUTURES_MAX_WORKERS")
+            max_workers: str | int | None = self.get(mpi4py_worker_key)
 
-            if not isinstance(max_workers, int) or max_workers <= 1:
+            if max_workers is not None and max_workers != "":
+                logging.debug(f"The configured value for $MPI4PY_FUTURES_MAX_WORKERS is: {max_workers}")
+                max_workers = int(max_workers)
+
+            if not isinstance(max_workers, int) or max_workers < 1:
                 logging.debug(f"The value for 'max_workers' was deemed invalid since it was either not an int or too low: {max_workers}")
-                max_workers = max(1, int(os.environ.get("NPROCS", os.environ.get("NCPUS", min(os.cpu_count(), 12))) - 1))
+                max_workers = max(1, int(os.environ.get("NPROCS", os.environ.get("nprocs", os.environ.get("NCPUS", min(os.cpu_count(), 18))) - 1)))
                 logging.debug(f"Evaluated the number of optimal max workers to '{max_workers}'")
 
             self.__non_configurable_values[key] = max_workers
 
         return int(self.__non_configurable_values[key])
+
+    @property
+    def has_hydra(self) -> bool:
+        """
+        Declares whether Hydra process management is available. MPIProcessPool only works when Hydra is available
+        """
+        key: str = "HAS_HYDRA"
+
+        if key not in self.__non_configurable_values:
+            if self.mpi_is_available:
+                try:
+                    import subprocess
+
+                    # TODO: Find a better way to do this
+                    check_result: subprocess.CompletedProcess[str] = subprocess.run(
+                        "mpiexec --help",
+                        shell=True,
+                        capture_output=True,
+                        text=True
+                    )
+                    hydra_is_present = "hydra" in check_result.stdout.lower()
+                except:
+                    hydra_is_present = False
+            else:
+                hydra_is_present: bool = False
+
+            self.__non_configurable_values[key] = hydra_is_present
+        return self.__non_configurable_values[key]
 
     @property
     def base_path(self) -> pathlib.Path:
@@ -268,11 +311,7 @@ class _Settings(UserDict):
 
         if key not in self.keys():
             import multiprocessing
-            import shutil
             allowed: bool = True
-
-            if any(shutil.which(command) for command in ["srun", "sbatch", "qsub", "bsub", "aprun"]):
-                allowed: bool = False
 
             if multiprocessing.parent_process() is not None:
                 allowed = False

@@ -206,22 +206,25 @@ def get_multiprocessor(
     :param initargs: Positional arguments for the initializer
     :returns: A multiprocessing Executor if one is allowed within this runtime context
     """
-    if max_workers == 1:
+    from post_processing.configuration import settings
+    if max_workers is None:
+        max_workers = settings.default_worker_count
+
+    if max_workers is None or max_workers <= 1:
         return None
 
-    from post_processing.configuration import settings
-
-    import shutil
+    if not settings.allow_multiprocessing:
+        LOGGER.debug(f"Multiprocessing is not allowable in this current application configuration - it will not be used.")
+        return None
 
     executor_args: dict = {
         "initargs": tuple() if initargs is None else initargs,
         "initializer": initializer,
-        "max_workers": max_workers or settings.default_worker_count
+        "max_workers": max_workers
     }
 
     if settings.mpi_is_available:
         try:
-            from mpi4py.futures import MPIPoolExecutor
             from mpi4py import MPI
             communicator: MPI.Intracomm = MPI.COMM_WORLD
 
@@ -233,31 +236,30 @@ def get_multiprocessor(
                     )
                 return None
 
-            if executor_args['max_workers'] > 0:
-                if settings.this_is_verbose:
-                    LOGGER.debug(f"An MPIPoolExecutor with {executor_args.get('max_workers')} workers is being used")
+            if settings.this_is_verbose:
+                LOGGER.debug(f"An MPIPoolExecutor with {executor_args.get('max_workers')} workers is being used")
 
+            import concurrent.futures
+
+            if settings.has_hydra:
                 if not executor_args.get("initializer"):
                     executor_args['initializer'] = _default_mpi_initializer
-                return MPIPoolExecutor(**executor_args)
-            if settings.this_is_verbose:
-                LOGGER.debug(
-                    f"MPI is available, but there are not enough nodes to justify an MPI multiprocessor. "
-                    f"Checking to see if a regular multiprocessor may be used."
-                )
+                from mpi4py.futures import MPIPoolExecutor
+                executor_implementation: typing.Type[concurrent.futures.Executor] = MPIPoolExecutor
+            else:
+                if not executor_args.get("initializer"):
+                    executor_args['initializer'] = _default_initializer
+                # TODO: an MPICommExecutor would work better, but scoping and use would have to change since it
+                #  relies on multiple MPI processes running, so a mechanism to get ranks > 0 to "return" from within
+                #  the executor's context manager, which they will only be released from when rank 0 exits.
+                executor_implementation: typing.Type[concurrent.futures.Executor] = concurrent.futures.ProcessPoolExecutor
+            return executor_implementation(**executor_args)
         except Exception as e:
             if settings.this_is_verbose:
                 LOGGER.debug(
                     f"MPI is supposed to be available but it could not be imported. Something is wrong. "
                     f"Moving on to alternative multiprocessing solutions. {e}", exc_info=True
                 )
-
-    if any(shutil.which(command) for command in ["srun", "sbatch", "qsub", "bsub", "aprun"]):
-        LOGGER.debug(
-            f"The prescence of 'srun', 'sbatch', 'qsub', or 'bsub' while not running with mpi support looks like "
-            f"this is running in an HPC environment without MPI. Multiprocessing will not be enabled for this."
-        )
-        return None
 
     import multiprocessing
     if multiprocessing.parent_process() is not None:
@@ -286,21 +288,18 @@ def get_multiprocessor(
     )
 
     if any(variable in os.environ for variable in notebook_variables):
-        LOGGER.info(
+        LOGGER.debug(
             f"The existence of one of the following environment variables makes it look like this is running in a "
             f"shared notebook environment, so implicit multiprocessing will not be used: "
             f"{', '.join(notebook_variables)}"
         )
         return None
 
-    if not settings.allow_multiprocessing:
-        LOGGER.debug("A multiprocessor will not be acquired - `allow_multiprocessing` is `False`")
-        return None
-
-    import concurrent.futures
-    LOGGER.info(f"A ProcessPoolExecutor will be used for communication")
+    LOGGER.debug(f"A ProcessPoolExecutor will be used for communication")
     if not executor_args.get("initializer"):
         executor_args['initializer'] = _default_initializer
+
+    import concurrent.futures
     return concurrent.futures.ProcessPoolExecutor(**executor_args)
 
 
