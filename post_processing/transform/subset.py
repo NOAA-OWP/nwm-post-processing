@@ -1,5 +1,5 @@
 """
-Contains logic for subsetting netcdf files
+Contains logic for subsetting 2D+ netcdf files
 """
 import os
 import typing

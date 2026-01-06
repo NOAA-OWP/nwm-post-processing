@@ -244,6 +244,9 @@ def _subset_by_label(
                 for name, variable in input_data.coords.items()
             }
 
+            for coordinate_name, array in new_coordinates.items():
+                array.encoding.update(input_data.coords[coordinate_name].encoding)
+
             data_variables: dict[str, xarray.DataArray] = {}
             for name, variable in input_data.data_vars.items():
                 data = select_via_numpy(

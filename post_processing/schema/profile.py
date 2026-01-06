@@ -1303,6 +1303,11 @@ class Peek(PathToPathOperation):
         from post_processing.utilities.netcdf import peek
         LOGGER.warning(f"Peeking into operations. Do not do this in production!")
 
+        if isinstance(data, generic.Iterable):
+            current_data: generic.Iterable[pathlib.Path] = data
+        else:
+            current_data: generic.Iterable[pathlib.Path] = [data]
+
         if self.show_summary:
             parameter_information: str = f"""
 Profile:             {profile.output_type} data for the {profile.configuration} configuration over {profile.region}
@@ -1311,13 +1316,13 @@ Work directory:      {work_directory}
 Previous Operations: 
     - {(os.linesep + '    - ').join(list(map(str, previous_operations)))}
 Files:
-    - {(os.linesep + '    - ').join(list(map(str, data)))}
+    - {(os.linesep + '    - ').join(list(map(str, current_data)))}
 
 """
             LOGGER.info(parameter_information)
 
         if self.show_state:
-            for path in data:
+            for path in current_data:
                 details: str = peek(path)
                 LOGGER.info(details)
 
