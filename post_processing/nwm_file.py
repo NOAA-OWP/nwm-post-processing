@@ -138,13 +138,14 @@ class NWMFile:
             # Hawaii channel_rt and land both have frames formatted like "f[HHH][MM]" and everything else has "fHHH",
             # where "H" is 'hour' and "MM" is 'minute'
             if self.region in (enums.Region.Hawaii, enums.Region.HawaiiAPRFC) and self.model_output_type != enums.ModelOutputType.Forcing:
-                name += f"f{str(self.frame).zfill(5)}"
+                name += f"f{str(self.frame[:5]).zfill(5)}"
             else:
-                name += f"f{str(self.frame).zfill(2)}"
+                name += f"f{str(self.frame[:3]).zfill(2)}"
         else:
             name += f"tm{str(self.t_minus).zfill(2)}"
 
         name += f".{self.region.value}.nc"
+        return name
 
     def __eq__(self, other: typing.Any) -> bool:
         if not isinstance(other, self.__class__):

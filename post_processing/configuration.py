@@ -123,6 +123,7 @@ class _Settings(UserDict):
     """
     def __init__(self, initial_values: generic.Mapping = None, **kwargs):
         super().__init__()
+        self.__non_configurable_values: dict[str, typing.Any] = {}
 
         for key, value in os.environ.items():
             self.__setitem__(key=key, item=value)
@@ -157,7 +158,98 @@ class _Settings(UserDict):
         :param key: The name of the environment variable to find
         :returns: The appropriate key
         """
-        return next(filter(lambda contained_key: contained_key.lower() == key.lower(), self.keys()), key)
+        configured_key: str | None = next(
+            filter(lambda contained_key: contained_key.lower() == key.lower(), self.keys()),
+            None
+        )
+
+        if configured_key:
+            return configured_key
+
+        derived_key: str | None = next(
+            filter(lambda contained_key: contained_key.lower() == key.lower(), self.__non_configurable_values.keys()),
+            None
+        )
+
+        if derived_key:
+            return derived_key
+
+        return key
+
+    @property
+    def mpi_is_available(self) -> bool:
+        """
+        Whether MPI is available within this process
+
+        NOTE: MPI may be available within the environment, but not necessarily the process
+        """
+        key: str = "MPI_IS_AVAILABLE"
+        if key not in self.__non_configurable_values:
+            try:
+                from mpi4py import MPI
+                self.__non_configurable_values[key] = True
+            except ImportError:
+                self.__non_configurable_values[key] = False
+            except RuntimeError as runtime_error:
+                if "cannot load mpi library" in str(runtime_error).lower():
+                    self.__non_configurable_values[key] = False
+                else:
+                    raise
+
+        return bool(self.__non_configurable_values[key])
+
+    @property
+    def default_worker_count(self) -> int:
+        """
+        The number of workers that may be used when not explicitly indicated
+        """
+        proposed_key: str = f"{self.prefix}_DEFAULT_WORKER_COUNT".lower()
+        key: str = self._find_key(key=proposed_key)
+
+        if key not in self.__non_configurable_values:
+            mpi4py_worker_key: str = self._find_key("MPI4PY_FUTURES_MAX_WORKERS")
+            max_workers: str | int | None = self.get(mpi4py_worker_key)
+
+            if max_workers is not None and max_workers != "":
+                logging.debug(f"The configured value for $MPI4PY_FUTURES_MAX_WORKERS is: {max_workers}")
+                max_workers = int(max_workers)
+
+            if not isinstance(max_workers, int) or max_workers < 1:
+                logging.debug(f"The value for 'max_workers' was deemed invalid since it was either not an int or too low: {max_workers}")
+                max_workers = max(1, int(os.environ.get("NPROCS", os.environ.get("nprocs", os.environ.get("NCPUS", min(os.cpu_count(), 18))) - 1)))
+                logging.debug(f"Evaluated the number of optimal max workers to '{max_workers}'")
+
+            self.__non_configurable_values[key] = max_workers
+
+        return int(self.__non_configurable_values[key])
+
+    @property
+    def has_hydra(self) -> bool:
+        """
+        Declares whether Hydra process management is available. MPIProcessPool only works when Hydra is available
+        """
+        key: str = "HAS_HYDRA"
+
+        if key not in self.__non_configurable_values:
+            if self.mpi_is_available:
+                try:
+                    import subprocess
+
+                    # TODO: Find a better way to do this
+                    check_result: subprocess.CompletedProcess[str] = subprocess.run(
+                        "mpiexec --help",
+                        shell=True,
+                        capture_output=True,
+                        text=True
+                    )
+                    hydra_is_present = "hydra" in check_result.stdout.lower()
+                except:
+                    hydra_is_present = False
+            else:
+                hydra_is_present: bool = False
+
+            self.__non_configurable_values[key] = hydra_is_present
+        return self.__non_configurable_values[key]
 
     @property
     def base_path(self) -> pathlib.Path:
@@ -208,6 +300,57 @@ class _Settings(UserDict):
         The prefix of important application environment parameters
         """
         return "PP"
+
+    @property
+    def allow_multiprocessing(self) -> bool:
+        """
+        Whether to allow multiprocessing
+        """
+        proposed_key: str = f"{self.prefix}_allow_multiprocessing"
+        key: str = self._find_key(key=proposed_key)
+
+        if key not in self.keys():
+            import multiprocessing
+            allowed: bool = True
+
+            if multiprocessing.parent_process() is not None:
+                allowed = False
+
+            serverless_variables: generic.Iterable[str] = (
+                "AWS_LAMBDA_FUNCTION_NAME",
+                "FUNCTION_NAME",
+                "K_SERVICE",
+                "AZURE_FUNCTIONS_ENVIRONMENT"
+            )
+            if any(variable in os.environ for variable in serverless_variables):
+                allowed = False
+
+            notebook_variables: generic.Iterable[str] = (
+                "COLAB_GPU",
+                "KAGGLE_KERNEL_RUN_TYPE",
+                "JUPYTERHUB_USER"
+            )
+
+            if any(variable in os.environ for variable in notebook_variables):
+                allowed = False
+
+            if allowed and self.mpi_is_available:
+                from mpi4py import MPI
+                communicator: MPI.Intracomm = MPI.COMM_WORLD
+                allowed = communicator.Get_rank() == 0
+
+            self.__setitem__(key=key, item=allowed)
+
+        stored_value: typing.Any = self.__getitem__(key=key)
+
+        return str(stored_value).lower() in ('true', 't', '1', 'yes', 'y', 'on')
+
+    @allow_multiprocessing.setter
+    def allow_multiprocessing(self, value: bool):
+        proposed_key: str = f"{self.prefix}_allow_multiprocessing"
+        key: str = self._find_key(key=proposed_key)
+        self.__setitem__(key, value)
+
 
     @property
     def allow_threading(self) -> bool:

@@ -20,6 +20,7 @@ from post_processing.utilities import netcdf
 from post_processing.work import starmap_threaded
 from post_processing.utilities.common import NWM_FILENAME_PATTERN
 from post_processing.enums import TimeUnit
+from post_processing.work import starmap_executor
 
 LOGGER: logging.Logger = logging.get_logger(__file__)
 
@@ -84,6 +85,7 @@ def calculate_time_bounds(
         )
         netcdf_data[output_variable_name] = time_bound_variable
         netcdf_data[output_variable_name].attrs.update(attributes)
+        LOGGER.debug(f"Updated time bounds on {input_path}")
         netcdf.write(target=output_path, dataset=netcdf_data)
 
     return output_path
@@ -143,9 +145,11 @@ class TimeBoundOperation(base_profiles.PathToPathOperation, base_profiles.FileOu
 
             arguments.append(path_arguments)
 
-        files_with_accumulated_rates: generic.Sequence[pathlib.Path] = starmap_threaded(
+        files_with_accumulated_rates: generic.Sequence[pathlib.Path] = starmap_executor(
             function=calculate_time_bounds,
-            args=arguments
+            args=arguments,
+            executor=profile.executor,
+            fallback_to_threads=True
         )
 
         return files_with_accumulated_rates

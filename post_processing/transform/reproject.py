@@ -13,6 +13,7 @@ import logging
 import collections.abc as generic
 import dataclasses
 import warnings
+import atexit
 
 from threading import RLock
 
@@ -241,6 +242,12 @@ class _ProjectionStore:
 
 ProjectionStore: _ProjectionStore = _ProjectionStore()
 """A central store for common projections"""
+
+@atexit.register
+def clean():
+    import os
+    LOGGER.debug(f"Removing the ProjectionStore on PID {os.getpid()}")
+    ProjectionStore.clean()
 
 def remove_projection(
         path: pathlib.Path,

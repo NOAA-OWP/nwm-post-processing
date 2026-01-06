@@ -218,12 +218,12 @@ class ThreadedGateway(Gateway):
         with self.__lock:
             if self.__thread is not None and self.__thread.is_alive():
                 if settings.this_is_verbose:
-                    LOGGER.debug(f"Shutting down {self.__class__.__name__}")
+                    LOGGER.debug(f"Shutting down {self.__class__.__name__} on PID {os.getpid()}")
                 self._should_operate.clear()
                 try:
                     self.enqueue(None)
                 except:
-                    LOGGER.debug(f"Could not enqueue 'None' - {self.__class__.__name__} must be already shutting down")
+                    pass
 
                 # Try to dump all passed in jobs
                 while True:
@@ -268,6 +268,12 @@ def get_gateway(queue_length: int = DEFAULT_QUEUE_LENGTH, wait_seconds: float = 
     :param wait_seconds: The amount of seconds to wait for the polling thread to complete
     :returns: The appropriate gateway implementation
     """
+    import xarray
+
+    # Read patterns are generally 'read once, throw away', so set the cache to 0 so it doesn't keep hold of memory
+    # too terribly long
+    xarray.set_options(file_cache_maxsize=1)
+
     if communication.COMMUNICATE_VIA_THREADS:
         return ThreadedGateway(queue_length=queue_length, wait_seconds=wait_seconds)
     if communication.COMMUNICATE_VIA_PROCESSES:

@@ -4,3 +4,4 @@ from .combine import CombineOperation
 from .stream import StreamOperation
 from .stream import StreamCalculation
 from .group import GroupByLeadOperation
+from .file_filter import FilterOperation

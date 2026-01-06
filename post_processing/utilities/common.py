@@ -19,6 +19,7 @@ LOGGER: logging.Logger = logging.getLogger(pathlib.Path(__file__).stem)
 if typing.TYPE_CHECKING:
     import numpy
     import numpy.typing
+    import concurrent.futures
     import xarray
 
 T = typing.TypeVar("T")
@@ -175,6 +176,131 @@ def expand_path(path: typing.Union[str, pathlib.Path], strict: bool = True) -> g
             or not strict
     ]
     return matching_paths
+
+
+def _default_initializer(*args, **kwargs):
+    import os
+    LOGGER.debug(f"Initializing multiprocessor on PID: {os.getpid()}")
+
+def _default_mpi_initializer(*args, **kwargs):
+    import os
+    from mpi4py import MPI
+    communicator: MPI.Intracomm = MPI.COMM_WORLD
+    LOGGER.debug(
+        f"Initializing MPI worker on PID {os.getpid()}, rank {communicator.Get_rank()}"
+    )
+
+
+def get_multiprocessor(
+    max_workers: int = None,
+    initializer: generic.Callable[..., typing.Any] | None = None,
+    initargs: generic.Iterable | None = None,
+) -> typing.Optional["concurrent.futures.Executor"]:
+    """
+    Gets a multiprocess function executor if it is supported within the current process
+
+    NOTE: The caller is responsible for closing this multiprocessor
+
+    :param max_workers: The maximum number of workers that the multiprocessor may have
+    :param initializer: A function to run immediately within each new processor
+    :param initargs: Positional arguments for the initializer
+    :returns: A multiprocessing Executor if one is allowed within this runtime context
+    """
+    from post_processing.configuration import settings
+    if max_workers is None:
+        max_workers = settings.default_worker_count
+
+    if max_workers is None or max_workers <= 1:
+        return None
+
+    if not settings.allow_multiprocessing:
+        LOGGER.debug(f"Multiprocessing is not allowable in this current application configuration - it will not be used.")
+        return None
+
+    executor_args: dict = {
+        "initargs": tuple() if initargs is None else initargs,
+        "initializer": initializer,
+        "max_workers": max_workers
+    }
+
+    if settings.mpi_is_available:
+        try:
+            from mpi4py import MPI
+            communicator: MPI.Intracomm = MPI.COMM_WORLD
+
+            if communicator.Get_rank() > 0:
+                if settings.this_is_verbose:
+                    LOGGER.debug(
+                        f"MPI is enabled, but this is rank {communicator.Get_rank()} - a multiprocessor will not "
+                        f"be issued."
+                    )
+                return None
+
+            if settings.this_is_verbose:
+                LOGGER.debug(f"An MPIPoolExecutor with {executor_args.get('max_workers')} workers is being used")
+
+            import concurrent.futures
+
+            if settings.has_hydra:
+                if not executor_args.get("initializer"):
+                    executor_args['initializer'] = _default_mpi_initializer
+                from mpi4py.futures import MPIPoolExecutor
+                executor_implementation: typing.Type[concurrent.futures.Executor] = MPIPoolExecutor
+            else:
+                if not executor_args.get("initializer"):
+                    executor_args['initializer'] = _default_initializer
+                # TODO: an MPICommExecutor would work better, but scoping and use would have to change since it
+                #  relies on multiple MPI processes running, so a mechanism to get ranks > 0 to "return" from within
+                #  the executor's context manager, which they will only be released from when rank 0 exits.
+                executor_implementation: typing.Type[concurrent.futures.Executor] = concurrent.futures.ProcessPoolExecutor
+            return executor_implementation(**executor_args)
+        except Exception as e:
+            if settings.this_is_verbose:
+                LOGGER.debug(
+                    f"MPI is supposed to be available but it could not be imported. Something is wrong. "
+                    f"Moving on to alternative multiprocessing solutions. {e}", exc_info=True
+                )
+
+    import multiprocessing
+    if multiprocessing.parent_process() is not None:
+        LOGGER.debug(
+            f"This process is the child of this application - multiprocessors may only be created here for the root process."
+        )
+        return None
+
+    serverless_variables: generic.Iterable[str] = (
+        "AWS_LAMBDA_FUNCTION_NAME",
+        "FUNCTION_NAME",
+        "K_SERVICE",
+        "AZURE_FUNCTIONS_ENVIRONMENT"
+    )
+    if any(variable in os.environ for variable in serverless_variables):
+        LOGGER.debug(
+            f"The existence of one of the following environment variables makes it look like this is running in a "
+            f"serverless environment where implicit multiprocessing is not allowed: {', '.join(serverless_variables)}"
+        )
+        return None
+
+    notebook_variables: generic.Iterable[str] = (
+        "COLAB_GPU",
+        "KAGGLE_KERNEL_RUN_TYPE",
+        "JUPYTERHUB_USER"
+    )
+
+    if any(variable in os.environ for variable in notebook_variables):
+        LOGGER.debug(
+            f"The existence of one of the following environment variables makes it look like this is running in a "
+            f"shared notebook environment, so implicit multiprocessing will not be used: "
+            f"{', '.join(notebook_variables)}"
+        )
+        return None
+
+    LOGGER.debug(f"A ProcessPoolExecutor will be used for communication")
+    if not executor_args.get("initializer"):
+        executor_args['initializer'] = _default_initializer
+
+    import concurrent.futures
+    return concurrent.futures.ProcessPoolExecutor(**executor_args)
 
 
 def expand_paths(

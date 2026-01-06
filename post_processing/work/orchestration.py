@@ -1,6 +1,7 @@
 """
 Functions and objects used to orchestrate work within single calls
 """
+import concurrent.futures
 import typing
 import collections.abc as generic
 import logging
@@ -10,6 +11,7 @@ from post_processing.utilities.logging import get_logger
 LOGGER: logging.Logger = get_logger(__file__)
 
 if typing.TYPE_CHECKING:
+    from concurrent.futures import Executor
     from concurrent.futures import Future
     from post_processing.interfaces.work import PendingTaskResult
 
@@ -37,6 +39,143 @@ Either a series of positional arguments, a dictionary of keyword arguments,
 or a tuple of the first item being positional arguments and the second being keyword arguments
 """
 
+def shutdown_executor(executor: typing.Optional["Executor"] = None, worker_count: int | None = None):
+    """
+    Ensure that any passed executor is properly shutdown
+
+    :param executor: The executor to try and shutdown. This is a noop if there is no executor
+    :param worker_count: The number of workers the executor uses. Defaults to the number of CPUs as the best guess
+        if none is passed. This may not be enough if the executor is oversubscribed.
+    """
+    if not isinstance(executor, concurrent.futures.Executor):
+        LOGGER.debug(f"There was no executor to shut down")
+        return
+
+    LOGGER.debug(f"Shutting down '{executor}'")
+
+    if worker_count is None or worker_count < 1:
+        import os
+        worker_count = os.cpu_count()
+
+    from post_processing.transform.subsetting.cache import clean as remove_masks
+    from post_processing.transform.reproject import clean as remove_projections
+    from post_processing.utilities.netcdf import close_gateway
+
+    # The cleanup functions don't take arguments, but the number of calls queued is based off of the number of argument
+    # sequences passed. We multiply the empty sequences by the number of workers, then multiply THAT to ensure timing
+    # doesn't possibly exclude any workers
+    cleanup_stub_arguments: generic.Sequence[generic.Sequence] = [[]] * worker_count * 2
+
+    #mask_removals = starmap_executor(remove_masks, args=cleanup_stub_arguments, executor=executor)
+    #projection_removals = starmap_executor(remove_projections, args=cleanup_stub_arguments, executor=executor)
+    close_results = starmap_executor(close_gateway, args=cleanup_stub_arguments, executor=executor)
+
+    #LOGGER.debug(f"Removed masks '{len(mask_removals)}' times")
+    #LOGGER.debug(f"Removed projections {len(projection_removals)} times")
+    LOGGER.debug(f"Closed gateways '{len(close_results)}' times")
+
+@typing.overload
+def starmap_executor(
+    function: generic.Callable[FunctionParameters, RT],
+    args: generic.Mapping[KT, RT],
+    executor: typing.Optional["Executor"],
+    fallback_to_threads: bool = False,
+) -> generic.Mapping[KT, RT]:
+    ...
+
+@typing.overload
+def starmap_executor(
+    function: generic.Callable[FunctionParameters, RT],
+    args: generic.Iterable[ArgsAndKwargs],
+    executor: typing.Optional["Executor"],
+    fallback_to_threads: bool = False,
+) -> generic.Sequence[RT]:
+    ...
+
+def starmap_executor(
+    function: generic.Callable[FunctionParameters, RT],
+    args: generic.Mapping[KT, ArgsAndKwargs] | generic.Iterable[ArgsAndKwargs],
+    executor: typing.Optional["Executor"],
+    fallback_to_threads: bool = False,
+) -> generic.Mapping[KT, RT] | generic.Sequence[RT]:
+    """
+    Call the given function with the given arguments through the given executor and wait for the results
+
+    :param function: The function to call
+    :param args: The arguments to pass to the function
+    :param executor: The executor to call the functions through
+    :param fallback_to_threads: Whether to fall back to threaded parallelization if the executor is not available
+    :returns: The results from each call
+    """
+    from post_processing.configuration import settings
+    from post_processing.enums import Verbosity
+    from concurrent.futures import Future
+
+    if executor is None:
+        if fallback_to_threads:
+            return starmap_threaded(
+                function=function,
+                args=args
+            )
+        return starmap(
+            function=function,
+            args=args,
+        )
+
+    if isinstance(args, generic.Mapping):
+        future_results: dict[KT, Future[RT]] = {}
+    else:
+        future_results: list[Future[RT]] = []
+
+    for key, arg in (args.items() if isinstance(args, generic.Mapping) else ((None, arg) for arg in args)):
+        arguments_are_keyword: bool = isinstance(arg, generic.Mapping)
+        arguments_are_positional: bool = isinstance(arg, generic.Sequence) and not isinstance(arg, str)
+        arguments_are_positional_and_keyword = (
+            isinstance(arg, generic.Sequence)
+                and len(arg) == 2
+                and isinstance(arg[0], generic.Sequence) and not isinstance(arg[0], str)
+                and isinstance(arg[1], generic.Mapping)
+        )
+
+        if arguments_are_positional_and_keyword:
+            future_result: Future[RT] = executor.submit(
+                function,
+                *arg[0],
+                **arg[1]
+            )
+        elif arguments_are_keyword:
+            future_result: Future[RT] = executor.submit(
+                function,
+                **arg
+            )
+        elif arguments_are_positional:
+            future_result: Future[RT] = executor.submit(
+                function,
+                *arg,
+            )
+        else:
+            future_result: Future[RT] = executor.submit(
+                function,
+                arg
+            )
+
+        if isinstance(args, generic.Mapping):
+            future_results[key] = future_result
+        else:
+            future_results.append(future_result)
+
+    if settings.verbosity >= Verbosity.ALL:
+        LOGGER.debug(f"{len(future_results)} jobs have been scheduled for {function}")
+
+    results, exceptions = cycle_futures(futures=future_results)
+
+    if exceptions:
+        from post_processing.utilities.common import condense_exceptions
+        raise condense_exceptions(
+            f"Could not perform {function.__name__} across {len(args)} sets of arguments",
+            exceptions
+        )
+    return results
 
 
 @typing.overload
@@ -143,7 +282,6 @@ def starmap_threaded(
     :returns: The result of each function call
     """
     from post_processing.configuration import settings
-    from post_processing.enums import Verbosity
 
     if thread_prefix is None:
         import threading
@@ -154,68 +292,13 @@ def starmap_threaded(
 
     if thread_count is None:
         thread_count = settings.maximum_additional_threads
-
-    if isinstance(args, generic.Mapping):
-        results: dict[KT, RT] = {}
-    else:
-        results: list[RT] = []
-
     import concurrent.futures
     with concurrent.futures.ThreadPoolExecutor(max_workers=thread_count, thread_name_prefix=thread_prefix) as executor:
-        if isinstance(args, generic.Mapping):
-            future_results: dict[KT, concurrent.futures.Future[RT]] = {}
-        else:
-            future_results: list[concurrent.futures.Future[RT]] = []
-
-        for key, arg in (args.items() if isinstance(args, generic.Mapping) else ((None, arg) for arg in args)):
-            arguments_are_keyword: bool = isinstance(arg, generic.Mapping)
-            arguments_are_positional: bool = isinstance(arg, generic.Sequence) and not isinstance(arg, str)
-            arguments_are_positional_and_keyword: bool = (
-                isinstance(arg, generic.Sequence)
-                    and len(arg) == 2
-                    and isinstance(arg[0], generic.Sequence) and not isinstance(arg[0], str)
-                    and isinstance(arg[1], generic.Mapping)
-            )
-            if arguments_are_keyword:
-                future_result: concurrent.futures.Future[RT] = executor.submit(
-                    function,
-                    **arg
-                )
-            elif arguments_are_positional_and_keyword:
-                future_result: concurrent.futures.Future[RT] = executor.submit(
-                    function,
-                    *arg[0],
-                    **arg[1]
-                )
-            elif arguments_are_positional:
-                future_result: concurrent.futures.Future[RT] = executor.submit(
-                    function,
-                    *arg
-                )
-            else:
-                future_result: concurrent.futures.Future[RT] = executor.submit(
-                    function,
-                    arg
-                )
-
-            if isinstance(args, generic.Mapping):
-                future_results[key] = future_result
-            else:
-                future_results.append(future_result)
-
-        if settings.verbosity >= Verbosity.ALL:
-            LOGGER.debug(f"{len(future_results)} jobs have been scheduled for {function}")
-
-        results, exceptions = cycle_futures(futures=future_results)
-
-        if exceptions:
-            from post_processing.utilities.common import condense_exceptions
-            raise condense_exceptions(
-                f"Could not perform {function.__name__} across {len(args)} sets of arguments",
-                exceptions
-            )
-
-    return results
+        return starmap_executor(
+            function=function,
+            args=args,
+            executor=executor
+        )
 
 
 @typing.overload
@@ -284,7 +367,8 @@ def cycle_future_list(
             result: T = value.result(timeout=block_seconds)
             transformed_result: VT = transform(result, results)
             results.append(transformed_result)
-        except TimeoutError:
+            del value
+        except (TimeoutError, concurrent.futures.TimeoutError):
             current_values.append(value)
             future_id: int = id(value)
             if future_id == last_item_id:
@@ -293,6 +377,7 @@ def cycle_future_list(
         except Exception as e:
             processed_exception: Exception = exception_handler(e)
             exceptions.append(processed_exception)
+            del value
 
     return results, exceptions
 
@@ -348,24 +433,23 @@ def cycle_future_mapping(
     elif not callable(exception_handler):
         raise ValueError(f"{exception_handler} (type={type(exception_handler)}) is not callable")
 
-    current_values: dict[KT, PendingTaskResult[T]] = {
-        key: value
-        for key, value in futures.items()
-    }
+    current_values: list[tuple[KT, PendingTaskResult[T]]] = list(futures.items())
 
     results: dict[KT, VT] = {}
     last_item_id: typing.Optional[int] = None
     exceptions: list[Exception] = []
 
+
     while current_values:
-        key, future = current_values.popitem()
+        key, future = current_values.pop(0)
 
         try:
             result: T = future.result(timeout=block_seconds)
             transformed_result: VT = transform(key, result, results)
             results[key] = transformed_result
-        except TimeoutError:
-            current_values[key] = future
+            del future
+        except (TimeoutError, concurrent.futures.TimeoutError):
+            current_values.append((key, future))
             future_id: int = id(key)
             if future_id == last_item_id:
                 time.sleep(backoff_seconds)
@@ -373,6 +457,7 @@ def cycle_future_mapping(
         except Exception as e:
             processed_exception: Exception = exception_handler(e)
             exceptions.append(processed_exception)
+            del future
 
     return results, exceptions
 
@@ -502,7 +587,7 @@ def cycle_future(
             if transform is not None:
                 result = transform(result)
             return result, None
-        except TimeoutError:
+        except (TimeoutError, concurrent.futures.TimeoutError):
             continue
         except Exception as exception:
             if exception_handler is not None:

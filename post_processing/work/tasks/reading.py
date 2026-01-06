@@ -50,6 +50,8 @@ def _load(
     if "chunks" in load_kwargs:
         chunks = load_kwargs.pop("chunks")
 
+    load_kwargs['cache'] = False
+
     if isinstance(target, generic.Sequence) and len(target) == 1:
         target = target[0]
 
@@ -77,8 +79,14 @@ def _load(
                         dataset: xarray.Dataset = xarray.load_dataset(target, engine=engine, **load_kwargs).copy(deep=True)
                         dataset.close()
                 else:
-                    LOGGER.debug(f"Loading '{target} lazily...")
-                    dataset: xarray.Dataset = xarray.open_dataset(target, engine=engine, chunks=chunks, **load_kwargs)
+                    if settings.this_is_very_verbose:
+                        LOGGER.debug(f"Loading '{target} lazily...")
+                    dataset: xarray.Dataset = xarray.open_dataset(
+                        target,
+                        engine=engine,
+                        chunks=chunks,
+                        **load_kwargs
+                    )
 
                 return dataset
 

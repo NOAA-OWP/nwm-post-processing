@@ -7,6 +7,7 @@ import itertools
 import os
 import re
 import shutil
+import threading
 import types
 import typing
 import dataclasses
@@ -14,6 +15,7 @@ import enum
 import pathlib
 import logging
 import functools
+import concurrent.futures
 
 import collections.abc as generic
 
@@ -23,9 +25,9 @@ import xarray
 
 from post_processing import enums
 from post_processing.schema.base import BaseModel
-from post_processing.schema.base import member
 from post_processing.schema.base import get_fields
 from post_processing.schema.base import postprocessing_model
+from post_processing.schema.base import member as member_field
 
 from post_processing.enums import Region
 from post_processing.enums import ModelOutputType
@@ -36,6 +38,7 @@ from post_processing import schema
 
 from post_processing.work import starmap
 from post_processing.work import starmap_threaded
+from post_processing.work import starmap_executor
 from post_processing.work import cycle_futures
 from post_processing.work import cycle_future
 
@@ -147,6 +150,8 @@ class OperationType(enum.StrEnum):
     """Stream arrays one by one into online transform algorithms"""
     COMBINE = "combine"
     """Combine two variables into one"""
+    FILE_FILTER = "file_filter"
+    """Filter out what files may pass on to the next operations"""
 
 
 @dataclasses.dataclass
@@ -269,7 +274,7 @@ class ProfileOperation(BaseModel, OperationHandler[InputType, OutputType], abc.A
     """
     comment: typing.Optional[str] = dataclasses.field(default=None, kw_only=True)
     """A comment from the writer explaining what this operation does"""
-    operation_id: typing.Optional[str] = member()
+    operation_id: typing.Optional[str] = dataclasses.field(default=None, kw_only=True)
     """A specialized identifier for this operation"""
     disable: bool = dataclasses.field(default=False, kw_only=True)
     """Disable operation of this operation"""
@@ -482,7 +487,7 @@ class EchoOperation(ProfileOperation[InputType, InputType]):
     level: typing.Union[int, str] = dataclasses.field(default=logging.INFO)
     verbosity: typing.Union[int, str] = dataclasses.field(default=enums.Verbosity.NORMAL)
     logger_name: typing.Optional[str] = dataclasses.field(default=None)
-    _logger: logging.Logger = member(default_factory=lambda: LOGGER)
+    _logger: logging.Logger = member_field(default_factory=lambda: LOGGER)
 
 @postprocessing_model(unsafe_hash=True)
 class RaiseOperation(ProfileOperation[InputType, InputType]):
@@ -701,10 +706,11 @@ class ReprojectionOperation(PathToPathOperation, FileOutputMixin):
         ]
 
         try:
-            updated_paths: generic.Sequence[pathlib.Path] = starmap_threaded(
+            updated_paths: generic.Sequence[pathlib.Path] = starmap_executor(
                 function=self._reproject_file,
                 args=kwargs,
-                thread_count=settings.maximum_additional_threads
+                executor=profile.executor,
+                fallback_to_threads=True
             )
         except Exception as exception:
             LOGGER.error(
@@ -814,10 +820,11 @@ class SubsetOperation(PathToPathOperation):
 
                 subset_arguments.append(file_kwargs)
 
-            subset_paths: SeriesOfPaths = starmap_threaded(
+            subset_paths: SeriesOfPaths = starmap_executor(
                 function=mask_dataset,
                 args=subset_arguments,
-                thread_count=settings.maximum_additional_threads
+                executor=profile.executor,
+                fallback_to_threads=True
             )
 
             collapsed_paths: list[pathlib.Path] = [
@@ -842,10 +849,11 @@ class SubsetOperation(PathToPathOperation):
                 for subset_path in collapsed_paths
             ]
 
-            results: SeriesOfPaths = starmap_threaded(
+            results: SeriesOfPaths = starmap_executor(
                 function=call_generic_operations,
                 args=arguments_on_each,
-                thread_count=settings.maximum_additional_threads
+                executor=profile.executor,
+                fallback_to_threads=True
             )
         except Exception as exception:
             if 'failure in' not in str(exception).lower():
@@ -978,9 +986,9 @@ class SubsetOperation(PathToPathOperation):
     """A pattern used to describe how output filenames should look"""
     identifier_pattern: typing.Optional[str] = dataclasses.field(default=None)
     """A pattern used to extract metadata from the mask filename"""
-    _pattern: typing.Optional[re.Pattern] = member(default=None)
+    _pattern: typing.Optional[re.Pattern] = member_field(default=None)
     """The generated pattern that may be used to pull identifiers from """
-    _mask_identifiers: dict[pathlib.Path, dict[str, typing.Any]] = member(default_factory=dict)
+    _mask_identifiers: dict[pathlib.Path, dict[str, typing.Any]] = member_field(default_factory=dict)
     """Identifiers that were lifted from the mask filename"""
 
 @postprocessing_model
@@ -1039,14 +1047,14 @@ class ExtractOperation(PathToPathOperation):
                     },
                     "output_pattern": self.output_pattern,
                 }
-                for input_file, (mask, identifiers) in itertools.product(data, self._identifier_mapping.items())
+                for input_file, (mask, identifiers) in itertools.product(data, self.identifier_mapping.items())
             ]
 
             from post_processing.transform.subsetting.vector import subset_vector_file_into_file_by_value
-            subset_paths: generic.Sequence[pathlib.Path] = starmap(
+            subset_paths: generic.Sequence[pathlib.Path] = starmap_executor(
                 function=subset_vector_file_into_file_by_value,
                 args=subset_arguments,
-                thread_count=settings.maximum_additional_threads
+                executor=profile.executor
             )
 
             arguments_for_each: list[dict[str, typing.Any]] = [
@@ -1067,20 +1075,61 @@ class ExtractOperation(PathToPathOperation):
                 for subset_path in subset_paths
             ]
 
-            results: SeriesOfPaths = starmap(
+            results: SeriesOfPaths = starmap_executor(
                 function=call_generic_operations,
                 args=arguments_for_each,
-                thread_count=settings.maximum_additional_threads
+                executor=profile.executor
             )
         except Exception as exception:
             if 'failure in' not in str(exception).lower():
                 exception.args = (f"Failure in:{os.linesep}{self}{os.linesep}{exception.args[0]}", *exception.args[1:])
             raise exception
 
-        from post_processing.transform.subset import clean as clean_masks
-        clean_masks()
-
         return [path for inner_results in results for path in inner_results]
+
+    @property
+    def identifier_mapping(self) -> generic.Mapping[pathlib.Path, generic.Mapping[str, str]]:
+        if isinstance(self._identifier_mapping, generic.Mapping):
+            return self._identifier_mapping
+
+        if self._pattern is None:
+            try:
+                self._pattern = re.compile(self.identifier_pattern)
+            except Exception as e:
+                error = ValueError(f"Cannot use '{self.identifier_pattern}' to find identifiers in masks: {e}")
+                raise error
+
+            if not self._pattern.groupindex:
+                error = ValueError(
+                    f"'{self.identifier_pattern}' is not a valid pattern for finding identifiers in mask files - "
+                    f"it has not parameter groups. "
+                    f"Please define parameter groups via strings like '(?P<variable_name>pattern)'"
+                )
+                raise error
+
+        masks_without_identifiers: list[pathlib.Path] = []
+
+        for mask in self.masks:
+            mask_name: str = mask.stem
+            match: typing.Optional[re.Match] = self._pattern.search(mask_name)
+
+            if not match:
+                masks_without_identifiers.append(mask)
+                continue
+
+            self._identifier_mapping[mask] = {
+                key: '' if value is None else value
+                for key, value in match.groupdict().items()
+            }
+
+        if masks_without_identifiers:
+            error = ValueError(
+                f"The following files did not contain identifiers: "
+                f"{', '.join(map(pathlib.Path.name.fget, masks_without_identifiers))}"
+            )
+            raise error
+
+        return self._identifier_mapping
 
     def _validate(self):
         errors: list[Exception] = []
@@ -1212,8 +1261,8 @@ class ExtractOperation(PathToPathOperation):
     each: list[typing.Union[ProfileOperation]]
     dimension: str = dataclasses.field(default="feature_id")
     mask_coordinate: typing.Optional[str] = dataclasses.field(default=None)
-    _pattern: typing.Optional[re.Pattern] = member(default=None)
-    _identifier_mapping: dict[pathlib.Path, dict[str, str]] = member(default_factory=dict)
+    _pattern: typing.Optional[re.Pattern] = member_field(default=None)
+    _identifier_mapping: dict[pathlib.Path, dict[str, str]] = member_field(default_factory=dict)
 
 @postprocessing_model(unsafe_hash=True)
 class MergeOperation(PathToPathOperation):
@@ -1250,7 +1299,24 @@ class MergeOperation(PathToPathOperation):
         from post_processing.utilities.netcdf import load_metadata
 
         try:
-            operation_metadata: dict[str, typing.Any] = load_metadata(path=data)
+            all_metadata: dict[pathlib.Path, dict[str, typing.Any]] = dict(starmap_executor(
+                function=load_metadata,
+                args={
+                    path: {
+                        "path": path
+                    }
+                    for path in data
+                },
+                executor=profile.executor,
+                fallback_to_threads=True
+            ))
+
+            operation_metadata: dict[str, typing.Any] = {}
+
+            for path in sorted(list(all_metadata.keys())):
+                metadata_for_path: dict[str, typing.Any] = all_metadata.pop(path)
+                operation_metadata.update(metadata_for_path)
+
             operation_metadata.update(metadata)
             filename: str = self.file_name_pattern.format_map(operation_metadata)
             output_path: pathlib.Path = work_directory / filename
@@ -1361,10 +1427,12 @@ class DropOperation(PathToPathOperation, FileOutputMixin):
             f"{prefix}Drop the following data variables: {', '.join(self.fields)}"
         )
 
+    @staticmethod
     def _remove_dimensions(
-        self,
         input_file: pathlib.Path,
-        output_file: pathlib.Path
+        output_file: pathlib.Path,
+        fields: generic.Sequence[str],
+        exclude: bool
     ) -> pathlib.Path:
         """
         Remove the given fields as dimensions
@@ -1377,14 +1445,14 @@ class DropOperation(PathToPathOperation, FileOutputMixin):
         import xarray
 
         with netcdf.load(target=input_file, full_load=True) as netcdf_data:
-            if self.exclude:
+            if exclude:
                 dimensions_to_remove: list[str] = [
                     str(dimension)
                     for dimension in netcdf_data.sizes.keys()
-                    if dimension not in self.fields
+                    if dimension not in fields
                 ]
             else:
-                dimensions_to_remove: list[str] = list(self.fields)
+                dimensions_to_remove: list[str] = list(fields)
 
             netcdf_without_dimensions: xarray.Dataset = netcdf_data.drop_dims(drop_dims=dimensions_to_remove)
 
@@ -1401,6 +1469,7 @@ class DropOperation(PathToPathOperation, FileOutputMixin):
             elif result is None:
                 raise FileNotFoundError(f"Could not find the path to the written data in {output_file}")
             output_file = result
+        LOGGER.debug(f"Dropped the {', '.join(dimensions_to_remove)} dimensions from '{input_file}'")
         return output_file
 
     @staticmethod
@@ -1431,10 +1500,12 @@ class DropOperation(PathToPathOperation, FileOutputMixin):
         dataset = dataset.drop_vars(variables_to_drop)
         return dataset
 
+    @staticmethod
     def _remove_variables(
-        self,
         input_file: pathlib.Path,
-        output_file: pathlib.Path
+        output_file: pathlib.Path,
+        fields: generic.Sequence[str],
+        exclude: bool
     ) -> pathlib.Path:
         """
         Remove the given variables from the netcdf file
@@ -1449,10 +1520,10 @@ class DropOperation(PathToPathOperation, FileOutputMixin):
         pending_result: PendingTaskResult[pathlib.Path] = netcdf.submit_dataset_operation(
             target=input_file,
             output_path=output_file,
-            function=self._drop_variable,
+            function=DropOperation._drop_variable,
             kwargs={
-                "fields": self.fields,
-                "exclude": self.exclude,
+                "fields": fields,
+                "exclude": exclude,
             },
         )
 
@@ -1464,6 +1535,11 @@ class DropOperation(PathToPathOperation, FileOutputMixin):
             raise FileNotFoundError(f"Did not get a reference to data written to '{output_file}'")
 
         output_file = result
+
+        if exclude and settings.this_is_verbose:
+            LOGGER.debug(f"Dropped all variables except {', '.join(fields)} from {input_file}")
+        elif settings.this_is_verbose:
+            LOGGER.debug(f"Dropped the following variables from {input_file}: {', '.join(fields)}")
 
         return output_file
 
@@ -1487,10 +1563,9 @@ class DropOperation(PathToPathOperation, FileOutputMixin):
         :returns: The Paths for each created object
         """
         if self.drop_dimension:
-            drop_function: generic.Callable[[pathlib.Path, pathlib.Path], pathlib.Path] = self._remove_dimensions
+            drop_function: generic.Callable[[pathlib.Path, pathlib.Path, generic.Sequence[str], bool], pathlib.Path] = self._remove_dimensions
         else:
-            drop_function: generic.Callable[[pathlib.Path, pathlib.Path], pathlib.Path] = self._remove_variables
-
+            drop_function: generic.Callable[[pathlib.Path, pathlib.Path, generic.Sequence[str], bool], pathlib.Path] = self._remove_variables
 
         input_output_mapping: generic.Mapping[pathlib.Path, pathlib.Path] = {
             file: self.get_output_path(
@@ -1506,15 +1581,18 @@ class DropOperation(PathToPathOperation, FileOutputMixin):
             {
                 "input_file": input_path,
                 "output_file": output_path,
+                "fields": self.fields.copy(),
+                "exclude": self.exclude
             }
             for input_path, output_path in input_output_mapping.items()
         ]
 
         try:
-            updated_files: generic.Sequence[pathlib.Path] = starmap_threaded(
+            updated_files: generic.Sequence[pathlib.Path] = starmap_executor(
                 function=drop_function,
                 args=arguments,
-                thread_count=settings.maximum_additional_threads
+                executor=profile.executor,
+                fallback_to_threads=True
             )
         except Exception as exception:
             if "failure in" not in str(exception):
@@ -1601,10 +1679,10 @@ class RenameOperation(PathToPathOperation, FileOutputMixin):
         from post_processing.transform.rename import rename_dimension
 
         try:
-            new_files: generic.Sequence[pathlib.Path] = starmap(
+            new_files: generic.Sequence[pathlib.Path] = starmap_executor(
                 function=rename_variable if self.rename_variable else rename_dimension,
                 args=arguments,
-                thread_count=settings.maximum_additional_threads
+                executor=profile.executor
             )
         except Exception as exception:
             if 'failure in' not in str(exception):
@@ -1693,9 +1771,10 @@ class UnitConversionOperation(PathToPathOperation, FileOutputMixin):
         ]
 
         try:
-            new_files: generic.Sequence[pathlib.Path] = starmap(
+            new_files: generic.Sequence[pathlib.Path] = starmap_executor(
                 function=convert_file,
-                args=arguments
+                args=arguments,
+                executor=profile.executor
             )
         except Exception as exception:
             if 'failure in' not in str(exception):
@@ -1773,10 +1852,11 @@ class AttributeOperation(PathToPathOperation, FileOutputMixin):
         ]
 
         try:
-            new_paths: generic.Sequence[pathlib.Path] = starmap_threaded(
+            new_paths: generic.Sequence[pathlib.Path] = starmap_executor(
                 function=nco.add_or_modify_attribute,
                 args=arguments,
-                thread_count=settings.maximum_additional_threads
+                executor=profile.executor,
+                fallback_to_threads=True
             )
         except Exception as exception:
             if 'failure in' not in str(exception):
@@ -1863,6 +1943,128 @@ class SaveOperation(PathToPathOperation):
                 exceptions=errors
             )
 
+    @staticmethod
+    def save_single_file(
+        source_file: pathlib.Path,
+        target_directory: pathlib.Path,
+        filename_pattern: str,
+        metadata: generic.Mapping[str, typing.Any],
+        include_conditions: generic.Mapping[str, typing.Any] = None,
+        metadata_search_pattern: re.Pattern | None = None,
+    ) -> pathlib.Path | None:
+        """
+        Perform the save operation for a single file. Implemented as a seperate static function rather than a
+        member function or within the call method to help protect this operation when performed under different
+        concurrency paradigms (if at all)
+
+        :param source_file:
+        :param target_directory:
+        :param filename_pattern:
+        :param metadata:
+        :param include_conditions:
+        :param metadata_search_pattern:
+        :returns: The path to the new location of the file, if saved, None if the file was excluded from saving
+        """
+        from post_processing.utilities.common import NWM_FILENAME_PATTERN
+        from post_processing.enums import Verbosity
+        from post_processing.utilities.netcdf import load_metadata
+        file_specific_metadata: dict[str, typing.Any] = {}
+        file_name_match: typing.Optional[re.Match] = NWM_FILENAME_PATTERN.search(source_file.name)
+
+        if file_name_match:
+            file_specific_metadata.update(file_name_match.groupdict())
+            if file_specific_metadata.get("frame", False):
+                file_specific_metadata['slice'] = f"f{file_specific_metadata['frame']}"
+            else:
+                file_specific_metadata['slice'] = f"tm{file_specific_metadata['tminus']}"
+
+        # load_metadata is a blocking operation across ALL threads, so this may be a bottleneck if not run in multiple processes
+        file_specific_metadata.update({
+            **load_metadata(path=source_file),
+            **metadata,
+            "file_name": source_file.name,
+            "file_stem": source_file.stem
+        })
+
+        if settings.verbosity >= Verbosity.ALL:
+            LOGGER.debug(
+                f"{os.linesep}"
+                f"Available Metadata:{os.linesep}"
+                f"    - {(os.linesep + '    - ').join([str(key) + ': ' + str(value) for key, value in metadata.items()])}"
+                f"{os.linesep}"
+            )
+
+        if metadata_search_pattern:
+            matching_identifiers: typing.Optional[re.Match] = metadata_search_pattern.search(source_file.name)
+
+            if matching_identifiers:
+                file_specific_metadata.update(matching_identifiers.groupdict())
+            else:
+                LOGGER.warning(
+                    f"No identifiers were found in '{source_file.name}' with the pattern: '{metadata_search_pattern.pattern}'"
+                )
+
+        if 'rfc' in file_specific_metadata and not file_specific_metadata.get("RFC", None):
+            from post_processing.enums import RFC
+            rfc_abbreviation: typing.Optional[RFC] = RFC.from_string(file_specific_metadata['rfc'], strict=False)
+            if rfc_abbreviation:
+                file_specific_metadata["RFC"] = rfc_abbreviation
+
+        exclude: bool = False
+        for field_name, expected_value in include_conditions.items():
+            if field_name in file_specific_metadata and file_specific_metadata[field_name] != expected_value:
+                if settings.this_is_verbose:
+                    LOGGER.debug(
+                        f"'{source_file}' does not meet the metadata requirements for saving. It will be skipped."
+                    )
+                exclude = True
+                break
+
+        if exclude:
+            return None
+
+        try:
+            # If the logic says "Just let the name fall through",
+            # scrub off any references to the stage in the name
+            if filename_pattern == "{file_name}" or filename_pattern == "{input_name}":
+                filename: str = STAGE_PATTERN.sub("", source_file.name)
+            elif filename_pattern:
+                filename: str = filename_pattern.format(**file_specific_metadata)
+            else:
+                filename: str = source_file.name
+        except KeyError as e:
+            from post_processing.utilities.common import to_json
+            LOGGER.error(
+                f"Could not generate a new file name used to save: {e}{os.linesep}"
+                f"Output Pattern: '{filename_pattern}'{os.linesep}"
+                f"Available Options: {to_json(file_specific_metadata)}"
+            )
+            raise
+
+        try:
+            output_directory: pathlib.Path = pathlib.Path(str(target_directory).format(**file_specific_metadata))
+        except KeyError as e:
+            LOGGER.error(
+                f"Key for file path template ('{str(target_directory)}') not found: {e}.{os.linesep}"
+                f"Available variables:{os.linesep}"
+                f"    - {(os.linesep + '    - ').join(list(map(lambda pair: str(pair[0]) + ': ' + str(pair[1]), file_specific_metadata.items())))}"
+            )
+            raise
+
+        output_directory.mkdir(parents=True, exist_ok=True)
+        path: pathlib.Path = output_directory / filename
+
+        try:
+            shutil.copy(source_file, path)
+        except:
+            LOGGER.error(f"Could not copy '{source_file}' ({'exists' if source_file.is_file() else 'does not exist'}) to '{path}'")
+            raise
+
+        if settings.this_is_very_verbose:
+            LOGGER.debug(f"Wrote {source_file} to {path}")
+
+        return path
+
     def __call__(
         self,
         profile: "Profile",
@@ -1885,120 +2087,49 @@ class SaveOperation(PathToPathOperation):
         :param metadata: Metadata provided from previous operations that may be used as helpful hints
         :returns: The Paths for each created object
         """
-        import shutil
-        from post_processing.configuration import settings
-        from post_processing.enums import Verbosity
-        from post_processing.utilities.netcdf import load_metadata
-        from post_processing.utilities.common import NWM_FILENAME_PATTERN
+        save_arguments: generic.Sequence[generic.Mapping[str, typing.Any]] = [
+            {
+                "source_file": file,
+                "target_directory": self.directory,
+                "filename_pattern": self.filename_pattern,
+                "metadata": metadata.copy(),
+                "include_conditions": self.include_conditions,
+                "metadata_search_pattern": self._compiled_pattern
+            }
+            for file in data
+        ]
 
-        saved_files: list[pathlib.Path] = []
-        try:
-            for file in data:
-                file_specific_metadata: dict[str, typing.Any] = {}
-                file_name_match: typing.Optional[re.Match] = NWM_FILENAME_PATTERN.search(file.name)
+        from post_processing.work.orchestration import starmap_executor
 
-                if file_name_match:
-                    file_specific_metadata.update(file_name_match.groupdict())
-                    if file_specific_metadata.get("frame", False):
-                        file_specific_metadata['slice'] = f"f{file_specific_metadata['frame']}"
-                    else:
-                        file_specific_metadata['slice'] = f"tm{file_specific_metadata['tminus']}"
+        saved_files: generic.Sequence[pathlib.Path | None] = starmap_executor(
+            self.__class__.save_single_file,
+            args=save_arguments,
+            executor=profile.executor,
+            fallback_to_threads=True
+        )
 
-                file_specific_metadata.update({
-                    **load_metadata(path=file),
-                    **metadata,
-                    "file_name": file.name,
-                    "file_stem": file.stem
-                })
+        saved_files = [
+            path
+            for path in saved_files
+            if path is not None
+        ]
 
-                if settings.verbosity >= Verbosity.ALL:
-                    LOGGER.debug(
-                        f"{os.linesep}"
-                        f"Available Metadata:{os.linesep}"
-                        f"    - {(os.linesep + '    - ').join([str(key) + ': ' + str(value) for key, value in metadata.items()])}"
-                        f"{os.linesep}"
-                    )
+        from collections import Counter
+        duplicate_files: generic.Mapping[pathlib.Path, int] = {
+            key: count
+            for key, count in Counter(saved_files).items()
+            if count > 1
+        }
 
-                if self._compiled_pattern:
-                    matching_identifiers: typing.Optional[re.Match] = self._compiled_pattern.search(file.name)
-
-                    if matching_identifiers:
-                        file_specific_metadata.update(matching_identifiers.groupdict())
-                    else:
-                        LOGGER.warning(
-                            f"No identifiers were found in '{file.name}' with the pattern: '{self.identifier_pattern}'"
-                        )
-
-                if 'rfc' in file_specific_metadata and not file_specific_metadata.get("RFC", None):
-                    from post_processing.enums import RFC
-                    rfc_abbreviation: typing.Optional[RFC] = RFC.from_string(file_specific_metadata['rfc'], strict=False)
-                    if rfc_abbreviation:
-                        file_specific_metadata["RFC"] = rfc_abbreviation
-
-                exclude: bool = False
-                for field_name, expected_value in self.include_conditions.items():
-                    if field_name in file_specific_metadata and file_specific_metadata[field_name] != expected_value:
-                        if settings.this_is_verbose:
-                            LOGGER.debug(
-                                f"'{file}' does not meet the metadata requirements for saving. It will be skipped."
-                            )
-                        exclude = True
-                        break
-                if exclude:
-                    continue
-
-                try:
-                    # If the logic says "Just let the name fall through",
-                    # scrub off any references to the stage in the name
-                    if self.filename_pattern == "{file_name}" or self.filename_pattern == "{input_name}":
-                        filename: str = STAGE_PATTERN.sub("", file.name)
-                    elif self.filename_pattern:
-                        filename: str = self.filename_pattern.format(**file_specific_metadata)
-                    else:
-                        filename: str = file.name
-                except KeyError as e:
-                    from post_processing.utilities.common import to_json
-                    LOGGER.error(
-                        f"Could not generate a new file name used to save: {e}{os.linesep}"
-                        f"Output Pattern: '{self.filename_pattern}'{os.linesep}"
-                        f"Available Options: {to_json(file_specific_metadata)}"
-                    )
-                    raise
-
-                try:
-                    output_directory: pathlib.Path = pathlib.Path(str(self.directory).format(**file_specific_metadata))
-                except KeyError as e:
-                    LOGGER.error(
-                        f"Key for file path template ('{str(self.directory)}') not found. Available variables:{os.linesep}"
-                        f"    - {(os.linesep + '    - ').join(list(map(lambda pair: str(pair[0]) + ': ' + str(pair[1]), file_specific_metadata.items())))}"
-                    )
-                    raise
-
-                output_directory.mkdir(parents=True, exist_ok=True)
-                path: pathlib.Path = output_directory / filename
-
-                if path in saved_files:
-                    from pprint import pformat
-                    raise FileExistsError(
-                        f"Attempted to save to '{path}', but it was already saved to within this operation. "
-                        f"It is likely that there is a naming error{os.linesep}"
-                        f"Template: {pathlib.Path(self.directory) / self.filename_pattern}{os.linesep}"
-                        f"Available Metadata:{os.linesep}"
-                        f"{pformat(file_specific_metadata, indent=4, sort_dicts=True)}"
-                    )
-
-                try:
-                    shutil.copy(file, path)
-                except:
-                    LOGGER.error(f"Could not copy '{file}' ({'exists' if file.is_file() else 'does not exist'}) to '{path}'")
-                    raise
-                saved_files.append(path)
-                if settings.this_is_very_verbose:
-                    LOGGER.debug(f"Wrote {file} to {path}")
-        except Exception as exception:
-            if 'failure in' not in str(exception):
-                exception.args = (f"Failure in:{os.linesep}{self}{os.linesep}{exception.args[0]}", *exception.args[1:])
-            raise exception
+        if duplicate_files:
+            duplication_descriptions: generic.Sequence[str] = [
+                f"{path}, {count} times"
+                for path, count in duplicate_files.items()
+            ]
+            raise FileExistsError(
+                f"Files were overwritten when saving:{os.linesep}"
+                f"    - {(os.linesep + '    - ').join(duplication_descriptions)}"
+            )
 
         missing_files: list[pathlib.Path] = [
             saved_path
@@ -2007,7 +2138,7 @@ class SaveOperation(PathToPathOperation):
         ]
         
         if missing_files:
-            raise FileExistsError(
+            raise FileNotFoundError(
                 f"Save operation failed. The following files are missing:{os.linesep}"
                 f"    - {(os.linesep + '    - ').join(map(str, missing_files))}"
             )
@@ -2031,7 +2162,7 @@ class SaveOperation(PathToPathOperation):
     return_new_paths: bool = dataclasses.field(default=True)
     identifier_pattern: typing.Optional[str] = dataclasses.field(default=None)
     include_conditions: dict[str, typing.Any] = dataclasses.field(default_factory=dict)
-    _compiled_pattern: typing.Optional[re.Pattern] = member(default=None)
+    _compiled_pattern: typing.Optional[re.Pattern] = member_field(default=None)
 
 
 @postprocessing_model
@@ -2147,65 +2278,74 @@ class BranchOperation(ProfileOperation[InputType, generic.Sequence[pathlib.Path]
         :returns: The Paths for each created object
         """
         import concurrent.futures
+        if profile.executor is None or True:
+            return self.branch_sequentially(
+                profile=profile,
+                process_identifier=process_identifier,
+                work_directory=work_directory,
+                data=data,
+                previous_operations=previous_operations,
+                metadata=metadata
+            )
+
         from post_processing.interfaces.work import PendingTaskResult
         future_results: dict[str, PendingTaskResult[generic.Sequence[pathlib.Path]]] = {}
 
         try:
-            with concurrent.futures.ThreadPoolExecutor() as executor:
-                for branch_name, branch_logic in self.branches.items():
-                    future_result = executor.submit(
-                        call_generic_operations,
-                        operations=branch_logic,
-                        profile=profile,
-                        process_identifier=process_identifier,
-                        work_directory=work_directory,
-                        data=data,
-                        previous_operations=previous_operations.copy(),
-                        metadata=metadata.copy()
+            for branch_name, branch_logic in self.branches.items():
+                future_result = profile.executor.submit(
+                    call_generic_operations,
+                    operations=branch_logic,
+                    profile=profile,
+                    process_identifier=process_identifier,
+                    work_directory=work_directory,
+                    data=data,
+                    previous_operations=previous_operations.copy(),
+                    metadata=metadata.copy()
+                )
+                future_results[branch_name] = future_result
+
+            def process_error(error: Exception) -> Exception:
+                from post_processing.utilities.common import condense_exceptions
+                new_error_message: str = (
+                    f"Could not perform the branching operation named '{branch_name}' "
+                    f"from the {profile.output_type} data from the '{profile.configuration}' configuration over {profile.region} profile: {error}"
+                )
+                return condense_exceptions(new_error_message, [error])
+
+            def log_duplicates(
+                branch: str,
+                returned_paths: generic.Sequence[pathlib.Path],
+                current_paths: SeriesOfPaths
+            ) -> generic.Sequence[pathlib.Path]:
+                current_paths = set(path for resultant_paths in current_paths for path in resultant_paths)
+                preexisting_paths, new_paths = partition(lambda path: path in current_paths, returned_paths)
+                if preexisting_paths:
+                    LOGGER.warning(
+                        f"Processing from the '{branch}' branch in 'profile' for {metadata['cycle']}z on "
+                        f"{metadata['date']} encountered duplicate results at: "
+                        f"{', '.join(map(str, preexisting_paths))}"
                     )
-                    future_results[branch_name] = future_result
+                return returned_paths
 
-                def process_error(error: Exception) -> Exception:
-                    from post_processing.utilities.common import condense_exceptions
-                    new_error_message: str = (
-                        f"Could not perform the branching operation named '{branch_name}' "
-                        f"from the {profile.output_type} data from the '{profile.configuration}' configuration over {profile.region} profile: {error}"
-                    )
-                    return condense_exceptions(new_error_message, [error])
+            results, exceptions = cycle_futures(
+                futures=future_results,
+                transform=log_duplicates,
+                exception_handler=process_error
+            )
 
-                def log_duplicates(
-                    branch: str,
-                    returned_paths: generic.Sequence[pathlib.Path],
-                    current_paths: SeriesOfPaths
-                ) -> generic.Sequence[pathlib.Path]:
-                    current_paths = set(path for resultant_paths in current_paths for path in resultant_paths)
-                    preexisting_paths, new_paths = partition(lambda path: path in current_paths, returned_paths)
-                    if preexisting_paths:
-                        LOGGER.warning(
-                            f"Processing from the '{branch}' branch in 'profile' for {metadata['cycle']}z on "
-                            f"{metadata['date']} encountered duplicate results at: "
-                            f"{', '.join(map(str, preexisting_paths))}"
-                        )
-                    return returned_paths
-
-                results, exceptions = cycle_futures(
-                    futures=future_results,
-                    transform=log_duplicates,
-                    exception_handler=process_error
+            if exceptions:
+                from post_processing.utilities.common import condense_exceptions
+                raise condense_exceptions(
+                    f"One or more branches failed to process for profile on cycle {metadata['cycle']}z",
+                    exceptions
                 )
 
-                if exceptions:
-                    from post_processing.utilities.common import condense_exceptions
-                    raise condense_exceptions(
-                        f"One or more branches failed to process for profile on cycle {metadata['cycle']}z",
-                        exceptions
-                    )
-
-                melted_results: generic.Sequence[pathlib.Path] = list(set([
-                    path
-                    for branch_results in results.values()
-                    for path in branch_results
-                ]))
+            melted_results: generic.Sequence[pathlib.Path] = list(set([
+                path
+                for branch_results in results.values()
+                for path in branch_results
+            ]))
         except Exception as exception:
             if 'failure in' not in str(exception):
                 exception.args = (f"Failure in:{os.linesep}{self}{os.linesep}{exception.args[0]}", *exception.args[1:])
@@ -2291,7 +2431,8 @@ class BranchOperation(ProfileOperation[InputType, generic.Sequence[pathlib.Path]
         :param metadata: Metadata provided from previous operations that may be used as helpful hints
         :returns: The Paths for each created object
         """
-        branch_function = self.branch_concurrently if settings.allow_threading else self.branch_sequentially
+        branch_function = self.branch_concurrently if isinstance(profile.executor, concurrent.futures.Executor) else self.branch_sequentially
+
         results = branch_function(
             profile=profile,
             process_identifier=process_identifier,
@@ -2719,7 +2860,7 @@ class FunctionOperation(ProfileOperation[InputType, OutputType]):
     function_name: str
     kwargs: dict[str, typing.Any] = dataclasses.field(default_factory=dict)
     argument_mapping: dict[str, str] = dataclasses.field(default_factory=dict)
-    _function: PythonHandler[InputType, OutputType] = member(default=None)
+    _function: PythonHandler[InputType, OutputType] = member_field(default=None)
 
     def __hash__(self):
         try:
@@ -2824,6 +2965,11 @@ class FunctionOperation(ProfileOperation[InputType, OutputType]):
                 )
 
         kwargs.update(args)
+        if self._function is None:
+            self._function = get_function_by_name(self.function_name)
+
+        if not callable(self._function):
+            raise TypeError(f"Cannot call '{self._function}', supposedly named '{self.function_name}' from {self.__class__.__qualname__}")
         try:
             result: OutputType = self._function(**kwargs)
             if result is None:
@@ -2851,6 +2997,9 @@ class Profile(BaseModel):
     intermediate_directory: typing.Optional[pathlib.Path] = dataclasses.field(default_factory=lambda: settings.intermediate_directory)
     source_file: typing.Optional[pathlib.Path] = dataclasses.field(default=None)
     comment: typing.Optional[str] = dataclasses.field(default=None, kw_only=True)
+    executor: typing.Optional[concurrent.futures.Executor] = member_field()
+    _owns_executor: bool = member_field(default=False)
+    _lock: threading.RLock = member_field(default_factory=threading.RLock)
 
     def __str__(self):
         description = (
@@ -2962,6 +3111,43 @@ class Profile(BaseModel):
         elif errors:
             raise ExceptionGroup(f"Encountered an improper Profile", errors)
 
+        from concurrent.futures import Executor
+        self.executor: Executor | None = None
+
+    def start(self):
+        with self._lock:
+            LOGGER.info(f"Starting the executor for the profile at {self.source_file}")
+            if self.executor is None:
+                from post_processing.utilities.common import get_multiprocessor
+                self.executor = get_multiprocessor()
+
+                if self.executor is None:
+                    LOGGER.info(f"The profile for {self.source_file} is not eligible for a multiprocessor")
+                else:
+                    self._owns_executor = True
+            else:
+                LOGGER.info(f"There is already a running executor for the profile at {self.source_file}")
+
+    def stop(self):
+        with self._lock:
+            LOGGER.info(f"Stopping the executor for the profile at '{self.source_file}'")
+            if self.executor is not None and self._owns_executor:
+                self.executor.shutdown(cancel_futures=True)
+                self.executor = None
+            else:
+                LOGGER.info(f"There is not executor to stop for the profile at '{self.source_file}'")
+
+    def __enter__(self):
+        self.start()
+
+    def __exit__(
+        self,
+        exc_type: typing.Type[BaseException] | None = None,
+        exc_val: BaseException | None = None,
+        exc_tb = None
+    ):
+        self.stop()
+
     @timed_function()
     def run(
         self,
@@ -3002,7 +3188,24 @@ class Profile(BaseModel):
                 f"    - {(os.linesep + '    - ').join(map(str, files))}"
             )
         from post_processing.utilities.netcdf import load_metadata
-        input_metadata: dict[str, typing.Any] = load_metadata(path=files)
+        all_metadata: dict[pathlib.Path, dict[str, typing.Any]] = dict(starmap_executor(
+            function=load_metadata,
+            args={
+                path: {
+                    "path": path
+                }
+                for path in files
+            },
+            executor=self.executor,
+            fallback_to_threads=True
+        ))
+
+        input_metadata: dict[str, typing.Any] = {}
+
+        for path in sorted(list(all_metadata.keys())):
+            metadata_for_path: dict[str, typing.Any] = all_metadata.pop(path)
+            input_metadata.update(metadata_for_path)
+
         metadata: dict[str, typing.Any] = {
             **settings.to_dict(),
             **additional_metadata,
@@ -3029,7 +3232,7 @@ class Profile(BaseModel):
         work_directory: pathlib.Path = self.intermediate_directory / process_identifier
         work_directory.mkdir(parents=True, exist_ok=True)
 
-        safe_to_remove_intermediate_output: bool = True
+        safe_to_remove_intermediate_output: bool = False
 
         try:
             previous_operations: list[ProfileOperation] = []
@@ -3044,7 +3247,6 @@ class Profile(BaseModel):
             )
 
             if isinstance(output, xarray.Dataset):
-                safe_to_remove_intermediate_output = False
                 raise FileNotFoundError(
                     f"Data was not saved to files per the configuration. Intermediate data may be found in "
                     f"{work_directory} for the time being, but its persistence is not guaranteed. Please correct your "
@@ -3058,9 +3260,11 @@ class Profile(BaseModel):
                 ]
             elif isinstance(output, pathlib.Path):
                 output = [output.resolve()]
+            safe_to_remove_intermediate_output = True
             return output
         finally:
             if safe_to_remove_intermediate_output:
+                LOGGER.debug(f"Removing the working directory at {work_directory}")
                 shutil.rmtree(work_directory)
 
     def __call__(
@@ -3326,7 +3530,7 @@ def fan_out_operations(
     :returns: The accumulated results from each series of operations
     """
     LOGGER.debug(f"Fanning out operations for step {metadata.get('stage', '?')}")
-    results: typing.Sequence[OutputType] = starmap(
+    results: typing.Sequence[OutputType] = starmap_executor(
         function=call_generic_operations,
         args=[
             {
@@ -3340,7 +3544,8 @@ def fan_out_operations(
             }
             for data_member in data
         ],
-        thread_count=thread_count
+        executor=profile.executor,
+        fallback_to_threads=thread_count > 0
     )
     return results
 
@@ -3408,6 +3613,9 @@ def call_generic_operations(
             LOGGER.warning(f"{operation.__class__.__qualname__} disabled:{os.linesep}{operation}")
             continue
 
+        if operation.operation_id is None:
+            LOGGER.error(f"An operation from '{profile.source_file}' is missing an operation ID: '{operation}'")
+
         stage_working_directory: pathlib.Path = work_directory / operation.operation_id
         stage_working_directory.mkdir(parents=True, exist_ok=True)
 
@@ -3435,6 +3643,7 @@ def call_generic_operations(
                 f"Not adding a record of a call to '{operation.operation_id}) {operation.__class__.__qualname__}' - "
                 f"there is already a record"
             )
+        LOGGER.debug(f"{operation.operation_id}: {operation.__class__.__name__} is complete")
 
     for handler, kwargs in on_complete:
         updated_data = handler(current_data, **kwargs)

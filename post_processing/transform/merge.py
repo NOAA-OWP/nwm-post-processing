@@ -98,7 +98,6 @@ def merge_files(files: generic.Sequence[str | pathlib.Path]) -> xarray.Dataset:
             new_order.append(str(dimension))
 
     combined_files = combined_files.transpose(*new_order)
-    combined_files = combined_files.compute()
     LOGGER.debug(f"Data from {len(files)} files have been merged and encoded")
     return combined_files
 

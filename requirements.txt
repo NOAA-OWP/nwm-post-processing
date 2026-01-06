@@ -13,5 +13,6 @@ geopandas
 pyproj
 affine
 
-beautifulsoup4
 rasterio
+
+python-dateutil
