@@ -3116,26 +3116,26 @@ class Profile(BaseModel):
 
     def start(self):
         with self._lock:
-            LOGGER.info(f"Starting the executor for the profile at {self.source_file}")
+            LOGGER.debug(f"Starting the executor for the profile at {self.source_file}")
             if self.executor is None:
                 from post_processing.utilities.common import get_multiprocessor
                 self.executor = get_multiprocessor()
 
                 if self.executor is None:
-                    LOGGER.info(f"The profile for {self.source_file} is not eligible for a multiprocessor")
+                    LOGGER.debug(f"The profile for {self.source_file} is not eligible for a multiprocessor")
                 else:
                     self._owns_executor = True
             else:
-                LOGGER.info(f"There is already a running executor for the profile at {self.source_file}")
+                LOGGER.debug(f"There is already a running executor for the profile at {self.source_file}")
 
     def stop(self):
         with self._lock:
-            LOGGER.info(f"Stopping the executor for the profile at '{self.source_file}'")
+            LOGGER.debug(f"Stopping the executor for the profile at '{self.source_file}'")
             if self.executor is not None and self._owns_executor:
                 self.executor.shutdown(cancel_futures=True)
                 self.executor = None
             else:
-                LOGGER.info(f"There is not executor to stop for the profile at '{self.source_file}'")
+                LOGGER.debug(f"There is not executor to stop for the profile at '{self.source_file}'")
 
     def __enter__(self):
         self.start()

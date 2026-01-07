@@ -155,7 +155,7 @@ class _MaskProvider:
                         for dimension, length in mask_source.sizes.items()
                     ],
                 )
-                LOGGER.info(
+                LOGGER.debug(
                     f"The mask at '{path}::{variable}' has been loaded into the mask provider. "
                     f"The provider now weighs in at {format_bytes(self.nbytes)}"
                 )
