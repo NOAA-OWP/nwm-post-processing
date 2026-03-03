@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Contains logic for subsetting 2D+ netcdf files
 """

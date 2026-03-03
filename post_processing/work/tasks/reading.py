@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Task classes used for reading data
 """

@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Defines a base class that has the ability to create important sample data
 """

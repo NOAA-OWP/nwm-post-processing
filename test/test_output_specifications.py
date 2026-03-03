@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Tests to ensure that the output_specification classes work correctly for testing
 """

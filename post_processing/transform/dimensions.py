@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Functions and objects used to change dimensions on netcdf variables
 """

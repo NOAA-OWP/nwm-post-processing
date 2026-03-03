@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 from .operations import keep_only_variables
 from .operations import remove_variables
 from .operations import transform_variable

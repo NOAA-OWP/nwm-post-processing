@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Helper classes and functions for netcdf operations
 """

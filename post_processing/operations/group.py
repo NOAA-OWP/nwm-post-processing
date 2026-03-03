@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Defines a ProfileOperation that is used to groups inputs by lead for smaller operations
 """

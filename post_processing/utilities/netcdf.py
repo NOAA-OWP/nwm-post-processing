@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Helper functions and objects used to standardize file IO operations
 """

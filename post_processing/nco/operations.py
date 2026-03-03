@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Core wrappers around crucial netcdf operations
 """
