@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Functions and objects used to rename a variable and/or dimension in a netcdf file
 """

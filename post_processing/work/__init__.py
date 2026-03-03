@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 from .orchestration import starmap
 from .orchestration import starmap_threaded
 from .orchestration import starmap_executor

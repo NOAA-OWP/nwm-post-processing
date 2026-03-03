@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Helper functions and variables used to standardize testing behavior
 """

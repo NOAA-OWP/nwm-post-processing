@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Classes used to define what output netcdf files should look like
 """

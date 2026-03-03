@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Common aliases to use throughout the application
 """

@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Objects and functions used to allow a user to filter what files move on to a future operation
 """

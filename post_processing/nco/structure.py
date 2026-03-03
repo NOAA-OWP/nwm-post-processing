@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Classes/enums that express that structure of netcdf files
 """

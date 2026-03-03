@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Tasks classes concerned with writing data
 """

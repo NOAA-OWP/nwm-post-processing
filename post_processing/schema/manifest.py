@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Details an 'InputManifest', which holds all the information describing what is being processed
 """

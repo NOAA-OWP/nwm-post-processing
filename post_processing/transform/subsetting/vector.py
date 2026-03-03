@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Subsetting logic specifically for vector data input
 """

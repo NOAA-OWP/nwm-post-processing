@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Objects and functions used to bin values by percentile
 """
