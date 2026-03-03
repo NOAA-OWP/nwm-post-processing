@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 ######################################################################################
 #
 # A store for optional environment variable configuration
