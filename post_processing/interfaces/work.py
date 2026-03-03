@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Protocols for generic communication objects
 """

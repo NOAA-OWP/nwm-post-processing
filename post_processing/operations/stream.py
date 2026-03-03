@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Defines operations used to perform calculations on streaming arrays
 """

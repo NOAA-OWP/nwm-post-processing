@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Defines an operation that combines two variables of the same length into one
 """

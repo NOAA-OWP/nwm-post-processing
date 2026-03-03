@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Common settings used within and without the application
 """

@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Provides the means and access to use masks for subsetting
 """

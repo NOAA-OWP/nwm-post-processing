@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Contains logic for merging netcdf files
 """

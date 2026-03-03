@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Defines a profile for how a certain combination of Configuration + Model Output Type + Region should behave
 """

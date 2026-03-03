@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 The functions and objects used to define the operation to total a variables values over time
 """

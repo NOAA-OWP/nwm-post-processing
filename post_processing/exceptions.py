@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Defines common exceptions that may be reused
 """

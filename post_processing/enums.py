@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Enumerations used to describe data
 """

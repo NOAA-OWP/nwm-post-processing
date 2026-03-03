@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Defines logic for a thread that will handle the writing of netcdf data
 """

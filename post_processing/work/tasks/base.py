@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Base classes used to describe work distribution objects
 """
