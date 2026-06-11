@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nwm-post-processing"
-version = "1.0.3"
+version = "1.0.4"
 dependencies = [
     "netCDF4",
     "xarray",
