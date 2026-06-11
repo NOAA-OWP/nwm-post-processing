@@ -9,6 +9,8 @@ import re
 import pathlib
 import sys
 import os
+import ssl
+import tempfile
 
 from datetime import datetime
 from datetime import timedelta
@@ -35,11 +37,9 @@ LOGGER: logging.Logger = logging.getLogger(pathlib.Path(__file__).stem)
 """The primary logger for this file"""
 
 
-_DEFAULT_SOURCE_URL: str = "https://hydrology.nws.noaa.gov/pub/nwm/v3.1/wcoss-data"
+_DEFAULT_SOURCE_URL: str = "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/v3.0/"
 """The default location for where to find NWM output"""
 
-_FALLBACK_DEFAULT_SOURCE_URL: str = "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/v3.0"
-"""A fallback url to use if the default providing the most recent revision of data isn't accessible"""
 
 _VALID_CONFIGURATIONS: typing.List[str] = [
     "analysis_assim",
@@ -140,6 +140,8 @@ class Arguments:
         """Where to retrieve NWM output"""
         self.configuration: Configuration = None
         """What NWM configuration to download"""
+        self.certificate_path: str = ssl.get_default_verify_paths().openssl_cafile
+        """The path to certificates to use rather than the default mozilla certs"""
         self.cycle: str = None
         """What cycle of the configuration to download """
         self.date: str = (datetime.now().astimezone() - timedelta(days=1)).strftime("%Y%m%d")
@@ -206,8 +208,14 @@ class Arguments:
                 f"it MUST be a regex pattern that ONLY matches on numbers, like '\d' or '\d\d' or '0+' or '00'"
             )
 
+        if str(self.certificate_path).strip().lower() in ("none", ""):
+            self.certificate_path = None
+        elif self.certificate_path.strip().lower() == "false":
+            LOGGER.warning(f"TLS verification disabled - only perform this operation when performing diagnostics")
+            self.certificate_path = False
+
         if self.source_url is None:
-            verify_default_url()
+            verify_default_url(self.certificate_path)
             self.source_url = _DEFAULT_SOURCE_URL
 
     def __parse(self, args: typing.Sequence[str]):
@@ -234,6 +242,15 @@ class Arguments:
             type=Configuration,
             choices=[configuration for configuration in Configuration],
             help="What NWM configuration to download",
+        )
+
+        parser.add_argument(
+            "-c",
+            "--capath",
+            type=str,
+            default=self.certificate_path,
+            dest="certificate_path",
+            help="Where to find TLS certificates needed to access servers containing data"
         )
 
         parser.add_argument(
@@ -349,14 +366,25 @@ class ApacheDirectoryListingParser(HTMLParser):
         return super().handle_endtag(tag)
 
 
-def get_directory_links(url: str) -> typing.Dict[str, str]:
+def get_directory_links(
+    url: str,
+    certificate_path: str,
+    session: typing.Optional[requests.Session] = None
+) -> typing.Dict[str, str]:
     """
     Get the links to files within an apache directory listing
 
     :param url: The URL of the apache directory listing
+    :param certificate_path: The path to required TLS certificates
+    :param session: An optional requests session that can maintain connections
     :returns: A mapping of file names to their address
     """
-    raw_markup: bytes = requests.get(url=url).content
+    if isinstance(session, requests.Session):
+        with session.get(url=url, verify=certificate_path) as response:
+            raw_markup: bytes = response.content
+    else:
+        with requests.get(url=url, verify=certificate_path) as response:
+            raw_markup: bytes = response.content
     markup: str = raw_markup.decode()
 
     parser: ApacheDirectoryListingParser = ApacheDirectoryListingParser()
@@ -401,6 +429,7 @@ def download_file(
     url: str,
     filename: str,
     directory: pathlib.Path,
+    certificate_path: str,
     overwrite: bool = False
 ) -> typing.Optional[pathlib.Path]:
     """
@@ -410,12 +439,13 @@ def download_file(
     :param url: Where the file is
     :param filename: What to name the file
     :param directory: What directory to store the file in
+    :param certificate_path: The path to the certificate to use to communicate with the server
     :param overwrite: Whether to overwrite a preexisting file
     :returns: The path to the downloaded file
     """
     directory.mkdir(parents=True, exist_ok=True)
     path: pathlib.Path = directory / filename
-
+    holding_path: pathlib.Path = directory / f"{filename}.tmp"
     if path.exists() and not overwrite:
         LOGGER.info(f"Not downloading '{filename}' - it is already present")
         return None
@@ -424,10 +454,11 @@ def download_file(
         raise ValueError(f"Cannot save '{filename}' to '{path}' - it is already a directory")
     
     LOGGER.info(f"Downloading '{filename}'")
-    with http_session.get(url=url, stream=True) as response:
+    max_line_length: int = 0
+    with http_session.get(url=url, stream=True, verify=certificate_path) as response:
         content_length: int = int(response.headers.get("Content-Length", -1))
         update_pattern: str = "\rDownloading " + pathlib.Path(url).name + ": {progress:.1f}%"
-        with path.open("wb") as file:
+        with holding_path.open("wb") as file:
             chunk_size: int = 8192
             for chunk_index, chunk in enumerate(response.iter_content(chunk_size=8192)):
                 file.write(chunk)
@@ -435,11 +466,20 @@ def download_file(
                     progress: int = chunk_size * chunk_index
                     percentage: float = (progress / content_length) * 100
                     update: str = update_pattern.format(progress=percentage)
+                    max_line_length = max(max_line_length, len(update) + 1)
                     sys.stdout.write(update)
                     sys.stdout.flush()
-            if content_length > 0:
-                sys.stdout.write("\n")
-                sys.stdout.flush()
+
+        new_message = f"\rSaving to {path}...".ljust(max_line_length)
+        max_line_length = max(max_line_length, len(new_message) + 1)
+        sys.stdout.write(new_message)
+        sys.stdout.flush()
+        holding_path.replace(path)
+        sys.stdout.write(f"\r{filename} has been downloaded!".ljust(max_line_length + 1))
+        sys.stdout.flush()
+        if content_length > 0:
+            sys.stdout.write("\n")
+            sys.stdout.flush()
 
     return path
 
@@ -454,6 +494,7 @@ def download_input(
     region: str,
     member: typing.Optional[int],
     destination: pathlib.Path,
+    certificate_path: str,
     frame_pattern: str = r"\d+",
     overwrite: bool = False
 ) -> typing.Sequence[pathlib.Path]:
@@ -468,6 +509,7 @@ def download_input(
     :param region: Where the output was configured to model
     :param member: The ensemble member to download
     :param destination: Where to put the data
+    :param certificate_path: The path to the certificate needed to download data
     :param frame_pattern: A regex pattern to inject into the regex that matches on file name.
         Must be some variation of '\d' or '000*'. This will match on terms like 'tm00' or 'f018'
     :param overwrite: Whether to overwrite preexisting data
@@ -483,7 +525,10 @@ def download_input(
     listing_address: str = f"{source_url}/nwm.{date}/{configuration_part}/"
     """The address of the Apache directory listing where all the files may be found"""
 
-    links_in_listing: typing.Dict[str, str] = get_directory_links(url=listing_address)
+    links_in_listing: typing.Dict[str, str] = get_directory_links(
+        url=listing_address,
+        certificate_path=certificate_path
+    )
     """Links to each file within the listing for the date and configuration"""
 
     if not links_in_listing:
@@ -526,7 +571,8 @@ def download_input(
                     "url": url,
                     "filename": filename,
                     "directory": download_directory,
-                    "overwrite": overwrite
+                    "certificate_path": certificate_path,
+                    "overwrite": overwrite,
                 }
                 for filename, url in pertinent_links.items()
             ]
@@ -536,17 +582,10 @@ def download_input(
     return downloaded_files
 
 
-def verify_default_url():
-    global _DEFAULT_SOURCE_URL
-    with requests.head(_DEFAULT_SOURCE_URL) as response:
+def verify_default_url(certificate_path: typing.Optional[typing.Union[str, bool]]):
+    with requests.head(_DEFAULT_SOURCE_URL, verify=certificate_path) as response:
         if response.status_code < 400:
             return
-
-    LOGGER.error(f"The default source url is not accessible, trying the fallback url...")
-    with requests.head(_FALLBACK_DEFAULT_SOURCE_URL) as response:
-        if response.status_code < 400:
-            LOGGER.warning(f"Changing the default source url to '{_FALLBACK_DEFAULT_SOURCE_URL}")
-            _DEFAULT_SOURCE_URL = _FALLBACK_DEFAULT_SOURCE_URL
 
     raise Exception(f"There is not an accessible default source url")
 
@@ -571,6 +610,7 @@ def main() -> int:
             member=arguments.member,
             destination=arguments.destination,
             overwrite=arguments.overwrite,
+            certificate_path=arguments.certificate_path,
             frame_pattern=arguments.frame,
         )
 
