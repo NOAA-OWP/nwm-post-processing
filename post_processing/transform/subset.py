@@ -42,7 +42,7 @@ def mask_array(
     :return: A new data array with the originals metadata, but with all values not makes set to NaN
     """
     encoding: dict[str, typing.Any] = input_data.encoding.copy()
-    masked_data: xarray.DataArray = input_data.where(mask)
+    masked_data: xarray.DataArray = input_data.where(mask.astype(bool, copy=False))
     masked_data.attrs = input_data.attrs.copy()
     masked_data.encoding = encoding
 
@@ -136,7 +136,6 @@ def mask_dataset(
             if settings.this_is_very_verbose:
                 LOGGER.debug(f"Retrieving the mask at '{mask_path}' for '{input_path}'")
             mask_data: numpy.ndarray = MASK_PROVIDER.get_mask(path=mask_path, variable=mask_variable)
-            mask_data[mask_data == 0] = numpy.nan
             if settings.this_is_very_verbose:
                 LOGGER.debug(f"Retrieved the mask at '{mask_path}' for '{input_path}'")
 
