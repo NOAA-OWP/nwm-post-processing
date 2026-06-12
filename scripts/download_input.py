@@ -2,7 +2,6 @@
 """
 Downloads NWM output to be used as input data for post processing
 """
-import enum
 import typing
 import argparse
 import logging
@@ -11,7 +10,6 @@ import pathlib
 import sys
 import os
 import ssl
-import tempfile
 
 from urllib.parse import urljoin
 from datetime import datetime
@@ -32,6 +30,9 @@ if __name__ == "__main__":
         format=settings.log_format,
         datefmt=settings.date_format
     )
+
+    # The urllib3 connection pool logger can be very chatty - set it to only record warnings or worse in order to
+    # keep our logs free of unnecessary third party diagnostics
     connectionpool_logger: logging.Logger = logging.getLogger("urllib3.connectionpool")
     connectionpool_logger.setLevel(logging.WARNING)
 
@@ -218,8 +219,9 @@ class Arguments:
             self.certificate_path = False
 
         if self.source_url is None:
-            verify_default_url(self.certificate_path)
             self.source_url = _DEFAULT_SOURCE_URL
+
+        verify_source_url(self.source_url, self.certificate_path)
 
     def __parse(self, args: typing.Sequence[str]):
         """
@@ -342,11 +344,23 @@ class ApacheDirectoryListingParser(HTMLParser):
     def __init__(self, *, convert_charrefs = True):
         super().__init__(convert_charrefs=convert_charrefs)
         self.in_anchor: bool = False
+        """Whether or not the parser is currently interpreting an <a> tag"""
         self.href: typing.Optional[str] = None
+        """The current hyperlink reference interpreted by the parser"""
         self.current_text: typing.List[str] = []
+        """The lines of text currently being parsed"""
         self.links: typing.Dict[str, str] = {}
+        """Identified links"""
 
     def handle_starttag(self, tag, attrs):
+        """
+        Apply special handling for if an <a> tag is encountered
+
+        :param tag: The name of the tag passed in (a, div, table, article, etc)
+        :param attrs: Encountered attributes on the parsed tag
+        :returns: The results of the parent handle_starttag(tag, attrs) function. Expect `None`
+        """
+        # Capture the link if in an <a>. We're going to want to capture the text held within, so clear out the list
         if tag == 'a':
             self.in_anchor = True
             self.href = dict(attrs).get("href")
@@ -354,11 +368,22 @@ class ApacheDirectoryListingParser(HTMLParser):
         return super().handle_starttag(tag, attrs)
     
     def handle_data(self, data):
+        """
+        Interpret lines of text held within a tag
+
+        :param data: Data encountered within a tag
+        """
+        # If we're in an <a>, we want to store all the data held within - it will help provide a name for the link
         if self.in_anchor:
             self.current_text.append(data.strip())
         return super().handle_data(data)
     
     def handle_endtag(self, tag):
+        """
+        Collect collected information and store metadata if at the end of an <a>
+
+        :param tag: The type of tag that was reached
+        """
         if tag == 'a' and self.in_anchor:
             full_text = ''.join(self.current_text)
             if self.href and not self.href.endswith("/"):
@@ -433,7 +458,8 @@ def download_file(
     filename: str,
     directory: pathlib.Path,
     certificate_path: str,
-    overwrite: bool = False
+    overwrite: bool = False,
+    chunk_size: int = 8192,
 ) -> typing.Optional[pathlib.Path]:
     """
     Download the file at the URL and store it within the directory
@@ -444,36 +470,59 @@ def download_file(
     :param directory: What directory to store the file in
     :param certificate_path: The path to the certificate to use to communicate with the server
     :param overwrite: Whether to overwrite a preexisting file
+    :param chunk_size: The number of bytes to stream in at once
     :returns: The path to the downloaded file
     """
     directory.mkdir(parents=True, exist_ok=True)
     path: pathlib.Path = directory / filename
-    holding_path: pathlib.Path = directory / f"{filename}.tmp"
+
+    # Write the incoming data into a temporary file, then save it to the desired location.
+    # This will ensure that it doesn't save incomplete data.
+    holding_path: pathlib.Path = directory / f"{filename}.{os.getpid()}.tmp"
     holding_path.unlink(missing_ok=True)
+
+    # No works need to be done if the file exists and we don't intend to overwrite
     if path.exists() and not overwrite:
         LOGGER.info(f"Not downloading '{filename}' - it is already present")
         return None
 
+    # If the path is a preexisting directory, we're dealing with invalid input parameters
     if path.is_dir():
         raise ValueError(f"Cannot save '{filename}' to '{path}' - it is already a directory")
     
     LOGGER.info(f"Downloading '{filename}'")
-    max_line_length: int = 0
-    with http_session.get(url=url, stream=True, verify=certificate_path) as response:
-        content_length: int = int(response.headers.get("Content-Length", -1))
-        update_pattern: str = "\rDownloading " + pathlib.Path(url).name + ": {progress:.1f}%"
 
+    # Keep track of the length of the longest line. Progress text will be writing over itself. If a shorter line
+    # comes after a longer line, the output will be jumbled
+    max_line_length: int = 0
+
+    with http_session.get(url=url, stream=True, verify=certificate_path) as response:
+        # Try to capture the expected length of the response. It is not guaranteed to come through
+        content_length: int = int(response.headers.get("Content-Length", -1))
+        data_length: int = 0
+        update_pattern: str = "\rDownloading " + pathlib.Path(url).name + ": {progress:.1f}%"
+        data_length_update: str = "\rDownloaded {progress}B"
+        # Open the temporary file and write data to it iteratively - this will provide slightly faster download speeds
+        # and help keep track of progress
         with holding_path.open("wb") as file:
-            chunk_size: int = 8192
-            for chunk_index, chunk in enumerate(response.iter_content(chunk_size=8192)):
+            for chunk_index, chunk in enumerate(response.iter_content(chunk_size=chunk_size)):
                 file.write(chunk)
+                data_length += len(chunk)
+
+                # If an expected number of bytes was passed via the header, we can mark progress,
+                # otherwise we just have to accept that data was retrieved.
                 if content_length > 0:
                     progress: int = chunk_size * chunk_index
                     percentage: float = (progress / content_length) * 100
-                    update: str = update_pattern.format(progress=percentage)
-                    max_line_length = max(max_line_length, len(update) + 1)
-                    sys.stdout.write(update)
-                    sys.stdout.flush()
+                    update: str = update_pattern.format(progress=percentage).ljust(max_line_length)
+                else:
+                    # Just update the amount of data downloaded if we can't track progress
+                    update: str = data_length_update.format(progress=data_length).ljust(max_line_length)
+
+                max_line_length = max(max_line_length, len(update) + 1)
+                sys.stdout.write(update)
+                sys.stdout.flush()
+
 
         new_message = f"\rSaving to {path}...".ljust(max_line_length)
         max_line_length = max(max_line_length, len(new_message) + 1)
@@ -481,11 +530,15 @@ def download_file(
         sys.stdout.write(new_message)
         sys.stdout.flush()
 
+        # Move the temporary data into the intended location. The operating system will ensure that this is a
+        # thread and process safe operation
         holding_path.replace(path)
 
         sys.stdout.write(f"\r{filename} has been downloaded!".ljust(max_line_length + 1))
         sys.stdout.flush()
 
+        # This process has been writing and overwriting stdout over and over again. Force a newline into the stream
+        # to keep stdout messaging while clearing room for the next operation
         if content_length > 0:
             sys.stdout.write("\n")
             sys.stdout.flush()
@@ -591,14 +644,20 @@ def download_input(
     return downloaded_files
 
 
-def verify_default_url(certificate_path: typing.Optional[typing.Union[str, bool]]):
-    url: str = _DEFAULT_SOURCE_URL
-    if not url.endswith("/"):
-        url += "/"
-    with requests.head(url, verify=certificate_path) as response:
+def verify_source_url(source_url: str, certificate_path: typing.Optional[typing.Union[str, bool]]):
+    """
+    Ensure that the given URL can be reached for data downloading
+
+    :param source_url: The URL to test
+    :param certificate_path: The path to certificates that may be needed to communicate with the server
+    :raises Exception: Raised if a head request failed
+    """
+    if not source_url.endswith("/"):
+        source_url += "/"
+    with requests.head(source_url, verify=certificate_path) as response:
         if response.status_code < 400:
             return
-    raise Exception(f"There is not an accessible default source url at {url}. The certificate path was {certificate_path}")
+    raise Exception(f"There is not an accessible default source url at {source_url}. The certificate path was {certificate_path}")
 
 
 
@@ -608,8 +667,12 @@ def main() -> int:
     """
     arguments: Arguments = Arguments()
 
+    # Set the log level in order to give end users the chance to show more or less information
     LOGGER.setLevel(logging.getLevelName(arguments.log_level))
+
+    # Mark the start time so we can track how long it took to download data
     start: datetime = datetime.now()
+
     try:
         downloaded_files: typing.Sequence[pathlib.Path] = download_input(
             source_url=arguments.source_url,
@@ -625,6 +688,7 @@ def main() -> int:
             frame_pattern=arguments.frame,
         )
 
+        # List all newly downloaded files
         if downloaded_files:
             print(f"{len(downloaded_files)} files were downloaded:")
             for downloaded_file in downloaded_files:
@@ -632,7 +696,7 @@ def main() -> int:
         else:
             print("No files were downloaded")
     except BaseException as exception:
-        LOGGER.error(f"'{__file__} failed: {exception}", exc_info=True)
+        LOGGER.critical(f"'{__file__} failed: {exception}", exc_info=True)
         return 1
     LOGGER.info(f"Data downloaded in {datetime.now() - start}")
     return 0
