@@ -2,6 +2,7 @@
 """
 Downloads NWM output to be used as input data for post processing
 """
+import enum
 import typing
 import argparse
 import logging
@@ -12,6 +13,7 @@ import os
 import ssl
 import tempfile
 
+from urllib.parse import urljoin
 from datetime import datetime
 from datetime import timedelta
 
@@ -37,7 +39,7 @@ LOGGER: logging.Logger = logging.getLogger(pathlib.Path(__file__).stem)
 """The primary logger for this file"""
 
 
-_DEFAULT_SOURCE_URL: str = "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/v3.0/"
+_DEFAULT_SOURCE_URL: str = "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/v3.0"
 """The default location for where to find NWM output"""
 
 
@@ -135,6 +137,7 @@ class Arguments:
     """
     Command line parameter parser and handler
     """
+
     def __init__(self, *args: str):
         self.source_url: str = None
         """Where to retrieve NWM output"""
@@ -446,6 +449,7 @@ def download_file(
     directory.mkdir(parents=True, exist_ok=True)
     path: pathlib.Path = directory / filename
     holding_path: pathlib.Path = directory / f"{filename}.tmp"
+    holding_path.unlink(missing_ok=True)
     if path.exists() and not overwrite:
         LOGGER.info(f"Not downloading '{filename}' - it is already present")
         return None
@@ -458,6 +462,7 @@ def download_file(
     with http_session.get(url=url, stream=True, verify=certificate_path) as response:
         content_length: int = int(response.headers.get("Content-Length", -1))
         update_pattern: str = "\rDownloading " + pathlib.Path(url).name + ": {progress:.1f}%"
+
         with holding_path.open("wb") as file:
             chunk_size: int = 8192
             for chunk_index, chunk in enumerate(response.iter_content(chunk_size=8192)):
@@ -472,11 +477,15 @@ def download_file(
 
         new_message = f"\rSaving to {path}...".ljust(max_line_length)
         max_line_length = max(max_line_length, len(new_message) + 1)
+
         sys.stdout.write(new_message)
         sys.stdout.flush()
+
         holding_path.replace(path)
+
         sys.stdout.write(f"\r{filename} has been downloaded!".ljust(max_line_length + 1))
         sys.stdout.flush()
+
         if content_length > 0:
             sys.stdout.write("\n")
             sys.stdout.flush()
@@ -522,7 +531,7 @@ def download_input(
         region=region,
         member=member
     )
-    listing_address: str = f"{source_url}/nwm.{date}/{configuration_part}/"
+    listing_address: str = urljoin(source_url, f"/nwm.{date}/{configuration_part}/")
     """The address of the Apache directory listing where all the files may be found"""
 
     links_in_listing: typing.Dict[str, str] = get_directory_links(
@@ -583,11 +592,13 @@ def download_input(
 
 
 def verify_default_url(certificate_path: typing.Optional[typing.Union[str, bool]]):
-    with requests.head(_DEFAULT_SOURCE_URL, verify=certificate_path) as response:
+    url: str = _DEFAULT_SOURCE_URL
+    if not url.endswith("/"):
+        url += "/"
+    with requests.head(url, verify=certificate_path) as response:
         if response.status_code < 400:
             return
-
-    raise Exception(f"There is not an accessible default source url")
+    raise Exception(f"There is not an accessible default source url at {url}. The certificate path was {certificate_path}")
 
 
 
