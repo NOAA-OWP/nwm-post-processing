@@ -194,6 +194,22 @@ class BaseModel:
         :param kwargs: Keyword arguments
         :return: A newly constructed model
         """
+        return cls._build(kwargs)
+
+    @classmethod
+    def _build(
+        cls: typing.Type[ModelType],
+        kwargs: generic.Mapping[str, typing.Any],
+        source: typing.Optional[str] = None
+    ) -> ModelType:
+        """
+        Construct the model from a mapping of values
+
+        :param kwargs: The values to construct the model from
+        :param source: Where the values came from (such as a file path), named in errors to help find the culprit
+        :return: A newly constructed model
+        """
+        origin: str = f" (loaded from {source})" if source else ""
         type_hints: dict[str, typing.Any] = typing.get_type_hints(cls)
         initial_values: dict[str, typing.Any] = {}
 
@@ -230,19 +246,19 @@ class BaseModel:
                         for exception in e.exceptions
                     }
                     message: str = (
-                        f"Could not construct a {cls.__qualname__} due to the following errors:{os.linesep}"
+                        f"Could not construct a {cls.__qualname__}{origin} due to the following errors:{os.linesep}"
                         f"    - {(os.linesep + '    - ').join(submessages)}{os.linesep}"
                     )
                 else:
                     message: str = (
-                        f"Could not construct a {cls.__qualname__} from the following configuration:{os.linesep}"
+                        f"Could not construct a {cls.__qualname__}{origin} from the following configuration:{os.linesep}"
                         f"{to_json(kwargs)}{os.linesep*2}"
                         f"Due to: {e}"
                     )
                 raise RuntimeError(message) from e
             except Exception as json_exception:
                 LOGGER.error(
-                    f"Could not serialize the inputs to create a {cls.__qualname__}",
+                    f"Could not serialize the inputs to create a {cls.__qualname__}{origin}",
                     exc_info=json_exception
                 )
                 raise
@@ -261,6 +277,10 @@ class BaseModel:
         """
         import json
 
+        source: str = str(path_or_buffer) if isinstance(path_or_buffer, (pathlib.Path, str)) else str(
+            getattr(path_or_buffer, "name", "<buffer>")
+        )
+
         try:
             if isinstance(path_or_buffer, (pathlib.Path, str)):
                 with open(path_or_buffer, "r") as json_file:
@@ -269,7 +289,7 @@ class BaseModel:
                 text = path_or_buffer.read()
             data = json.loads(text)
 
-            deserialized_model: ModelType = cls.from_dict(**data)
+            deserialized_model: ModelType = cls._build(data, source=source)
             deserialized_model._raw_configuration = text
         except Exception as e:
             raise Exception(f"Could not load the configuration from {path_or_buffer}: {e}") from e
