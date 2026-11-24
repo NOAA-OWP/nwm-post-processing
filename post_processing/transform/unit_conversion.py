@@ -117,7 +117,7 @@ class _Conversions:
                 to_unit=["C", "c"],
                 from_unit=["K", "k"],
                 factor=1.0,
-                final_adjustment=-272.15,
+                final_adjustment=-273.15,
             ),
             ConversionFactor(
                 to_unit=["in"],
